@@ -25,7 +25,7 @@
         <aside id="sidebar" class="sidebar collapsed">
             <div class="sidebar-header">
                 <a href="{{ route('dashboard') }}" class="logo">
-                    <img src="{{ asset('images/logo-stti.png') }}" alt="STTI Logo" class="logo-img">
+                    <img src="{{ asset('assets/logo-stti.png') }}" alt="STTI Logo" class="logo-img">
                     <span class="logo-text">Inventaris STTI</span>
                 </a>
             </div>
@@ -168,8 +168,7 @@
                         <span id="darkModeToggleIcon">🌙</span>
                     </button>
                     <div class="user-profile">
-                        <img src="{{ auth()->user()->avatar ? Storage::url(auth()->user()->avatar) : asset('images/default-avatar.png') }}"
-                            alt="Profile" class="profile-img" id="userAvatarImg">
+                        <img src="{{ auth()->user()->avatar_url }}" alt="Profile" class="profile-img" id="userAvatarImg">
                         <div>
                             <span id="currentUser">{{ auth()->user()->name }}</span>
                             <span id="userRole" class="user-role">{{ auth()->user()->level }}</span>
@@ -207,7 +206,7 @@
                 <div class="footer-content">
                     <div class="footer-section">
                         <div class="footer-logo">
-                            <img src="{{ asset('images/logo-stti.png') }}" alt="STTI Logo" class="footer-logo-img">
+                            <img src="{{ asset('assets/logo-stti.png') }}" alt="STTI Logo" class="footer-logo-img">
                             <div class="footer-logo-text">
                                 <h3>SISTEM INVENTARIS</h3>
                                 <p>Sekolah Tinggi Teknologi Indonesia Cirebon</p>

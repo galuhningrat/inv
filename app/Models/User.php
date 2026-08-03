@@ -34,6 +34,18 @@ class User extends Authenticatable
         ];
     }
 
+    protected function avatarUrl(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                if ($this->avatar && Storage::disk('public')->exists($this->avatar)) {
+                    return Storage::url($this->avatar);
+                }
+                return asset('assets/admin.png'); // fallback, sementara pakai file yang sudah ada
+            },
+        );
+    }
+
     public function assetRequests()
     {
         return $this->hasMany(AssetRequest::class, 'requester_id');

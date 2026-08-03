@@ -5,7 +5,10 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class Asset extends Model
 {
@@ -31,7 +34,6 @@ class Asset extends Model
         'price' => 'decimal:2',
     ];
 
-    // ✅ PERBAIKAN: Gunakan DB transaction untuk prevent race condition
     protected static function boot()
     {
         parent::boot();
@@ -43,7 +45,6 @@ class Asset extends Model
         });
     }
 
-    // ✅ PERBAIKAN: Method generateAssetId yang lebih robust
     public static function generateAssetId($assetTypeId)
     {
         return DB::transaction(function () use ($assetTypeId) {
@@ -72,28 +73,53 @@ class Asset extends Model
             return "$year/$month/{$type->code}-$newNumberFormatted";
         });
     }
+    protected function imageUrl(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                if (!$this->image) {
+                    return asset('assets/logo-stti.png');
+                }
+
+                // Kasus data lama dari seeder yang masih pakai URL eksternal
+                if (Str::startsWith($this->image, ['http://', 'https://'])) {
+                    return $this->image;
+                }
+
+                // Kasus 1: gambar hasil upload form, tersimpan di storage disk 'public'
+                if (Storage::disk('public')->exists($this->image)) {
+                    return Storage::url($this->image);
+                }
+
+                // Kasus 2: gambar dari seeder, fisik di public/assets/products/
+                $filename = basename($this->image);
+                if (file_exists(public_path('assets/products/' . $filename))) {
+                    return asset('assets/products/' . $filename);
+                }
+
+                // Fallback terakhir kalau benar-benar tidak ditemukan
+                return asset('assets/logo-stti.png');
+            },
+        );
+    }
 
     // Relasi
     public function assetType()
     {
         return $this->belongsTo(AssetType::class);
     }
-
     public function borrowings()
     {
         return $this->hasMany(Borrowing::class);
     }
-
     public function maintenances()
     {
         return $this->hasMany(Maintenance::class);
     }
-
     public function qrCode()
     {
         return $this->hasOne(QrCode::class);
     }
-
     public function qrCodes()
     {
         return $this->hasMany(QrCode::class, 'asset_id');

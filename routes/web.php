@@ -55,7 +55,7 @@ Route::middleware(['auth'])->group(function () {
 
     // Maintenance Management
     Route::middleware(['level:maintenance'])->group(function () {
-        Route::resource('maintenances', MaintenanceController::class)->except(['edit', 'update']);
+        Route::resource('maintenances', MaintenanceController::class)->except(['edit']); // ✅ update diaktifkan lagi
         Route::get('/maintenances/asset/{id}', [MaintenanceController::class, 'showAssetDetail'])->name('maintenances.asset.detail');
     });
 

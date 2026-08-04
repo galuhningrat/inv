@@ -155,6 +155,18 @@
             color: #991b1b;
         }
 
+        .btn-report {
+            display: block;
+            text-align: center;
+            padding: 0.75rem;
+            background: var(--danger);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            margin-top: 1.25rem;
+        }
+
         .error-container {
             text-align: center;
             padding: 3rem 1.5rem;
@@ -194,60 +206,62 @@
 
         <div class="card">
             @if($error)
-                <div class="error-container">
-                    <div class="error-icon">❌</div>
-                    <h2 class="error-title">Aset Tidak Ditemukan</h2>
-                    <p class="error-message">{{ $error }}</p>
-                </div>
+            <div class="error-container">
+                <div class="error-icon">❌</div>
+                <h2 class="error-title">Aset Tidak Ditemukan</h2>
+                <p class="error-message">{{ $error }}</p>
+            </div>
             @else
-                <img src="{{ $asset->image ? Storage::url($asset->image) : asset('assets/default-asset.png') }}"
-                    alt="{{ $asset->name }}" class="asset-image">
+            <img src="{{ $asset->image_url }}" alt="{{ $asset->name }}" class="asset-image">
 
-                <div class="asset-info">
-                    <h2 class="asset-name">{{ $asset->name }}</h2>
-                    <p class="asset-id">ID: {{ $asset->asset_id }}</p>
+            <div class="asset-info">
+                <h2 class="asset-name">{{ $asset->name }}</h2>
+                <p class="asset-id">ID: {{ $asset->asset_id }}</p>
 
-                    <div class="info-grid">
-                        <div class="info-item">
-                            <div class="info-label">Jenis Aset</div>
-                            <div class="info-value">{{ $asset->assetType->name }}</div>
-                        </div>
-                        <div class="info-item">
-                            <div class="info-label">Merek</div>
-                            <div class="info-value">{{ $asset->brand }}</div>
-                        </div>
-                        <div class="info-item">
-                            <div class="info-label">Lokasi</div>
-                            <div class="info-value">{{ $asset->location }}</div>
-                        </div>
-                        <div class="info-item">
-                            <div class="info-label">Nomor Seri</div>
-                            <div class="info-value" style="font-size: 0.75rem;">{{ $asset->serial_number }}</div>
-                        </div>
-                        <div class="info-item">
-                            <div class="info-label">Status</div>
-                            <div class="info-value">
-                                <span
-                                    class="status-badge {{ $asset->status === 'Tersedia' ? 'status-available' : ($asset->status === 'Dipinjam' ? 'status-borrowed' : 'status-maintenance') }}">
-                                    {{ $asset->status }}
-                                </span>
-                            </div>
-                        </div>
-                        <div class="info-item">
-                            <div class="info-label">Kondisi</div>
-                            <div class="info-value">
-                                <span
-                                    class="status-badge {{ $asset->condition === 'Baik' ? 'condition-good' : ($asset->condition === 'Rusak Ringan' ? 'condition-minor' : 'condition-major') }}">
-                                    {{ $asset->condition }}
-                                </span>
-                            </div>
-                        </div>
-                        <div class="info-item" style="grid-column: span 2;">
-                            <div class="info-label">Tanggal Pembelian</div>
-                            <div class="info-value">{{ $asset->purchase_date->format('d F Y') }}</div>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <div class="info-label">Jenis Aset</div>
+                        <div class="info-value">{{ $asset->assetType->name }}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Merek</div>
+                        <div class="info-value">{{ $asset->brand }}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Lokasi</div>
+                        <div class="info-value">{{ $asset->location }}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Nomor Seri</div>
+                        <div class="info-value" style="font-size: 0.75rem;">{{ $asset->serial_number }}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Status</div>
+                        <div class="info-value">
+                            <span
+                                class="status-badge {{ $asset->status === 'Tersedia' ? 'status-available' : ($asset->status === 'Dipinjam' ? 'status-borrowed' : 'status-maintenance') }}">
+                                {{ $asset->status }}
+                            </span>
                         </div>
                     </div>
+                    <div class="info-item">
+                        <div class="info-label">Kondisi</div>
+                        <div class="info-value">
+                            <span
+                                class="status-badge {{ $asset->condition === 'Baik' ? 'condition-good' : ($asset->condition === 'Rusak Ringan' ? 'condition-minor' : 'condition-major') }}">
+                                {{ $asset->condition }}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="info-item" style="grid-column: span 2;">
+                        <div class="info-label">Tanggal Pembelian</div>
+                        <div class="info-value">{{ $asset->purchase_date->format('d F Y') }}</div>
+                    </div>
                 </div>
+                <a href="{{ route('maintenances.create', ['asset_id' => $asset->id]) }}" class="btn-report">
+                    🔧 Lapor Kerusakan
+                </a>
+            </div>
             @endif
         </div>
 

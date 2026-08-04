@@ -8,14 +8,6 @@ use Symfony\Component\HttpFoundation\Response;
 
 class CheckUserLevel
 {
-    protected $permissions = [
-        'Admin' => ['dashboard', 'assets-inv', 'borrowing', 'maintenance', 'users', 'requests', 'reports', 'qrCode'],
-        'Sarpras' => ['dashboard', 'assets-inv', 'borrowing', 'maintenance', 'reports', 'qrCode'],
-        'Rektor' => ['dashboard', 'reports'],
-        'Kaprodi' => ['dashboard', 'requests', 'reports'],
-        'Keuangan' => ['dashboard', 'requests', 'reports'],
-    ];
-
     public function handle(Request $request, Closure $next, string ...$modules): Response
     {
         $user = $request->user();
@@ -24,7 +16,7 @@ class CheckUserLevel
             return redirect()->route('login');
         }
 
-        $userPermissions = $this->permissions[$user->level] ?? [];
+        $userPermissions = config("permissions.roles.{$user->level}", []);
 
         foreach ($modules as $module) {
             if (in_array($module, $userPermissions)) {

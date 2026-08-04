@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
 
 class AssetRequest extends Model
 {
@@ -43,16 +44,20 @@ class AssetRequest extends Model
 
     public static function generateRequestId()
     {
-        $lastRequest = self::orderBy('request_id', 'desc')->first();
+        return DB::transaction(function () {
+            $lastRequest = self::where('request_id', 'LIKE', 'REQ-%')
+                ->lockForUpdate()
+                ->orderByRaw("CAST(SUBSTRING(request_id FROM '[0-9]+$') AS INTEGER) DESC")
+                ->first();
 
-        if ($lastRequest) {
-            $lastNumber = (int) substr($lastRequest->request_id, 4);
-            $newNumber = str_pad($lastNumber + 1, 3, '0', STR_PAD_LEFT);
-        } else {
-            $newNumber = '001';
-        }
+            $lastNumber = 0;
+            if ($lastRequest) {
+                preg_match('/(\d+)$/', $lastRequest->request_id, $matches);
+                $lastNumber = isset($matches[1]) ? (int) $matches[1] : 0;
+            }
 
-        return "REQ-$newNumber";
+            return sprintf('REQ-%03d', $lastNumber + 1);
+        });
     }
 
     public function requester()

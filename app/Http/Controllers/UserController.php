@@ -26,7 +26,7 @@ class UserController extends Controller
 
     public function create()
     {
-        $levels = ['Admin', 'Sarpras', 'Keuangan', 'Kaprodi', 'Rektor'];
+        $levels = ['Admin', 'Sarpras', 'Keuangan', 'Kaprodi', 'Rektor', 'PJ Pengadaan', 'Kalab', 'Aslab', 'Tim Pemeliharaan', 'Administrasi'];
         return view('users.create', compact('levels'));
     }
 
@@ -37,7 +37,7 @@ class UserController extends Controller
             'username' => 'required|string|unique:users,username',
             'email' => 'required|email|unique:users,email',
             'password' => 'required|string|min:6|confirmed',
-            'level' => 'required|in:Admin,Sarpras,Keuangan,Kaprodi,Rektor',
+            'level' => 'required|in:Admin,Sarpras,Keuangan,Kaprodi,Rektor,PJ Pengadaan,Kalab,Aslab,Tim Pemeliharaan,Administrasi',
             'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
@@ -62,7 +62,7 @@ class UserController extends Controller
 
     public function edit(User $user)
     {
-        $levels = ['Admin', 'Sarpras', 'Keuangan', 'Kaprodi', 'Rektor'];
+        $levels = ['Admin', 'Sarpras', 'Keuangan', 'Kaprodi', 'Rektor', 'PJ Pengadaan', 'Kalab', 'Aslab', 'Tim Pemeliharaan', 'Administrasi'];
         return view('users.edit', compact('user', 'levels'));
     }
 
@@ -73,7 +73,7 @@ class UserController extends Controller
             'username' => 'required|string|unique:users,username,' . $user->id,
             'email' => 'required|email|unique:users,email,' . $user->id,
             'password' => 'nullable|string|min:6|confirmed',
-            'level' => 'required|in:Admin,Sarpras,Keuangan,Kaprodi,Rektor',
+            'level' => 'required|in:Admin,Sarpras,Keuangan,Kaprodi,Rektor,PJ Pengadaan,Kalab,Aslab,Tim Pemeliharaan,Administrasi',
             'status' => 'required|in:Aktif,Nonaktif',
             'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);

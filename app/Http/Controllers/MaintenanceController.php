@@ -22,45 +22,60 @@ class MaintenanceController extends Controller
         return view('maintenances.index', compact('maintenances'));
     }
 
-    public function create()
+    public function create(Request $request)
     {
         $assets = Asset::with('assetType')
             ->orderBy('name')
             ->get()
             ->groupBy('assetType.name');
 
-        $maintenanceTypes = ['Preventif', 'Corrective', 'Predictive', 'Emergency'];
+        $maintenanceTypes = ['Preventif', 'Kuratif', 'Emergensi'];
 
-        return view('maintenances.create', compact('assets', 'maintenanceTypes'));
+        $preselectedAssetId = $request->query('asset_id');
+
+        return view('maintenances.create', compact('assets', 'maintenanceTypes', 'preselectedAssetId'));
     }
 
     public function store(Request $request)
     {
         $validated = $request->validate([
             'asset_id' => 'required|exists:assets,id',
-            'type' => 'required|in:Preventif,Corrective,Predictive,Emergency',
+            'type' => 'required|in:Preventif,Kuratif,Emergensi',
             'maintenance_date' => 'required|date',
-            'cost' => 'required|numeric|min:0',
             'description' => 'required|string',
             'technician' => 'required|string|max:255',
         ]);
 
         $validated['recorded_by'] = Auth::id();
-        $validated['status'] = 'Selesai';
+        $validated['status'] = 'Diterima';
+        $validated['cost'] = 0; // biaya diisi belakangan saat tiket diproses/selesai
 
         $maintenance = Maintenance::create($validated);
 
-        // Update asset condition if corrective maintenance
-        if ($validated['type'] === 'Corrective') {
-            Asset::where('id', $validated['asset_id'])
-                ->update([
-                    'condition' => 'Baik',
-                    'status' => 'Tersedia'
-                ]);
-        }
+        // Tandai aset sedang dalam penanganan
+        Asset::where('id', $validated['asset_id'])->update(['status' => 'Maintenance']);
 
         return redirect()->route('maintenances.index')
-            ->with('success', 'Catatan pemeliharaan berhasil disimpan!');
+            ->with('success', 'Tiket pemeliharaan berhasil dibuat!');
+    }
+
+    public function update(Request $request, Maintenance $maintenance)
+    {
+        $validated = $request->validate([
+            'status' => 'required|in:Diterima,Dalam Proses,Menunggu Komponen,Selesai',
+            'cost' => 'nullable|numeric|min:0',
+            'description' => 'nullable|string',
+            'technician' => 'nullable|string|max:255', // ✅ tambahan
+        ]);
+
+        $maintenance->update($validated);
+
+        if ($validated['status'] === 'Selesai') {
+            $maintenance->asset->update(['status' => 'Tersedia', 'condition' => 'Baik']);
+        }
+
+        return redirect()->route('maintenances.show', $maintenance)
+            ->with('success', 'Status tiket berhasil diperbarui!');
     }
 
     public function show(Maintenance $maintenance)

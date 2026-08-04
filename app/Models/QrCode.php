@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
+
 
 class QrCode extends Model
 {
@@ -30,16 +32,20 @@ class QrCode extends Model
 
     public static function generateQrCodeId()
     {
-        $lastQrCode = self::orderBy('qr_code_id', 'desc')->first();
+        return DB::transaction(function () {
+            $lastQrCode = self::where('qr_code_id', 'LIKE', 'QCD-%')
+                ->lockForUpdate()
+                ->orderByRaw("CAST(SUBSTRING(qr_code_id FROM '[0-9]+$') AS INTEGER) DESC")
+                ->first();
 
-        if ($lastQrCode) {
-            $lastNumber = (int) substr($lastQrCode->qr_code_id, 4);
-            $newNumber = str_pad($lastNumber + 1, 3, '0', STR_PAD_LEFT);
-        } else {
-            $newNumber = '001';
-        }
+            $lastNumber = 0;
+            if ($lastQrCode) {
+                preg_match('/(\d+)$/', $lastQrCode->qr_code_id, $matches);
+                $lastNumber = isset($matches[1]) ? (int) $matches[1] : 0;
+            }
 
-        return "QCD-$newNumber";
+            return sprintf('QCD-%03d', $lastNumber + 1);
+        });
     }
 
     public function asset()

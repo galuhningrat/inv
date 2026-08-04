@@ -4,5 +4,6 @@
   },
   "files.associations": {
     "*.blade.php": "blade"
-  }
+  },
+  "html.validate.scripts": false
 }

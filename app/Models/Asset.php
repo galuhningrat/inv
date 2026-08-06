@@ -27,6 +27,8 @@ class Asset extends Model
         'status',
         'image',
         'qr_code',
+        'penanggung_jawab_id',
+        'asset_request_id',
     ];
 
     protected $casts = [
@@ -123,5 +125,14 @@ class Asset extends Model
     public function qrCodes()
     {
         return $this->hasMany(QrCode::class, 'asset_id');
+    }
+    public function penanggungJawab()
+    {
+        return $this->belongsTo(User::class, 'penanggung_jawab_id');
+    }
+
+    public function assetRequest()
+    {
+        return $this->belongsTo(AssetRequest::class);
     }
 }

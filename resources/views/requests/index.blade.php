@@ -15,9 +15,8 @@
                     <tr>
                         <th>ID Pengajuan</th>
                         <th>Pengaju</th>
-                        <th>Nama Aset</th>
-                        <th>Jenis</th>
-                        <th>Jumlah</th>
+                        <th>Rincian Barang</th>
+                        <th>Total Unit</th>
                         <th>Prioritas</th>
                         <th>Status</th>
                         <th>Aksi</th>
@@ -28,24 +27,43 @@
                         <tr>
                             <td><strong>{{ $request->request_id }}</strong></td>
                             <td>{{ $request->requester->name }}</td>
-                            <td>{{ $request->asset_name }}</td>
-                            <td>{{ $request->assetType->name }}</td>
-                            <td>{{ $request->quantity }}</td>
+                            <td>
+                                @foreach ($request->items as $item)
+                                    {{ $item->item_name }} ({{ $item->quantity }} {{ $item->unit }})@if (!$loop->last)
+                                        ,
+                                    @endif
+                                @endforeach
+                            </td>
+                            <td>{{ $request->total_quantity }}</td>
                             <td>
                                 <span
-                                    class="status-badge {{ $request->priority === 'Urgent' ? 'maintenance' : ($request->priority === 'Tinggi' ? 'borrowed' : 'available') }}">
+                                    class="status-badge {{ $request->priority === 'Sangat Mendesak' ? 'maintenance' : ($request->priority === 'Mendesak' ? 'borrowed' : 'available') }}">
                                     {{ $request->priority }}
                                 </span>
                             </td>
                             <td>
-                                <span
-                                    class="status-badge {{ $request->status === 'Disetujui' ? 'available' : ($request->status === 'Ditolak' ? 'maintenance' : 'borrowed') }}">
-                                    {{ $request->status }}
-                                </span>
+                                @php
+                                    $statusClass = match ($request->status) {
+                                        'Disetujui', 'Dana Cair', 'Dikonfirmasi', 'Diterima' => 'available',
+                                        'Diverifikasi' => 'borrowed',
+                                        'Ditolak' => 'maintenance',
+                                        default => 'pending',
+                                    };
+                                @endphp
+                                <span class="status-badge {{ $statusClass }}">{{ $request->status }}</span>
                             </td>
                             <td>
                                 <div class="action-buttons">
-                                    @if($request->status === 'Pending' && in_array(auth()->user()->level, ['Admin', 'Kaprodi', 'Keuangan']))
+                                    @if ($request->status === 'Pending' && in_array(auth()->user()->level, ['PJ Pengadaan', 'Admin']))
+                                        <form action="{{ route('requests.verify', $request) }}" method="POST"
+                                            style="display: inline;">
+                                            @csrf
+                                            <button type="submit" class="btn btn-success"
+                                                onclick="return confirm('Verifikasi pengajuan ini?')">Verifikasi</button>
+                                        </form>
+                                    @endif
+
+                                    @if ($request->status === 'Diverifikasi' && auth()->user()->level === 'Rektor')
                                         <form action="{{ route('requests.approve', $request) }}" method="POST"
                                             style="display: inline;">
                                             @csrf
@@ -55,13 +73,39 @@
                                         <button type="button" class="btn btn-danger"
                                             onclick="showRejectModal({{ $request->id }})">Tolak</button>
                                     @endif
+
+                                    @if ($request->status === 'Disetujui' && auth()->user()->level === 'Keuangan')
+                                        <form action="{{ route('requests.disburse', $request) }}" method="POST"
+                                            style="display: inline;">
+                                            @csrf
+                                            <button type="submit" class="btn btn-success"
+                                                onclick="return confirm('Konfirmasi dana sudah dicairkan?')">Konfirmasi Dana
+                                                Cair</button>
+                                        </form>
+                                    @endif
+
+                                    @if ($request->status === 'Dana Cair' && auth()->user()->level === 'PJ Pengadaan')
+                                        <form action="{{ route('requests.confirm', $request) }}" method="POST"
+                                            style="display: inline;">
+                                            @csrf
+                                            <button type="submit" class="btn btn-success"
+                                                onclick="return confirm('Konfirmasi barang sudah diterima secara fisik?')">Konfirmasi
+                                                Fisik</button>
+                                        </form>
+                                    @endif
+
+                                    @if ($request->status === 'Dikonfirmasi' && in_array(auth()->user()->level, ['Sarpras', 'Admin']))
+                                        <a href="{{ route('requests.receive.form', $request) }}"
+                                            class="btn btn-success">Registrasi Aset</a>
+                                    @endif
+
                                     <a href="{{ route('requests.show', $request) }}" class="btn btn-secondary">Detail</a>
                                 </div>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" style="text-align: center; padding: 2rem;">Tidak ada data pengajuan.</td>
+                            <td colspan="7" style="text-align: center; padding: 2rem;">Tidak ada data pengajuan.</td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -72,7 +116,6 @@
         </div>
     </div>
 
-    <!-- Reject Modal -->
     <div id="rejectModal" class="modal" style="display: none;">
         <div class="modal-content">
             <div class="modal-header">

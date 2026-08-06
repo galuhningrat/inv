@@ -48,6 +48,20 @@ class QrCode extends Model
         });
     }
 
+    public static function generateCodeContent(string $prefix): string
+    {
+        $attempts = 0;
+        do {
+            $timestamp = base_convert(time() + $attempts, 10, 36);
+            $random = strtoupper(\Illuminate\Support\Str::random(6));
+            $code = "{$prefix}-{$timestamp}-{$random}";
+            $exists = \App\Models\Asset::where('qr_code', $code)->exists();
+            $attempts++;
+        } while ($exists && $attempts < 10);
+
+        return $code;
+    }
+
     public function asset()
     {
         return $this->belongsTo(Asset::class);

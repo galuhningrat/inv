@@ -34,6 +34,7 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware(['level:assets-inv'])->group(function () {
         Route::get('/assets-inv', [AssetController::class, 'index'])->name('assets-inv.index');
         Route::get('/assets-inv/create', [AssetController::class, 'create'])->name('assets-inv.create');
+        Route::get('/assets-inv/group-detail', [AssetController::class, 'groupDetail'])->name('assets-inv.group-detail');
         Route::post('/assets-inv', [AssetController::class, 'store'])->name('assets-inv.store');
         Route::get('/assets-inv/{asset}', [AssetController::class, 'show'])->name('assets-inv.show');
         Route::get('/assets-inv/{asset}/edit', [AssetController::class, 'edit'])->name('assets-inv.edit');
@@ -66,9 +67,16 @@ Route::middleware(['auth'])->group(function () {
 
     // Asset Requests Management
     Route::middleware(['level:requests'])->group(function () {
-        Route::resource('requests', AssetRequestController::class)->except(['edit', 'update']);
+        Route::resource('requests', AssetRequestController::class)
+            ->parameters(['requests' => 'assetRequest'])
+            ->except(['edit', 'update']);
+        Route::post('/requests/{assetRequest}/verify', [AssetRequestController::class, 'verify'])->name('requests.verify');
         Route::post('/requests/{assetRequest}/approve', [AssetRequestController::class, 'approve'])->name('requests.approve');
         Route::post('/requests/{assetRequest}/reject', [AssetRequestController::class, 'reject'])->name('requests.reject');
+        Route::get('/requests/{assetRequest}/receive', [AssetRequestController::class, 'showReceiveForm'])->name('requests.receive.form');
+        Route::post('/requests/{assetRequest}/receive', [AssetRequestController::class, 'receive'])->name('requests.receive');
+        Route::post('/requests/{assetRequest}/confirm', [AssetRequestController::class, 'confirmPhysical'])->name('requests.confirm');
+        Route::post('/requests/{assetRequest}/disburse', [AssetRequestController::class, 'disburseFund'])->name('requests.disburse');
     });
 
     // Reports

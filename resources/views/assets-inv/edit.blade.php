@@ -4,23 +4,42 @@
 @section('page-title', 'Edit Aset')
 
 @section('content')
+    @php
+        $groupParams = collect(request()->only(['group_name', 'group_type_id', 'group_brand']))->filter();
+        $hasGroupContext = $groupParams->count() === 3 && is_numeric($groupParams['group_type_id'] ?? null);
+        $backUrl = $hasGroupContext
+            ? route('assets-inv.group-detail', [
+                'name' => $groupParams['group_name'],
+                'type_id' => $groupParams['group_type_id'],
+                'brand' => $groupParams['group_brand'],
+            ])
+            : route('assets-inv.index');
+    @endphp
+
     <div class="data-table-container">
         <div class="table-header" style="flex-wrap: wrap; gap: 1rem;">
             <h3 class="table-title" style="flex: 1; min-width: 200px;">Edit Aset: {{ $asset->name }}</h3>
-            <a href="{{ route('assets-inv.index') }}" class="btn btn-secondary">← Kembali</a>
+            <a href="{{ $backUrl }}" class="btn btn-secondary">← Kembali</a>
         </div>
         <div style="padding: 1rem;">
             <form action="{{ route('assets-inv.update', $asset) }}" method="POST" enctype="multipart/form-data">
                 @csrf
                 @method('PUT')
 
+                @if ($hasGroupContext)
+                    <input type="hidden" name="group_name" value="{{ $groupParams['group_name'] }}">
+                    <input type="hidden" name="group_type_id" value="{{ $groupParams['group_type_id'] }}">
+                    <input type="hidden" name="group_brand" value="{{ $groupParams['group_brand'] }}">
+                @endif
+
                 <!-- Nama Aset & Jenis Aset -->
                 <div class="form-row"
                     style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
                     <div class="form-group" style="margin-bottom: 0;">
                         <label for="name">Nama Aset <span style="color: red;">*</span></label>
-                        <input type="text" id="name" name="name" class="form-control @error('name') error @enderror"
-                            value="{{ old('name', $asset->name) }}" required>
+                        <input type="text" id="name" name="name"
+                            class="form-control @error('name') error @enderror" value="{{ old('name', $asset->name) }}"
+                            required>
                         @error('name')
                             <div class="error-message" style="display: block;">{{ $message }}</div>
                         @enderror
@@ -30,8 +49,9 @@
                         <select id="asset_type_id" name="asset_type_id"
                             class="form-control @error('asset_type_id') error @enderror" required>
                             <option value="">Pilih Jenis</option>
-                            @foreach($assetTypes as $type)
-                                <option value="{{ $type->id }}" {{ old('asset_type_id', $asset->asset_type_id) == $type->id ? 'selected' : '' }}>
+                            @foreach ($assetTypes as $type)
+                                <option value="{{ $type->id }}"
+                                    {{ old('asset_type_id', $asset->asset_type_id) == $type->id ? 'selected' : '' }}>
                                     {{ $type->name }} ({{ $type->code }})
                                 </option>
                             @endforeach
@@ -47,8 +67,9 @@
                     style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
                     <div class="form-group" style="margin-bottom: 0;">
                         <label for="brand">Merek <span style="color: red;">*</span></label>
-                        <input type="text" id="brand" name="brand" class="form-control @error('brand') error @enderror"
-                            value="{{ old('brand', $asset->brand) }}" required>
+                        <input type="text" id="brand" name="brand"
+                            class="form-control @error('brand') error @enderror" value="{{ old('brand', $asset->brand) }}"
+                            required>
                         @error('brand')
                             <div class="error-message" style="display: block;">{{ $message }}</div>
                         @enderror
@@ -69,8 +90,9 @@
                     style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
                     <div class="form-group" style="margin-bottom: 0;">
                         <label for="price">Harga Pembelian <span style="color: red;">*</span></label>
-                        <input type="number" id="price" name="price" class="form-control @error('price') error @enderror"
-                            value="{{ old('price', $asset->price) }}" min="0" required>
+                        <input type="number" id="price" name="price"
+                            class="form-control @error('price') error @enderror" value="{{ old('price', $asset->price) }}"
+                            min="0" required>
                         @error('price')
                             <div class="error-message" style="display: block;">{{ $message }}</div>
                         @enderror
@@ -94,8 +116,9 @@
                         <select id="location" name="location" class="form-control @error('location') error @enderror"
                             required>
                             <option value="">Pilih Lokasi</option>
-                            @foreach($locations as $loc)
-                                <option value="{{ $loc }}" {{ old('location', $asset->location) === $loc ? 'selected' : '' }}>
+                            @foreach ($locations as $loc)
+                                <option value="{{ $loc }}"
+                                    {{ old('location', $asset->location) === $loc ? 'selected' : '' }}>
                                     {{ $loc }}
                                 </option>
                             @endforeach
@@ -109,10 +132,15 @@
                         <select id="condition" name="condition" class="form-control @error('condition') error @enderror"
                             required>
                             <option value="">Pilih Kondisi</option>
-                            <option value="Baik" {{ old('condition', $asset->condition) === 'Baik' ? 'selected' : '' }}>Baik
+                            <option value="Baik" {{ old('condition', $asset->condition) === 'Baik' ? 'selected' : '' }}>
+                                Baik
                             </option>
-                            <option value="Rusak Ringan" {{ old('condition', $asset->condition) === 'Rusak Ringan' ? 'selected' : '' }}>Rusak Ringan</option>
-                            <option value="Rusak Berat" {{ old('condition', $asset->condition) === 'Rusak Berat' ? 'selected' : '' }}>Rusak Berat</option>
+                            <option value="Rusak Ringan"
+                                {{ old('condition', $asset->condition) === 'Rusak Ringan' ? 'selected' : '' }}>Rusak Ringan
+                            </option>
+                            <option value="Rusak Berat"
+                                {{ old('condition', $asset->condition) === 'Rusak Berat' ? 'selected' : '' }}>Rusak Berat
+                            </option>
                         </select>
                         @error('condition')
                             <div class="error-message" style="display: block;">{{ $message }}</div>
@@ -123,11 +151,12 @@
                 <!-- Gambar Aset -->
                 <div class="form-group">
                     <label for="image">Gambar Aset</label>
-                    @if($asset->image)
+                    @if ($asset->image)
                         <div style="margin-bottom: 1rem;">
                             <img src="{{ Storage::url($asset->image) }}" alt="{{ $asset->name }}"
                                 style="max-width: 200px; border-radius: 8px;">
-                            <p style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.5rem;">Gambar saat ini
+                            <p style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.5rem;">Gambar saat
+                                ini
                             </p>
                         </div>
                     @endif
@@ -156,8 +185,9 @@
             const preview = document.getElementById('imagePreview');
             if (input.files && input.files[0]) {
                 const reader = new FileReader();
-                reader.onload = function (e) {
-                    preview.innerHTML = `<img src="${e.target.result}" alt="Preview" style="max-width: 200px; height: auto; border-radius: 8px; margin-top: 1rem;">`;
+                reader.onload = function(e) {
+                    preview.innerHTML =
+                        `<img src="${e.target.result}" alt="Preview" style="max-width: 200px; height: auto; border-radius: 8px; margin-top: 1rem;">`;
                 }
                 reader.readAsDataURL(input.files[0]);
             } else {

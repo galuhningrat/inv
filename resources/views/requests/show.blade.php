@@ -6,7 +6,7 @@
 @section('content')
     <div class="data-table-container">
         <div class="table-header">
-            <h3 class="table-title">Detail: {{ $assetRequest->request_id ?? 'N/A' }}</h3>
+            <h3 class="table-title">Detail: {{ $assetRequest->request_id }}</h3>
             <a href="{{ route('requests.index') }}" class="btn btn-secondary">← Kembali</a>
         </div>
 
@@ -14,50 +14,37 @@
             <div class="detail-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 2rem;">
                 <div>
                     <h4 style="margin-bottom: 1rem; border-bottom: 2px solid var(--primary-color); padding-bottom: 0.5rem;">
-                        Informasi Pengajuan
-                    </h4>
-                    <p><strong>ID:</strong> {{ $assetRequest->request_id ?? '-' }}</p>
+                        Informasi Pengajuan</h4>
+                    <p><strong>ID:</strong> {{ $assetRequest->request_id }}</p>
                     <p><strong>Pengaju:</strong> {{ optional($assetRequest->requester)->name ?? '-' }}</p>
                     <p><strong>Level:</strong> {{ optional($assetRequest->requester)->level ?? '-' }}</p>
                     <p><strong>Tanggal:</strong> {{ $assetRequest->created_at->format('d F Y H:i') }}</p>
                     <p><strong>Status:</strong>
-                        <span
-                            class="status-badge {{ $assetRequest->status === 'Disetujui' ? 'approved' : ($assetRequest->status === 'Ditolak' ? 'rejected' : 'pending') }}">
-                            {{ $assetRequest->status }}
-                        </span>
+                        @php
+                            $statusClass = match ($assetRequest->status) {
+                                'Disetujui', 'Diterima' => 'approved',
+                                'Diverifikasi' => 'borrowed',
+                                'Ditolak' => 'rejected',
+                                default => 'pending',
+                            };
+                        @endphp
+                        <span class="status-badge {{ $statusClass }}">{{ $assetRequest->status }}</span>
                     </p>
                 </div>
 
                 <div>
                     <h4 style="margin-bottom: 1rem; border-bottom: 2px solid var(--primary-color); padding-bottom: 0.5rem;">
-                        Informasi Aset
-                    </h4>
-                    <p><strong>Nama:</strong> {{ $assetRequest->asset_name }}</p>
-                    <p><strong>Jenis:</strong>
-                        @if($assetRequest->assetType)
-                            {{ $assetRequest->assetType->name }}
-                        @else
-                            <span style="color: var(--text-secondary);">Tidak ada jenis</span>
-                        @endif
-                    </p>
-                    <p><strong>Jumlah:</strong>
-                        <span class="status-badge available">{{ $assetRequest->quantity }} unit</span>
-                    </p>
-
-                    @if($assetRequest->estimated_price)
-                        <p><strong>Est. Harga/unit:</strong>
-                            <span class="price-display">Rp
-                                {{ number_format($assetRequest->estimated_price, 0, ',', '.') }}</span>
-                        </p>
-                        <p><strong>Total Est.:</strong>
-                            <span class="price-display">Rp
-                                {{ number_format($assetRequest->estimated_price * $assetRequest->quantity, 0, ',', '.') }}</span>
-                        </p>
+                        Klasifikasi</h4>
+                    <p><strong>Jenis Barang:</strong> {{ $assetRequest->jenis_barang }}</p>
+                    <p><strong>Kategori Barang:</strong> {{ $assetRequest->kategori_barang }}</p>
+                    <p><strong>Alasan Pengajuan:</strong> {{ $assetRequest->alasan_pengajuan }}</p>
+                    @if ($assetRequest->relatedAsset)
+                        <p><strong>Aset Terkait:</strong> {{ $assetRequest->relatedAsset->asset_id }} —
+                            {{ $assetRequest->relatedAsset->name }}</p>
                     @endif
-
                     <p><strong>Prioritas:</strong>
                         <span
-                            class="status-badge {{ $assetRequest->priority === 'Urgent' ? 'maintenance' : ($assetRequest->priority === 'Tinggi' ? 'borrowed' : 'available') }}">
+                            class="status-badge {{ $assetRequest->priority === 'Sangat Mendesak' ? 'maintenance' : ($assetRequest->priority === 'Mendesak' ? 'borrowed' : 'available') }}">
                             {{ $assetRequest->priority }}
                         </span>
                     </p>
@@ -66,29 +53,108 @@
 
             <div style="margin-bottom: 2rem;">
                 <h4 style="margin-bottom: 1rem; border-bottom: 2px solid var(--primary-color); padding-bottom: 0.5rem;">
-                    Alasan Pengajuan
-                </h4>
-                <div style="background: var(--light-bg); padding: 1.5rem; border-radius: 8px; line-height: 1.6;">
-                    {{ $assetRequest->reason }}
-                </div>
+                    Rincian Barang yang Diajukan</h4>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>No</th>
+                            <th>Nama Barang</th>
+                            <th>Spesifikasi</th>
+                            <th>Jenis Aset</th>
+                            <th>Jumlah</th>
+                            <th>Satuan</th>
+                            <th>Est. Harga/Unit</th>
+                            <th>Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($assetRequest->items as $item)
+                            <tr>
+                                <td>{{ $loop->iteration }}</td>
+                                <td>{{ $item->item_name }}</td>
+                                <td>{{ $item->specification ?? '-' }}</td>
+                                <td>{{ $item->assetType->name ?? '-' }}</td>
+                                <td>{{ $item->quantity }}</td>
+                                <td>{{ $item->unit }}</td>
+                                <td>{{ $item->estimated_price_per_unit ? 'Rp ' . number_format($item->estimated_price_per_unit, 0, ',', '.') : '-' }}
+                                </td>
+                                <td>Rp {{ number_format($item->subtotal, 0, ',', '.') }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="7" style="text-align: right;"><strong>Total Estimasi</strong></td>
+                            <td><strong>Rp {{ number_format($assetRequest->total_estimated_price, 0, ',', '.') }}</strong>
+                            </td>
+                        </tr>
+                    </tfoot>
+                </table>
             </div>
 
-            @if($assetRequest->status !== 'Pending')
+            <div style="margin-bottom: 2rem;">
+                <h4 style="margin-bottom: 1rem; border-bottom: 2px solid var(--primary-color); padding-bottom: 0.5rem;">
+                    Alasan / Latar Belakang</h4>
+                <div style="background: var(--light-bg); padding: 1.5rem; border-radius: 8px; line-height: 1.6;">
+                    {{ $assetRequest->reason }}</div>
+            </div>
+
+            @if ($assetRequest->verified_by)
                 <div style="margin-bottom: 2rem;">
                     <h4 style="margin-bottom: 1rem; border-bottom: 2px solid var(--primary-color); padding-bottom: 0.5rem;">
-                        Informasi Persetujuan
-                    </h4>
-                    <p><strong>Diproses oleh:</strong> {{ optional($assetRequest->approver)->name ?? '-' }}</p>
+                        Verifikasi PJ Pengadaan</h4>
+                    <p><strong>Diverifikasi oleh:</strong> {{ optional($assetRequest->verifier)->name ?? '-' }}</p>
+                    <p><strong>Tanggal:</strong>
+                        {{ $assetRequest->verified_at ? $assetRequest->verified_at->format('d F Y H:i') : '-' }}</p>
+                    @if ($assetRequest->verification_notes)
+                        <div style="margin-top: 0.5rem; background: var(--light-bg); padding: 1rem; border-radius: 8px;">
+                            {{ $assetRequest->verification_notes }}</div>
+                    @endif
+                </div>
+            @endif
+
+            @if ($assetRequest->approved_by)
+                <div style="margin-bottom: 2rem;">
+                    <h4 style="margin-bottom: 1rem; border-bottom: 2px solid var(--primary-color); padding-bottom: 0.5rem;">
+                        Persetujuan Ketua STTI</h4>
+                    <p><strong>{{ $assetRequest->status === 'Ditolak' ? 'Ditolak oleh' : 'Disetujui oleh' }}:</strong>
+                        {{ optional($assetRequest->approver)->name ?? '-' }}</p>
                     <p><strong>Tanggal:</strong>
                         {{ $assetRequest->approved_at ? $assetRequest->approved_at->format('d F Y H:i') : '-' }}</p>
+                    @if ($assetRequest->approval_notes)
+                        <div style="margin-top: 0.5rem; background: var(--light-bg); padding: 1rem; border-radius: 8px;">
+                            {{ $assetRequest->approval_notes }}</div>
+                    @endif
+                </div>
+            @endif
 
-                    @if($assetRequest->approval_notes)
-                        <div style="margin-top: 1rem;">
-                            <p><strong>Catatan:</strong></p>
-                            <div style="background: var(--light-bg); padding: 1rem; border-radius: 8px;">
-                                {{ $assetRequest->approval_notes }}
-                            </div>
-                        </div>
+            @if ($assetRequest->disbursed_by)
+                <div style="margin-bottom: 2rem;">
+                    <h4 style="margin-bottom: 1rem; border-bottom: 2px solid var(--primary-color); padding-bottom: 0.5rem;">
+                        Pencairan Dana (Bagian Keuangan)</h4>
+                    <p><strong>Dicairkan oleh:</strong> {{ optional($assetRequest->disburser)->name ?? '-' }}</p>
+                    <p><strong>Tanggal:</strong>
+                        {{ $assetRequest->disbursed_at ? $assetRequest->disbursed_at->format('d F Y H:i') : '-' }}
+                    </p>
+                    @if ($assetRequest->disbursement_notes)
+                        <div style="margin-top: 0.5rem; background: var(--light-bg); padding: 1rem; border-radius: 8px;">
+                            {{ $assetRequest->disbursement_notes }}</div>
+                    @endif
+                </div>
+            @endif
+
+            @if ($assetRequest->confirmed_by)
+                <div style="margin-bottom: 2rem;">
+                    <h4 style="margin-bottom: 1rem; border-bottom: 2px solid var(--primary-color); padding-bottom: 0.5rem;">
+                        Konfirmasi Penerimaan Fisik (PJ Pengadaan)</h4>
+                    <p><strong>Dikonfirmasi oleh:</strong> {{ optional($assetRequest->confirmer)->name ?? '-' }}
+                    </p>
+                    <p><strong>Tanggal:</strong>
+                        {{ $assetRequest->confirmed_at ? $assetRequest->confirmed_at->format('d F Y H:i') : '-' }}
+                    </p>
+                    @if ($assetRequest->confirmation_notes)
+                        <div style="margin-top: 0.5rem; background: var(--light-bg); padding: 1rem; border-radius: 8px;">
+                            {{ $assetRequest->confirmation_notes }}</div>
                     @endif
                 </div>
             @endif
@@ -96,17 +162,44 @@
             <div class="btn-group" style="justify-content: center; margin-top: 2rem;">
                 <a href="{{ route('requests.index') }}" class="btn btn-secondary">Kembali</a>
 
-                @if($assetRequest->status === 'Pending' && in_array(auth()->user()->level, ['Admin', 'Kaprodi', 'Keuangan']))
+                @if ($assetRequest->status === 'Pending' && in_array(auth()->user()->level, ['Sarpras', 'Admin']))
+                    <form action="{{ route('requests.verify', $assetRequest) }}" method="POST" style="display: inline;">
+                        @csrf
+                        <button type="submit" class="btn btn-success"
+                            onclick="return confirm('Verifikasi pengajuan ini?')">✓ Verifikasi</button>
+                    </form>
+                    <button type="button" class="btn btn-danger" onclick="showRejectModal()">✗ Tolak</button>
+                @endif
+
+                @if ($assetRequest->status === 'Diverifikasi' && auth()->user()->level === 'Rektor')
                     <form action="{{ route('requests.approve', $assetRequest) }}" method="POST" style="display: inline;">
                         @csrf
-                        <button type="submit" class="btn btn-success" onclick="return confirm('Setujui pengajuan?')">
-                            ✓ Setujui
-                        </button>
+                        <button type="submit" class="btn btn-success" onclick="return confirm('Setujui pengajuan?')">✓
+                            Setujui</button>
                     </form>
+                    <button type="button" class="btn btn-danger" onclick="showRejectModal()">✗ Tolak</button>
+                @endif
 
-                    <button type="button" class="btn btn-danger" onclick="showRejectModal()">
-                        ✗ Tolak
-                    </button>
+                @if ($assetRequest->status === 'Disetujui' && auth()->user()->level === 'Keuangan')
+                    <form action="{{ route('requests.disburse', $assetRequest) }}" method="POST" style="display: inline;">
+                        @csrf
+                        <button type="submit" class="btn btn-success"
+                            onclick="return confirm('Konfirmasi dana sudah dicairkan?')">Konfirmasi Dana Cair</button>
+                    </form>
+                @endif
+
+                @if ($assetRequest->status === 'Dana Cair' && auth()->user()->level === 'PJ Pengadaan')
+                    <form action="{{ route('requests.confirm', $assetRequest) }}" method="POST" style="display: inline;">
+                        @csrf
+                        <button type="submit" class="btn btn-success"
+                            onclick="return confirm('Konfirmasi barang sudah diterima secara fisik?')">Konfirmasi
+                            Fisik</button>
+                    </form>
+                @endif
+
+                @if ($assetRequest->status === 'Dikonfirmasi' && in_array(auth()->user()->level, ['Sarpras', 'Admin']))
+                    <a href="{{ route('requests.receive.form', $assetRequest) }}" class="btn btn-success">Registrasi
+                        Aset</a>
                 @endif
             </div>
         </div>
@@ -135,7 +228,6 @@
             </form>
         </div>
     </div>
-
 @endsection
 
 @push('scripts')

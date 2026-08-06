@@ -4,17 +4,29 @@
 @section('page-title', 'Detail Aset')
 
 @section('content')
+    @php
+        $groupParams = collect(request()->only(['group_name', 'group_type_id', 'group_brand']))->filter();
+        $hasGroupContext = $groupParams->count() === 3 && is_numeric($groupParams['group_type_id'] ?? null);
+        $backUrl = $hasGroupContext
+            ? route('assets-inv.group-detail', [
+                'name' => $groupParams['group_name'],
+                'type_id' => $groupParams['group_type_id'],
+                'brand' => $groupParams['group_brand'],
+            ])
+            : route('assets-inv.index');
+    @endphp
+    
     <div class="data-table-container">
         <div class="table-header">
             <h3 class="table-title">Detail Informasi Aset</h3>
-            <a href="{{ route('assets-inv.index') }}" class="btn btn-secondary">← Kembali</a>
+            <a href="{{ $backUrl }}" class="btn btn-secondary">← Kembali</a>
         </div>
         <div style="padding: 2rem;">
             <div class="asset-detail">
                 <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 2rem; margin-bottom: 2rem;">
                     <div class="detail-image">
-                        <img src="{{ $asset->image ? Storage::url($asset->image) : asset('assets/default-asset.png') }}"
-                            alt="{{ $asset->name }}" style="width: 100%; border-radius: 12px; box-shadow: var(--shadow);">
+                        <img src="{{ $asset->image_url }}" alt="{{ $asset->name }}"
+                            style="width: 100%; border-radius: 12px; box-shadow: var(--shadow);">
                     </div>
                     <div class="detail-info">
                         <h2 style="margin-bottom: 1rem; color: var(--text-primary);">{{ $asset->name }}</h2>
@@ -28,17 +40,20 @@
                             <p><strong>Kode QR:</strong> {{ $asset->qr_code }}</p>
                             <p>
                                 <strong>Status:</strong>
-                                <span class="status-badge {{ $asset->status === 'Tersedia' ? 'available' : ($asset->status === 'Dipinjam' ? 'borrowed' : 'maintenance') }}">
+                                <span
+                                    class="status-badge {{ $asset->status === 'Tersedia' ? 'available' : ($asset->status === 'Dipinjam' ? 'borrowed' : 'maintenance') }}">
                                     {{ $asset->status }}
                                 </span>
                             </p>
                             <p>
                                 <strong>Kondisi:</strong>
-                                <span class="status-badge {{ $asset->condition === 'Baik' ? 'available' : ($asset->condition === 'Rusak Ringan' ? 'borrowed' : 'maintenance') }}">
+                                <span
+                                    class="status-badge {{ $asset->condition === 'Baik' ? 'available' : ($asset->condition === 'Rusak Ringan' ? 'borrowed' : 'maintenance') }}">
                                     {{ $asset->condition }}
                                 </span>
                             </p>
-                            <p><strong>Harga:</strong> <span class="price-display">Rp {{ number_format($asset->price, 0, ',', '.') }}</span></p>
+                            <p><strong>Harga:</strong> <span class="price-display">Rp
+                                    {{ number_format($asset->price, 0, ',', '.') }}</span></p>
                             <p><strong>Tanggal Pembelian:</strong> {{ $asset->purchase_date->format('d F Y') }}</p>
                         </div>
                     </div>
@@ -47,23 +62,33 @@
                 <!-- QR Code -->
                 <div style="text-align: center; margin: 2rem 0;">
                     <h4 style="margin-bottom: 1rem;">QR Code Aset</h4>
-                    <div id="qrCodeContainer" style="display: inline-block; padding: 15px; background: white; border-radius: 8px; box-shadow: var(--shadow);"></div>
-                    <p style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.875rem;">{{ $asset->qr_code }}</p>
+                    <div id="qrCodeContainer"
+                        style="display: inline-block; padding: 15px; background: white; border-radius: 8px; box-shadow: var(--shadow);">
+                    </div>
+                    <p style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.875rem;">{{ $asset->qr_code }}
+                    </p>
                 </div>
 
                 <div class="btn-group" style="justify-content: center;">
-                    <a href="{{ route('assets-inv.edit', $asset) }}" class="btn btn-primary">Edit Aset</a>
+                    <a href="{{ route('assets-inv.edit', array_merge(['asset' => $asset->id], $hasGroupContext ? $groupParams->toArray() : [])) }}"
+                        class="btn btn-primary">Edit Aset</a>
                     <button class="btn btn-secondary" onclick="printQrCode()">Cetak QR Code</button>
-                    <form action="{{ route('assets-inv.destroy', $asset) }}" method="POST" style="display: inline;" onsubmit="return confirm('Apakah Anda yakin ingin menghapus aset ini?')">
+                    <form action="{{ route('assets-inv.destroy', $asset) }}" method="POST" style="display: inline;"
+                        onsubmit="return confirm('Apakah Anda yakin ingin menghapus aset ini?')">
                         @csrf
                         @method('DELETE')
+                        @if ($hasGroupContext)
+                            <input type="hidden" name="group_name" value="{{ $groupParams['group_name'] }}">
+                            <input type="hidden" name="group_type_id" value="{{ $groupParams['group_type_id'] }}">
+                            <input type="hidden" name="group_brand" value="{{ $groupParams['group_brand'] }}">
+                        @endif
                         <button type="submit" class="btn btn-danger">Hapus Aset</button>
                     </form>
                 </div>
             </div>
 
             <!-- Borrowing History -->
-            @if($asset->borrowings->count() > 0)
+            @if ($asset->borrowings->count() > 0)
                 <div style="margin-top: 2rem;">
                     <h4 style="margin-bottom: 1rem;">Riwayat Peminjaman</h4>
                     <table class="data-table">
@@ -77,14 +102,16 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach($asset->borrowings as $borrowing)
+                            @foreach ($asset->borrowings as $borrowing)
                                 <tr>
                                     <td>{{ $borrowing->borrowing_id }}</td>
                                     <td>{{ $borrowing->borrower_name }}</td>
                                     <td>{{ $borrowing->borrow_date->format('d M Y') }}</td>
-                                    <td>{{ $borrowing->actual_return_date ? $borrowing->actual_return_date->format('d M Y') : $borrowing->return_date->format('d M Y') }}</td>
+                                    <td>{{ $borrowing->actual_return_date ? $borrowing->actual_return_date->format('d M Y') : $borrowing->return_date->format('d M Y') }}
+                                    </td>
                                     <td>
-                                        <span class="status-badge {{ $borrowing->status === 'Selesai' ? 'available' : 'borrowed' }}">
+                                        <span
+                                            class="status-badge {{ $borrowing->status === 'Selesai' ? 'available' : 'borrowed' }}">
                                             {{ $borrowing->status }}
                                         </span>
                                     </td>
@@ -96,7 +123,7 @@
             @endif
 
             <!-- Maintenance History -->
-            @if($asset->maintenances->count() > 0)
+            @if ($asset->maintenances->count() > 0)
                 <div style="margin-top: 2rem;">
                     <h4 style="margin-bottom: 1rem;">Riwayat Pemeliharaan</h4>
                     <table class="data-table">
@@ -110,7 +137,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach($asset->maintenances as $maintenance)
+                            @foreach ($asset->maintenances as $maintenance)
                                 <tr>
                                     <td>{{ $maintenance->maintenance_id }}</td>
                                     <td>{{ $maintenance->type }}</td>
@@ -131,7 +158,7 @@
 
 @push('scripts')
     <script>
-        document.addEventListener('DOMContentLoaded', function () {
+        document.addEventListener('DOMContentLoaded', function() {
             const qrContainer = document.getElementById('qrCodeContainer');
             const qrUrl = '{{ route('asset.detail', ['qrcode' => $asset->qr_code]) }}';
 

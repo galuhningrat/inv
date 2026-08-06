@@ -16,7 +16,6 @@ class AssetController extends Controller
     {
         $query = Asset::with('assetType');
 
-        // Search
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
@@ -28,22 +27,78 @@ class AssetController extends Controller
             });
         }
 
-        // Filter by status
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
-        }
-
-        // Filter by type
         if ($request->filled('type')) {
             $query->whereHas('assetType', function ($q) use ($request) {
                 $q->where('code', $request->type);
             });
         }
 
-        $assets = $query->orderBy('created_at', 'desc')->get();
         $assetTypes = AssetType::all();
 
-        return view('assets-inv.index', compact('assets', 'assetTypes'));
+        // Kalau filter status aktif, tampilkan FLAT per-unit (karena status memang atribut per-unit,
+        // tidak masuk akal dikelompokkan saat sedang difilter per status)
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+            $assets = $query->orderBy('created_at', 'desc')->get();
+
+            return view('assets-inv.index', [
+                'assets' => $assets,
+                'assetTypes' => $assetTypes,
+                'isGrouped' => false,
+            ]);
+        }
+
+        // Default: kelompokkan per (nama + jenis + merek)
+        $allAssets = $query->orderBy('created_at', 'desc')->get();
+
+        $grouped = $allAssets
+            ->groupBy(fn($a) => $a->name . '|' . $a->asset_type_id . '|' . $a->brand)
+            ->map(function ($group) {
+                $first = $group->first();
+                return (object) [
+                    'name' => $first->name,
+                    'brand' => $first->brand,
+                    'asset_type_id' => $first->asset_type_id,
+                    'assetType' => $first->assetType,
+                    'location' => $first->location,
+                    'image_url' => $first->image_url,
+                    'price' => $first->price,
+                    'total_quantity' => $group->count(),
+                    'tersedia_count' => $group->where('status', 'Tersedia')->count(),
+                    'dipinjam_count' => $group->where('status', 'Dipinjam')->count(),
+                    'maintenance_count' => $group->where('status', 'Maintenance')->count(),
+                ];
+            })->values();
+
+        return view('assets-inv.index', [
+            'grouped' => $grouped,
+            'assetTypes' => $assetTypes,
+            'isGrouped' => true,
+        ]);
+    }
+
+    public function groupDetail(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string',
+            'type_id' => 'required|exists:asset_types,id',
+            'brand' => 'required|string',
+        ]);
+
+        $units = Asset::with('assetType')
+            ->where('name', $validated['name'])
+            ->where('asset_type_id', $validated['type_id'])
+            ->where('brand', $validated['brand'])
+            ->orderBy('serial_number')
+            ->get();
+
+        abort_if($units->isEmpty(), 404);
+
+        return view('assets-inv.group-detail', [
+            'units' => $units,
+            'groupName' => $validated['name'],
+            'groupBrand' => $validated['brand'],
+        ]);
     }
 
     public function create()
@@ -187,7 +242,7 @@ class AssetController extends Controller
 
         $asset->update($validated);
 
-        return redirect()->route('assets-inv.index')
+        return redirect($this->resolveGroupRedirect($request))
             ->with('success', 'Aset berhasil diupdate!');
     }
 
@@ -207,6 +262,38 @@ class AssetController extends Controller
             return redirect()->route('assets-inv.index')
                 ->with('error', 'Gagal menghapus aset: ' . $e->getMessage());
         }
+    }
+
+    private function resolveGroupRedirect(Request $request): string
+    {
+        if ($request->filled('group_name') && is_numeric($request->input('group_type_id')) && $request->filled('group_brand')) {
+            return route('assets-inv.group-detail', [
+                'name' => $request->input('group_name'),
+                'type_id' => $request->input('group_type_id'),
+                'brand' => $request->input('group_brand'),
+            ]);
+        }
+
+        return route('assets-inv.index');
+    }
+    private function resolveGroupRedirectAfterDelete(Request $request, array $group): string
+    {
+        if ($request->filled('group_name')) {
+            $stillExists = Asset::where('name', $group['name'])
+                ->where('asset_type_id', $group['type_id'])
+                ->where('brand', $group['brand'])
+                ->exists();
+
+            if ($stillExists) {
+                return route('assets-inv.group-detail', [
+                    'name' => $group['name'],
+                    'type_id' => $group['type_id'],
+                    'brand' => $group['brand'],
+                ]);
+            }
+        }
+
+        return route('assets-inv.index'); // grup sudah kosong (unit terakhir dihapus) atau memang bukan dari grup
     }
 
     public function generateQrCode(Request $request)

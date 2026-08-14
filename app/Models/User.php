@@ -62,4 +62,8 @@ class User extends Authenticatable
     {
         return $this->hasMany(Maintenance::class, 'recorded_by');
     }
+    public function unit()
+    {
+        return $this->belongsTo(Unit::class);
+    }
 }

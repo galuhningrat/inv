@@ -20,9 +20,16 @@
                     <p><strong>Tanggal Pinjam:</strong> {{ $borrowing->borrow_date->format('d F Y') }}</p>
                     <p><strong>Tanggal Kembali:</strong> {{ $borrowing->return_date->format('d F Y') }}</p>
                     <p><strong>Status:</strong>
-                        <span class="status-badge {{ $borrowing->status === 'Aktif' ? 'borrowed' : 'available' }}">
-                            {{ $borrowing->status }}
-                        </span>
+                        @php
+                            $statusClass = match ($borrowing->status) {
+                                'Aktif' => 'borrowed',
+                                'Selesai' => 'available',
+                                'Menunggu Persetujuan Kalab' => 'pending',
+                                'Ditolak' => 'maintenance',
+                                default => 'maintenance',
+                            };
+                        @endphp
+                        <span class="status-badge {{ $statusClass }}">{{ $borrowing->status }}</span>
                     </p>
                 </div>
 
@@ -32,6 +39,7 @@
                     <p><strong>ID Aset:</strong> {{ $borrowing->asset->asset_id }}</p>
                     <p><strong>Jenis:</strong> {{ $borrowing->asset->assetType->name }}</p>
                     <p><strong>Lokasi:</strong> {{ $borrowing->asset->location }}</p>
+                    <p><strong>Unit Pemilik:</strong> {{ $borrowing->asset->unit->name ?? '-' }}</p>
                 </div>
             </div>
 
@@ -42,25 +50,92 @@
                 </div>
             </div>
 
-            @if($borrowing->actual_return_date)
+            @if ($borrowing->kalab_approved_by)
                 <div style="margin-top: 1.5rem;">
-                    <p><strong>Tanggal Pengembalian Aktual:</strong> {{ $borrowing->actual_return_date->format('d F Y') }}</p>
+                    <h4 style="margin-bottom: 1rem;">
+                        {{ $borrowing->status === 'Ditolak' ? 'Penolakan Kalab (Lintas-Unit)' : 'Persetujuan Kalab (Lintas-Unit)' }}
+                    </h4>
+                    <div style="background: var(--light-bg); padding: 1rem; border-radius: 8px;">
+                        <p><strong>{{ $borrowing->status === 'Ditolak' ? 'Ditolak oleh' : 'Disetujui oleh' }}:</strong>
+                            {{ optional($borrowing->kalabApprover)->name ?? '-' }}</p>
+                        <p><strong>Tanggal:</strong>
+                            {{ $borrowing->kalab_approved_at ? $borrowing->kalab_approved_at->format('d F Y H:i') : '-' }}
+                        </p>
+                        @if ($borrowing->kalab_rejection_notes)
+                            <p style="margin-top: 0.5rem;"><strong>Alasan Penolakan:</strong>
+                                {{ $borrowing->kalab_rejection_notes }}</p>
+                        @endif
+                    </div>
+                </div>
+            @endif
+
+            @if ($borrowing->actual_return_date)
+                <div style="margin-top: 1.5rem;">
+                    <p><strong>Tanggal Pengembalian Aktual:</strong> {{ $borrowing->actual_return_date->format('d F Y') }}
+                    </p>
                 </div>
             @endif
 
             <div class="btn-group" style="margin-top: 2rem; justify-content: center;">
-                @if($borrowing->status === 'Aktif')
-                    <form action="{{ route('borrowings.return', $borrowing) }}" method="POST" style="display: inline;">
+                @can('approveCrossUnit', $borrowing)
+                    <form action="{{ route('borrowings.approve-cross-unit', $borrowing) }}" method="POST"
+                        style="display: inline;">
                         @csrf
-                        <button type="submit" class="btn btn-success" onclick="return confirm('Konfirmasi pengembalian aset?')">
-                            ✔ Kembalikan Aset
+                        <button type="submit" class="btn btn-success"
+                            onclick="return confirm('Setujui peminjaman lintas-unit ini?')">
+                            ✔ Setujui Peminjaman
                         </button>
                     </form>
+                @endcan
+
+                @can('rejectCrossUnit', $borrowing)
+                    <button type="button" class="btn btn-danger" onclick="showRejectModal()">
+                        ✗ Tolak Peminjaman
+                    </button>
+                @endcan
+
+                @if ($borrowing->status === 'Aktif')
+                    @can('update', $borrowing)
+                        <form action="{{ route('borrowings.return', $borrowing) }}" method="POST" style="display: inline;">
+                            @csrf
+                            <button type="submit" class="btn btn-success"
+                                onclick="return confirm('Konfirmasi pengembalian aset?')">
+                                ✔ Kembalikan Aset
+                            </button>
+                        </form>
+                    @endcan
                 @endif
+
                 <a href="{{ route('borrowings.index') }}" class="btn btn-secondary">Kembali ke Daftar</a>
             </div>
         </div>
     </div>
+
+    @can('rejectCrossUnit', $borrowing)
+        <div id="rejectModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">Tolak Peminjaman Lintas-Unit</h3>
+                    <button class="close-modal" onclick="closeRejectModal()">×</button>
+                </div>
+                <form action="{{ route('borrowings.reject-cross-unit', $borrowing) }}" method="POST">
+                    @csrf
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label for="kalab_rejection_notes">Alasan Penolakan</label>
+                            <textarea id="kalab_rejection_notes" name="kalab_rejection_notes" class="form-control" rows="4"
+                                placeholder="Alasan penolakan (opsional)"></textarea>
+                        </div>
+                    </div>
+                    <div class="btn-group"
+                        style="justify-content: flex-end; padding: 1rem 1.5rem; border-top: 1px solid var(--border-color);">
+                        <button type="button" class="btn btn-secondary" onclick="closeRejectModal()">Batal</button>
+                        <button type="submit" class="btn btn-danger">Tolak</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    @endcan
 
     <style>
         @media (max-width: 768px) {
@@ -80,3 +155,15 @@
         }
     </style>
 @endsection
+
+@push('scripts')
+    <script>
+        function showRejectModal() {
+            document.getElementById('rejectModal').classList.add('active');
+        }
+
+        function closeRejectModal() {
+            document.getElementById('rejectModal').classList.remove('active');
+        }
+    </script>
+@endpush

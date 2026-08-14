@@ -9,24 +9,27 @@ use Illuminate\Support\Facades\Storage;
 
 class UserController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $users = User::orderByRaw("CASE 
-                                WHEN level = 'Admin' THEN 1
-                                WHEN level = 'Sarpras' THEN 2
-                                WHEN level = 'Rektor' THEN 3
-                                WHEN level = 'Kaprodi' THEN 4
-                                WHEN level = 'Keuangan' THEN 5
-                                ELSE 6
-                            END")
-            ->paginate(10); // Tetap gunakan paginate(10) Anda
+        $perPage = in_array($request->input('per_page'), [10, 15, 25, 50, 100]) ? $request->input('per_page') : 10;
 
-        return view('users.index', compact('users'));
+        $users = User::with('unit')
+            ->orderByRaw("CASE WHEN level = 'Admin' THEN 1 WHEN level = 'Sarpras' THEN 2 ELSE 3 END");
+
+        if ($request->filled('unit_id')) {
+            $users->where('unit_id', $request->unit_id);
+        }
+
+        $users = $users->paginate($perPage)->appends($request->query());
+
+        $units = \App\Models\Unit::all();
+
+        return view('users.index', compact('users', 'units'));
     }
 
     public function create()
     {
-        $levels = ['Admin', 'Sarpras', 'Keuangan', 'Kaprodi', 'Rektor', 'PJ Pengadaan', 'Kalab', 'Aslab', 'Tim Pemeliharaan', 'Administrasi'];
+        $levels = ['Admin', 'Sarpras', 'Keuangan', 'Kaprodi', 'Rektor', 'PJ Pengadaan', 'Kalab', 'Aslab', 'Tim Pemeliharaan', 'Administrasi', 'Karyawan', 'Dosen', 'Mahasiswa'];
         return view('users.create', compact('levels'));
     }
 
@@ -37,7 +40,7 @@ class UserController extends Controller
             'username' => 'required|string|unique:users,username',
             'email' => 'required|email|unique:users,email',
             'password' => 'required|string|min:6|confirmed',
-            'level' => 'required|in:Admin,Sarpras,Keuangan,Kaprodi,Rektor,PJ Pengadaan,Kalab,Aslab,Tim Pemeliharaan,Administrasi',
+            'level' => 'required|in:Admin,Sarpras,Keuangan,Kaprodi,Rektor,PJ Pengadaan,Kalab,Aslab,Tim Pemeliharaan,Administrasi,Karyawan,Dosen,Mahasiswa',
             'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
@@ -62,7 +65,7 @@ class UserController extends Controller
 
     public function edit(User $user)
     {
-        $levels = ['Admin', 'Sarpras', 'Keuangan', 'Kaprodi', 'Rektor', 'PJ Pengadaan', 'Kalab', 'Aslab', 'Tim Pemeliharaan', 'Administrasi'];
+        $levels = ['Admin', 'Sarpras', 'Keuangan', 'Kaprodi', 'Rektor', 'PJ Pengadaan', 'Kalab', 'Aslab', 'Tim Pemeliharaan', 'Administrasi', 'Karyawan', 'Dosen', 'Mahasiswa'];
         return view('users.edit', compact('user', 'levels'));
     }
 
@@ -73,7 +76,7 @@ class UserController extends Controller
             'username' => 'required|string|unique:users,username,' . $user->id,
             'email' => 'required|email|unique:users,email,' . $user->id,
             'password' => 'nullable|string|min:6|confirmed',
-            'level' => 'required|in:Admin,Sarpras,Keuangan,Kaprodi,Rektor,PJ Pengadaan,Kalab,Aslab,Tim Pemeliharaan,Administrasi',
+            'level' => 'required|in:Admin,Sarpras,Keuangan,Kaprodi,Rektor,PJ Pengadaan,Kalab,Aslab,Tim Pemeliharaan,Administrasi,Karyawan,Dosen,Mahasiswa',
             'status' => 'required|in:Aktif,Nonaktif',
             'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);

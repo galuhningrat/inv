@@ -10,12 +10,18 @@ use App\Models\QrCode;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use App\Models\Location;
 
 class AssetRequestController extends Controller
 {
     public function index(Request $request)
     {
         $query = AssetRequest::with('requester', 'items', 'verifier', 'approver');
+
+        $user = auth()->user();
+        if (in_array($user->level, ['Kaprodi', 'Kalab'])) {
+            $query->where('unit_id', $user->unit_id);
+        }
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);
@@ -47,6 +53,8 @@ class AssetRequestController extends Controller
 
     public function store(Request $request)
     {
+        $this->authorize('create', AssetRequest::class);
+
         $validated = $request->validate([
             'jenis_barang' => 'required|in:Habis Pakai,Tidak Habis Pakai,Jasa',
             'kategori_barang' => 'required|in:ATK,Konsumsi,Alat,Furniture,Lainnya',
@@ -55,7 +63,8 @@ class AssetRequestController extends Controller
             'priority' => 'required|in:Normal,Mendesak,Sangat Mendesak',
             'reason' => 'required|string',
             'items' => 'required|array|min:1',
-            'items.*.asset_type_id' => 'required|exists:asset_types,id',
+            'items.*.item_type' => 'required|in:Fisik,Non-Fisik',
+            'items.*.asset_type_id' => 'required_if:items.*.item_type,Fisik|nullable|exists:asset_types,id',
             'items.*.item_name' => 'required|string|max:255',
             'items.*.specification' => 'nullable|string|max:255',
             'items.*.quantity' => 'required|integer|min:1',
@@ -64,10 +73,10 @@ class AssetRequestController extends Controller
         ]);
 
         DB::beginTransaction();
-
         try {
             $assetRequest = AssetRequest::create([
                 'requester_id' => Auth::id(),
+                'unit_id' => Auth::user()->unit_id,
                 'jenis_barang' => $validated['jenis_barang'],
                 'kategori_barang' => $validated['kategori_barang'],
                 'alasan_pengajuan' => $validated['alasan_pengajuan'],
@@ -94,6 +103,8 @@ class AssetRequestController extends Controller
 
     public function show(AssetRequest $assetRequest)
     {
+        $this->authorize('view', $assetRequest);
+
         $assetRequest->load('requester', 'items.assetType', 'verifier', 'approver', 'relatedAsset');
         return view('requests.show', compact('assetRequest'));
     }
@@ -190,32 +201,40 @@ class AssetRequestController extends Controller
 
     public function showReceiveForm(AssetRequest $assetRequest)
     {
-        if (Auth::user()->level !== 'Sarpras' && Auth::user()->level !== 'Admin') { // Sarpras only
+        if (Auth::user()->level !== 'Sarpras' && Auth::user()->level !== 'Admin') {
             abort(403, 'Hanya Bagian Sarpras yang dapat melakukan registrasi aset.');
         }
-
-        if ($assetRequest->status !== 'Dikonfirmasi') { // status baru
-            return redirect()->route('requests.index')
-                ->with('error', 'Barang belum dikonfirmasi diterima secara fisik oleh PJ Pengadaan.');
+        if ($assetRequest->status !== 'Dikonfirmasi') {
+            return redirect()->route('requests.index')->with('error', 'Barang belum dikonfirmasi diterima secara fisik oleh PJ Pengadaan.');
         }
 
         $assetRequest->load('items.assetType');
 
-        // kategorikan user per level untuk dropdown
         $usersByLevel = \App\Models\User::orderBy('name')->get()->groupBy('level');
+        $hasPhysical = $assetRequest->items->contains('item_type', 'Fisik');
+        $units = $hasPhysical ? \App\Models\Unit::with('locations')->whereNotNull('category')->orderBy('category')->orderBy('name')->get() : collect();
 
-        return view('requests.receive', compact('assetRequest', 'usersByLevel'));
+        $unitsForJs = $units->map(function ($u) {
+            return [
+                'id' => $u->id,
+                'name' => $u->name,
+                'category' => $u->category,
+                'locations' => $u->locations->map(function ($l) {
+                    return ['id' => $l->id, 'name' => $l->name];
+                })->values(),
+            ];
+        })->values();
+
+        return view('requests.receive', compact('assetRequest', 'usersByLevel', 'units', 'hasPhysical', 'unitsForJs'));
     }
 
     public function receive(Request $request, AssetRequest $assetRequest)
     {
-        if (Auth::user()->level !== 'Sarpras' && Auth::user()->level !== 'Admin') { //
+        if (Auth::user()->level !== 'Sarpras' && Auth::user()->level !== 'Admin') {
             abort(403, 'Hanya Bagian Sarpras yang dapat melakukan registrasi aset.');
         }
-
         if ($assetRequest->status !== 'Dikonfirmasi') {
-            return redirect()->route('requests.index')
-                ->with('error', 'Barang belum dikonfirmasi diterima secara fisik.');
+            return redirect()->route('requests.index')->with('error', 'Barang belum dikonfirmasi diterima secara fisik.');
         }
 
         $assetRequest->load('items');
@@ -229,38 +248,42 @@ class AssetRequestController extends Controller
 
         foreach ($assetRequest->items as $item) {
             $rules["brand.{$item->id}"] = 'required|string|max:255';
-            $rules["images.{$item->id}"] = 'required|image|mimes:jpg,jpeg,png,webp|max:2048'; //
-            $rules["serial_numbers.{$item->id}"] = 'required|array|size:' . $item->quantity;
-            $rules["serial_numbers.{$item->id}.*"] = 'required|string|distinct|unique:assets,serial_number';
-            $rules["conditions.{$item->id}"] = 'required|array|size:' . $item->quantity;
-            $rules["conditions.{$item->id}.*"] = 'required|in:Baik,Rusak Ringan,Rusak Berat';
             $rules["prices.{$item->id}"] = 'required|numeric|min:0';
+
+            for ($i = 0; $i < $item->quantity; $i++) {
+                $rules["unit_names.{$item->id}.{$i}"] = 'nullable|string|max:255';
+                $rules["images.{$item->id}.{$i}"] = 'required|image|mimes:jpg,jpeg,png,webp|max:2048'; // ✅ per-unit sekarang
+                $rules["serial_numbers.{$item->id}.{$i}"] = 'required|string|distinct|unique:assets,serial_number';
+                $rules["conditions.{$item->id}.{$i}"] = 'required|in:Baik,Rusak Ringan,Rusak Berat';
+                $rules["expired_dates.{$item->id}.{$i}"] = 'nullable|date'; // ✅ baru
+            }
         }
 
         $validated = $request->validate($rules);
 
         DB::beginTransaction();
-
         try {
             foreach ($assetRequest->items as $item) {
-                // upload gambar sekali per item, dipakai untuk semua unit dari item itu
-                $imagePath = $request->file("images.{$item->id}")->store('assets', 'public');
-                $item->update(['image' => $imagePath]);
+                for ($i = 0; $i < $item->quantity; $i++) {
+                    $imagePath = $request->file("images.{$item->id}.{$i}")->store('assets', 'public'); // ✅ per-unit
 
-                foreach ($validated['serial_numbers'][$item->id] as $index => $serialNumber) {
                     $asset = new Asset();
-                    $asset->name = $item->item_name;
+                    $asset->name = !empty($validated['unit_names'][$item->id][$i])
+                        ? $validated['unit_names'][$item->id][$i] // ✅ override nama per-unit kalau diisi
+                        : $item->item_name; // fallback ke nama generik item
                     $asset->asset_type_id = $item->asset_type_id;
                     $asset->brand = $validated['brand'][$item->id];
-                    $asset->serial_number = $serialNumber;
+                    $asset->serial_number = $validated['serial_numbers'][$item->id][$i];
                     $asset->price = $validated['prices'][$item->id];
                     $asset->purchase_date = $validated['purchase_date'];
+                    $asset->expired_at = $validated['expired_dates'][$item->id][$i] ?? null; // ✅ baru
                     $asset->location = $validated['location'];
-                    $asset->condition = $validated['conditions'][$item->id][$index];
+                    $asset->condition = $validated['conditions'][$item->id][$i];
                     $asset->status = 'Tersedia';
-                    $asset->image = $imagePath; // pakai foto item yang sama
+                    $asset->image = $imagePath;
                     $asset->penanggung_jawab_id = $validated['penanggung_jawab_id'] ?? $assetRequest->requester_id;
                     $asset->asset_request_id = $assetRequest->id;
+                    $asset->unit_id = $assetRequest->unit_id; // ✅ ikut unit dari pengajuannya
                     $asset->qr_code = QrCode::generateCodeContent($item->assetType->code);
                     $asset->save();
 
@@ -273,21 +296,19 @@ class AssetRequestController extends Controller
             }
 
             $assetRequest->update(['status' => 'Diterima']);
-
             DB::commit();
 
-            return redirect()->route('requests.index')
-                ->with('success', 'Semua item berhasil diregistrasi ke inventaris!');
-
+            return redirect()->route('requests.index')->with('success', 'Semua item berhasil diregistrasi ke inventaris!');
         } catch (\Exception $e) {
             DB::rollback();
-            return redirect()->back()->withInput()
-                ->with('error', 'Gagal memproses registrasi: ' . $e->getMessage());
+            return redirect()->back()->withInput()->with('error', 'Gagal memproses registrasi: ' . $e->getMessage());
         }
     }
 
     public function destroy(AssetRequest $assetRequest)
     {
+        $this->authorize('delete', $assetRequest);
+
         $assetRequest->delete();
         return redirect()->route('requests.index')->with('success', 'Pengajuan berhasil dihapus!');
     }

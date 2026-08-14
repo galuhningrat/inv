@@ -19,7 +19,7 @@
 
 <script src="{{ asset('js/horizontal-scroll.js') }}"></script>
 
-<body class="@if(session('dark_mode')) dark-mode @endif">
+<body class="@if (session('dark_mode')) dark-mode @endif">
     <div id="app" class="dashboard">
         <!-- Sidebar -->
         <aside id="sidebar" class="sidebar collapsed">
@@ -32,110 +32,112 @@
 
             <nav class="sidebar-nav">
                 @php
-                $userPermissions = config('permissions.roles.' . auth()->user()->level, []);
+                    $userPermissions = config('permissions.roles.' . auth()->user()->level, []);
                 @endphp
 
-                @if(in_array('dashboard', $userPermissions))
-                <a href="{{ route('dashboard') }}"
-                    class="nav-link {{ request()->routeIs('dashboard') ? 'active' : '' }}" data-page="dashboard">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="3" y="3" width="7" height="7" />
-                        <rect x="14" y="3" width="7" height="7" />
-                        <rect x="14" y="14" width="7" height="7" />
-                        <rect x="3" y="14" width="7" height="7" />
-                    </svg>
-                    <span>Dashboard</span>
-                </a>
+                @if (in_array('dashboard', $userPermissions))
+                    <a href="{{ route('dashboard') }}"
+                        class="nav-link {{ request()->routeIs('dashboard') ? 'active' : '' }}" data-page="dashboard">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="7" height="7" />
+                            <rect x="14" y="3" width="7" height="7" />
+                            <rect x="14" y="14" width="7" height="7" />
+                            <rect x="3" y="14" width="7" height="7" />
+                        </svg>
+                        <span>Dashboard</span>
+                    </a>
                 @endif
 
-                @if(in_array('assets-inv', $userPermissions))
-                <a href="{{ route('assets-inv.index') }}"
-                    class="nav-link {{ request()->routeIs('assets-inv.*') ? 'active' : '' }}" data-page="assets">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path
-                            d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-                        <polyline points="3.27,6.96 12,12.01 20.73,6.96" />
-                        <line x1="12" y1="22.08" x2="12" y2="12" />
-                    </svg>
-                    <span>Manajemen Aset</span>
-                </a>
+                @if (in_array('assets-inv', $userPermissions))
+                    <a href="{{ route('assets-inv.index') }}"
+                        class="nav-link {{ request()->routeIs(['assets-inv.*', 'intangible-assets.*']) ? 'active' : '' }}"
+                        data-page="assets">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path
+                                d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                            <polyline points="3.27,6.96 12,12.01 20.73,6.96" />
+                            <line x1="12" y1="22.08" x2="12" y2="12" />
+                        </svg>
+                        <span>Manajemen Aset</span>
+                    </a>
                 @endif
 
-                @if(in_array('borrowing', $userPermissions))
-                <a href="{{ route('borrowings.index') }}"
-                    class="nav-link {{ request()->routeIs('borrowings.*') ? 'active' : '' }}" data-page="borrowing">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-                    </svg>
-                    <span>Peminjaman</span>
-                </a>
+                @if (in_array('borrowing', $userPermissions))
+                    <a href="{{ route('borrowings.index') }}"
+                        class="nav-link {{ request()->routeIs('borrowings.*') ? 'active' : '' }}" data-page="borrowing">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                        </svg>
+                        <span>Peminjaman</span>
+                    </a>
                 @endif
 
-                @if(in_array('maintenance', $userPermissions))
-                <a href="{{ route('maintenances.index') }}"
-                    class="nav-link {{ request()->routeIs('maintenances.*') ? 'active' : '' }}" data-page="maintenance">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path
-                            d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
-                    </svg>
-                    <span>Pemeliharaan</span>
-                </a>
+                @if (in_array('maintenance', $userPermissions))
+                    <a href="{{ route('maintenances.index') }}"
+                        class="nav-link {{ request()->routeIs('maintenances.*') ? 'active' : '' }}"
+                        data-page="maintenance">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path
+                                d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+                        </svg>
+                        <span>Pemeliharaan</span>
+                    </a>
                 @endif
 
-                @if(in_array('users', $userPermissions))
-                <a href="{{ route('users.index') }}"
-                    class="nav-link {{ request()->routeIs('users.*') ? 'active' : '' }}" data-page="users">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                        <circle cx="9" cy="7" r="4" />
-                        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                    </svg>
-                    <span>Pengguna</span>
-                </a>
+                @if (in_array('users', $userPermissions))
+                    <a href="{{ route('users.index') }}"
+                        class="nav-link {{ request()->routeIs('users.*') ? 'active' : '' }}" data-page="users">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                            <circle cx="9" cy="7" r="4" />
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                        </svg>
+                        <span>Pengguna</span>
+                    </a>
                 @endif
 
-                @if(in_array('requests', $userPermissions))
-                <a href="{{ route('requests.index') }}"
-                    class="nav-link {{ request()->routeIs('requests.*') ? 'active' : '' }}" data-page="requests">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                        <polyline points="14,2 14,8 20,8" />
-                        <line x1="16" y1="13" x2="8" y2="13" />
-                        <line x1="16" y1="17" x2="8" y2="17" />
-                        <polyline points="10,9 9,9 8,9" />
-                    </svg>
-                    <span>Pengajuan Aset</span>
-                </a>
+                @if (in_array('requests', $userPermissions))
+                    <a href="{{ route('requests.index') }}"
+                        class="nav-link {{ request()->routeIs('requests.*') ? 'active' : '' }}" data-page="requests">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <polyline points="14,2 14,8 20,8" />
+                            <line x1="16" y1="13" x2="8" y2="13" />
+                            <line x1="16" y1="17" x2="8" y2="17" />
+                            <polyline points="10,9 9,9 8,9" />
+                        </svg>
+                        <span>Pengajuan Aset</span>
+                    </a>
                 @endif
 
-                @if(in_array('reports', $userPermissions))
-                <a href="{{ route('reports.index') }}"
-                    class="nav-link {{ request()->routeIs('reports.*') ? 'active' : '' }}" data-page="reports">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                        <polyline points="14,2 14,8 20,8" />
-                        <line x1="16" y1="13" x2="8" y2="13" />
-                        <line x1="16" y1="17" x2="8" y2="17" />
-                    </svg>
-                    <span>Laporan</span>
-                </a>
+                @if (in_array('reports', $userPermissions))
+                    <a href="{{ route('reports.index') }}"
+                        class="nav-link {{ request()->routeIs('reports.*') ? 'active' : '' }}" data-page="reports">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <polyline points="14,2 14,8 20,8" />
+                            <line x1="16" y1="13" x2="8" y2="13" />
+                            <line x1="16" y1="17" x2="8" y2="17" />
+                        </svg>
+                        <span>Laporan</span>
+                    </a>
                 @endif
 
-                @if(in_array('qrCode', $userPermissions))
-                <a href="{{ route('qrcodes.index') }}"
-                    class="nav-link {{ request()->routeIs('qrcodes.*') ? 'active' : '' }}" data-page="qrCode">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="3" y="3" width="7" height="7" rx="1" />
-                        <rect x="14" y="3" width="7" height="7" rx="1" />
-                        <rect x="3" y="14" width="7" height="7" rx="1" />
-                        <rect x="14" y="14" width="3" height="3" />
-                        <rect x="18" y="14" width="3" height="3" />
-                        <rect x="14" y="18" width="3" height="3" />
-                        <rect x="18" y="18" width="3" height="3" />
-                    </svg>
-                    <span>Manajemen QR Code</span>
-                </a>
+                @if (in_array('qrCode', $userPermissions))
+                    <a href="{{ route('qrcodes.index') }}"
+                        class="nav-link {{ request()->routeIs('qrcodes.*') ? 'active' : '' }}" data-page="qrCode">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="7" height="7" rx="1" />
+                            <rect x="14" y="3" width="7" height="7" rx="1" />
+                            <rect x="3" y="14" width="7" height="7" rx="1" />
+                            <rect x="14" y="14" width="3" height="3" />
+                            <rect x="18" y="14" width="3" height="3" />
+                            <rect x="14" y="18" width="3" height="3" />
+                            <rect x="18" y="18" width="3" height="3" />
+                        </svg>
+                        <span>Manajemen QR Code</span>
+                    </a>
                 @endif
             </nav>
         </aside>
@@ -161,7 +163,8 @@
                         <span id="darkModeToggleIcon">🌙</span>
                     </button>
                     <div class="user-profile">
-                        <img src="{{ auth()->user()->avatar_url }}" alt="Profile" class="profile-img" id="userAvatarImg">
+                        <img src="{{ auth()->user()->avatar_url }}" alt="Profile" class="profile-img"
+                            id="userAvatarImg">
                         <div>
                             <span id="currentUser">{{ auth()->user()->name }}</span>
                             <span id="userRole" class="user-role">{{ auth()->user()->level }}</span>
@@ -177,18 +180,18 @@
             <!-- Content Area -->
             <div class="content-area">
                 <!-- Flash Messages -->
-                @if(session('success'))
-                <div class="alert alert-success" id="flashMessage"
-                    style="margin-bottom: 1rem; padding: 1rem; background: #d1fae5; color: #065f46; border-radius: 8px; border-left: 4px solid #10b981;">
-                    {{ session('success') }}
-                </div>
+                @if (session('success'))
+                    <div class="alert alert-success" id="flashMessage"
+                        style="margin-bottom: 1rem; padding: 1rem; background: #d1fae5; color: #065f46; border-radius: 8px; border-left: 4px solid #10b981;">
+                        {{ session('success') }}
+                    </div>
                 @endif
 
-                @if(session('error'))
-                <div class="alert alert-error" id="flashMessage"
-                    style="margin-bottom: 1rem; padding: 1rem; background: #fee2e2; color: #991b1b; border-radius: 8px; border-left: 4px solid #ef4444;">
-                    {{ session('error') }}
-                </div>
+                @if (session('error'))
+                    <div class="alert alert-error" id="flashMessage"
+                        style="margin-bottom: 1rem; padding: 1rem; background: #fee2e2; color: #991b1b; border-radius: 8px; border-left: 4px solid #ef4444;">
+                        {{ session('error') }}
+                    </div>
                 @endif
 
                 @yield('content')
@@ -215,14 +218,14 @@
                         <h4 class="footer-title">Tautan Cepat</h4>
                         <ul class="footer-links">
                             <li><a href="{{ route('dashboard') }}">Dashboard</a></li>
-                            @if(in_array('assets-inv', $userPermissions ?? []))
-                            <li><a href="{{ route('assets-inv.index') }}">Manajemen Aset</a></li>
+                            @if (in_array('assets-inv', $userPermissions ?? []))
+                                <li><a href="{{ route('assets-inv.index') }}">Manajemen Aset</a></li>
                             @endif
-                            @if(in_array('borrowing', $userPermissions ?? []))
-                            <li><a href="{{ route('borrowings.index') }}">Peminjaman</a></li>
+                            @if (in_array('borrowing', $userPermissions ?? []))
+                                <li><a href="{{ route('borrowings.index') }}">Peminjaman</a></li>
                             @endif
-                            @if(in_array('reports', $userPermissions ?? []))
-                            <li><a href="{{ route('reports.index') }}">Laporan</a></li>
+                            @if (in_array('reports', $userPermissions ?? []))
+                                <li><a href="{{ route('reports.index') }}">Laporan</a></li>
                             @endif
                         </ul>
                     </div>
@@ -267,7 +270,8 @@
                 <div class="footer-bottom">
                     <div class="footer-bottom-content">
                         <div class="copyright">
-                            © {{ date('Y') }} STTI - Sekolah Tinggi Teknologi Indonesia Cirebon. All rights reserved.
+                            © {{ date('Y') }} STTI - Sekolah Tinggi Teknologi Indonesia Cirebon. All rights
+                            reserved.
                         </div>
                         <div class="footer-meta">
                             <span id="footerAssetCount">{{ \App\Models\Asset::count() }}</span> Aset •
@@ -480,7 +484,8 @@
 
             const toast = document.createElement('div');
             const bgColor = type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#f59e0b';
-            toast.style.cssText = `background: ${bgColor}; color: white; padding: 12px 20px; border-radius: 6px; margin-bottom: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); transform: translateX(100%); transition: transform 0.3s ease;`;
+            toast.style.cssText =
+                `background: ${bgColor}; color: white; padding: 12px 20px; border-radius: 6px; margin-bottom: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); transform: translateX(100%); transition: transform 0.3s ease;`;
             toast.textContent = message;
 
             toastContainer.appendChild(toast);
@@ -501,3 +506,304 @@
 </body>
 
 </html>
+
+@push('styles')
+    <style>
+        .asset-gate-container {
+            background: var(--card-background);
+            border-radius: 16px;
+            box-shadow: var(--shadow);
+            padding: 1.5rem 2rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .asset-gate-header h4 {
+            margin: 0 0 0.25rem;
+            font-size: 1rem;
+            color: var(--text-primary);
+        }
+
+        .asset-gate-header p {
+            margin: 0 0 1.25rem;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .asset-gate-cards {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .asset-gate-card {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1.25rem;
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            text-decoration: none;
+            color: inherit;
+            background: var(--light-bg);
+            transition: all 0.2s ease;
+        }
+
+        .asset-gate-card:hover {
+            border-color: var(--primary-color);
+            transform: translateY(-3px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+        }
+
+        .asset-gate-card.active {
+            border-color: var(--primary-color);
+            background: color-mix(in srgb, var(--primary-color) 8%, var(--card-background));
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
+        }
+
+        .asset-gate-icon {
+            font-size: 1.75rem;
+            flex-shrink: 0;
+            width: 56px;
+            height: 56px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--card-background);
+            border-radius: 12px;
+            box-shadow: inset 0 0 0 1px var(--border-color);
+        }
+
+        .asset-gate-info {
+            min-width: 0;
+        }
+
+        .asset-gate-info h5 {
+            margin: 0 0 0.25rem;
+            font-size: 0.95rem;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .asset-gate-info p {
+            margin: 0;
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        .asset-gate-check {
+            position: absolute;
+            top: 0.75rem;
+            right: 0.75rem;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: bold;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+        }
+
+        .badge-prototype {
+            font-size: 0.65rem;
+            font-weight: 600;
+            background: #fff3cd;
+            color: #856404;
+            padding: 0.15rem 0.55rem;
+            border-radius: 999px;
+            border: 1px solid #ffc107;
+            white-space: nowrap;
+        }
+
+        @media screen and (max-width: 640px) {
+            .asset-gate-cards {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .asset-type-tab:hover {
+            background: var(--card-background);
+            color: var(--text-primary);
+        }
+
+        .asset-type-tab.active {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        .asset-type-tab small {
+            font-weight: normal;
+            opacity: 0.85;
+        }
+
+        .item-type-picker {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .item-type-option {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            padding: 0.6rem 1rem;
+            border: 2px solid var(--border-color);
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            transition: all 0.15s ease;
+            flex: 1;
+            min-width: 220px;
+            background: var(--light-bg);
+        }
+
+        .item-type-option:hover {
+            border-color: var(--primary-color);
+        }
+
+        .item-type-option.active {
+            border-color: var(--primary-color);
+            background: color-mix(in srgb, var(--primary-color) 8%, var(--card-background));
+            color: var(--text-primary);
+        }
+
+        .item-type-option strong {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .item-type-option small {
+            display: block;
+            font-weight: normal;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-top: 0.1rem;
+        }
+
+        .item-type-icon {
+            font-size: 1.4rem;
+            flex-shrink: 0;
+        }
+
+        .view-toggle-wrapper {
+            padding: 0 2rem;
+            margin-bottom: 0.75rem;
+            margin-top: 0.5rem;
+        }
+
+        .view-toggle {
+            display: inline-flex;
+            background: #f3f4f6;
+            border-radius: 12px;
+            padding: 4px;
+            gap: 4px;
+            border: 1px solid #e5e7eb;
+            flex-wrap: wrap;
+        }
+
+        .view-toggle-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.6rem 1.2rem;
+            border-radius: 10px;
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: #6b7280;
+            background: transparent;
+            transition: all 0.2s ease;
+            border: none;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .view-toggle-btn .view-toggle-icon {
+            font-size: 1.2rem;
+            line-height: 1;
+        }
+
+        .view-toggle-btn .view-toggle-label {
+            font-weight: 500;
+        }
+
+        .view-toggle-btn:hover {
+            color: #111827;
+            background: rgba(0, 0, 0, 0.04);
+        }
+
+        .view-toggle-btn.active {
+            background: #ffffff;
+            color: #2563eb;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+            font-weight: 600;
+        }
+
+        .view-toggle-btn.active .view-toggle-label {
+            color: #2563eb;
+        }
+
+        /* Dark mode */
+        body.dark-mode .view-toggle {
+            background: #1f2937;
+            border-color: #374151;
+        }
+
+        body.dark-mode .view-toggle-btn:hover {
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        body.dark-mode .view-toggle-btn.active {
+            background: #111827;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Responsive */
+        @media screen and (max-width: 640px) {
+            .view-toggle-wrapper {
+                padding: 0 1rem;
+            }
+
+            .view-toggle {
+                width: 100%;
+                justify-content: stretch;
+            }
+
+            .view-toggle-btn {
+                flex: 1;
+                justify-content: center;
+                padding: 0.5rem 0.8rem;
+                font-size: 0.78rem;
+            }
+
+            .view-toggle-btn .view-toggle-label {
+                display: none;
+            }
+
+            .view-toggle-btn .view-toggle-icon {
+                font-size: 1.4rem;
+            }
+        }
+
+        @media screen and (max-width: 480px) {
+            .view-toggle-btn {
+                padding: 0.4rem 0.6rem;
+            }
+
+            .view-toggle-btn .view-toggle-icon {
+                font-size: 1.2rem;
+            }
+        }
+    </style>
+@endpush

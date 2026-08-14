@@ -29,6 +29,10 @@ class Asset extends Model
         'qr_code',
         'penanggung_jawab_id',
         'asset_request_id',
+        'unit_id',
+        'location_id',
+        'location_detail',
+        'expired_at',
     ];
 
     protected $casts = [
@@ -134,5 +138,13 @@ class Asset extends Model
     public function assetRequest()
     {
         return $this->belongsTo(AssetRequest::class);
+    }
+    public function unit()
+    {
+        return $this->belongsTo(Unit::class);
+    }
+    public function location_ref()
+    {
+        return $this->belongsTo(Location::class, 'location_id');
     }
 }

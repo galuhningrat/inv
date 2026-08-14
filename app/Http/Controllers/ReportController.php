@@ -13,21 +13,33 @@ use App\Exports\AssetsExport;
 use App\Exports\BorrowingsExport;
 use App\Exports\MaintenancesExport;
 use App\Exports\FinancialExport;
+use Illuminate\Support\Facades\Gate;
 
 class ReportController extends Controller
 {
     public function index()
     {
-        return view('reports.index');
+        $allowedTypes = collect(['assets', 'borrowing', 'maintenance', 'financial'])
+            ->filter(fn($type) => Gate::allows('view-report', $type))
+            ->values();
+
+        return view('reports.index', compact('allowedTypes'));
     }
 
     public function generate(Request $request)
     {
         $type = $request->type;
+        Gate::authorize('view-report', $type);
+
+        $user = Auth::user();
 
         switch ($type) {
             case 'assets':
-                $data = Asset::with('assetType')->get();
+                $query = Asset::with('assetType');
+                if (in_array($user->level, ['Kalab', 'Kaprodi'])) {
+                    $query->where('unit_id', $user->unit_id); 
+                }
+                $data = $query->get();
                 $title = 'LAPORAN INVENTARIS ASET';
                 break;
             case 'borrowing':
@@ -51,8 +63,6 @@ class ReportController extends Controller
             default:
                 return back()->with('error', 'Jenis laporan tidak valid');
         }
-
-        $user = Auth::user();
 
         return view('reports.preview', compact('type', 'data', 'title', 'user'));
     }
@@ -60,22 +70,40 @@ class ReportController extends Controller
     public function exportPdf(Request $request)
     {
         $type = $request->type;
+        Gate::authorize('view-report', $type);  // Cek otorisasi
 
+        $user = Auth::user();
+
+        // Tentukan view PDF berdasarkan tipe
+        $viewMap = [
+            'assets' => 'reports.pdf.assets',
+            'borrowing' => 'reports.pdf.borrowings',
+            'maintenance' => 'reports.pdf.maintenances',
+            'financial' => 'reports.pdf.financial',
+        ];
+
+        if (!isset($viewMap[$type])) {
+            return back()->with('error', 'Jenis laporan tidak valid');
+        }
+
+        // Ambil data sesuai tipe
         switch ($type) {
             case 'assets':
-                $data = Asset::with('assetType')->get();
+                $query = Asset::with('assetType');
+                // Scoping untuk Kalab/Kaprodi
+                if (in_array($user->level, ['Kalab', 'Kaprodi'])) {
+                    $query->where('unit_id', $user->unit_id);
+                }
+                $data = $query->get();
                 $title = 'LAPORAN INVENTARIS ASET';
-                $view = 'reports.pdf.assets';
                 break;
             case 'borrowing':
                 $data = Borrowing::with('asset', 'approver')->get();
                 $title = 'LAPORAN PEMINJAMAN ASET';
-                $view = 'reports.pdf.borrowings';
                 break;
             case 'maintenance':
                 $data = Maintenance::with('asset', 'recorder')->get();
                 $title = 'LAPORAN PEMELIHARAAN ASET';
-                $view = 'reports.pdf.maintenances';
                 break;
             case 'financial':
                 $data = [
@@ -86,15 +114,12 @@ class ReportController extends Controller
                     'maintenance_records' => Maintenance::count(),
                 ];
                 $title = 'LAPORAN KEUANGAN ASET';
-                $view = 'reports.pdf.financial';
                 break;
             default:
                 return back()->with('error', 'Jenis laporan tidak valid');
         }
 
-        $user = Auth::user();
-
-        $pdf = Pdf::loadView($view, compact('data', 'title', 'user'));
+        $pdf = Pdf::loadView($viewMap[$type], compact('data', 'title', 'user'));
         $pdf->setPaper('a4', 'portrait');
 
         return $pdf->download("laporan-{$type}.pdf");
@@ -103,6 +128,14 @@ class ReportController extends Controller
     public function exportExcel(Request $request)
     {
         $type = $request->type;
+        Gate::authorize('view-report', $type);  // Cek otorisasi
+
+        // Untuk Excel, kita tidak perlu scoping manual karena sudah di handle di Export class masing-masing
+        // Tapi kita tetap harus memastikan hanya tipe yang diizinkan
+        $allowedTypes = ['assets', 'borrowing', 'maintenance', 'financial'];
+        if (!in_array($type, $allowedTypes)) {
+            return back()->with('error', 'Jenis laporan tidak valid');
+        }
 
         switch ($type) {
             case 'assets':

@@ -22,7 +22,7 @@
                     <p><strong>Status:</strong>
                         @php
                             $statusClass = match ($assetRequest->status) {
-                                'Disetujui', 'Diterima' => 'approved',
+                                'Disetujui', 'Dana Cair', 'Dikonfirmasi', 'Diterima' => 'approved',
                                 'Diverifikasi' => 'borrowed',
                                 'Ditolak' => 'rejected',
                                 default => 'pending',
@@ -134,8 +134,7 @@
                         Pencairan Dana (Bagian Keuangan)</h4>
                     <p><strong>Dicairkan oleh:</strong> {{ optional($assetRequest->disburser)->name ?? '-' }}</p>
                     <p><strong>Tanggal:</strong>
-                        {{ $assetRequest->disbursed_at ? $assetRequest->disbursed_at->format('d F Y H:i') : '-' }}
-                    </p>
+                        {{ $assetRequest->disbursed_at ? $assetRequest->disbursed_at->format('d F Y H:i') : '-' }}</p>
                     @if ($assetRequest->disbursement_notes)
                         <div style="margin-top: 0.5rem; background: var(--light-bg); padding: 1rem; border-radius: 8px;">
                             {{ $assetRequest->disbursement_notes }}</div>
@@ -147,11 +146,9 @@
                 <div style="margin-bottom: 2rem;">
                     <h4 style="margin-bottom: 1rem; border-bottom: 2px solid var(--primary-color); padding-bottom: 0.5rem;">
                         Konfirmasi Penerimaan Fisik (PJ Pengadaan)</h4>
-                    <p><strong>Dikonfirmasi oleh:</strong> {{ optional($assetRequest->confirmer)->name ?? '-' }}
-                    </p>
+                    <p><strong>Dikonfirmasi oleh:</strong> {{ optional($assetRequest->confirmer)->name ?? '-' }}</p>
                     <p><strong>Tanggal:</strong>
-                        {{ $assetRequest->confirmed_at ? $assetRequest->confirmed_at->format('d F Y H:i') : '-' }}
-                    </p>
+                        {{ $assetRequest->confirmed_at ? $assetRequest->confirmed_at->format('d F Y H:i') : '-' }}</p>
                     @if ($assetRequest->confirmation_notes)
                         <div style="margin-top: 0.5rem; background: var(--light-bg); padding: 1rem; border-radius: 8px;">
                             {{ $assetRequest->confirmation_notes }}</div>
@@ -162,45 +159,46 @@
             <div class="btn-group" style="justify-content: center; margin-top: 2rem;">
                 <a href="{{ route('requests.index') }}" class="btn btn-secondary">Kembali</a>
 
-                @if ($assetRequest->status === 'Pending' && in_array(auth()->user()->level, ['Sarpras', 'Admin']))
+                @can('verify', $assetRequest)
                     <form action="{{ route('requests.verify', $assetRequest) }}" method="POST" style="display: inline;">
                         @csrf
-                        <button type="submit" class="btn btn-success"
-                            onclick="return confirm('Verifikasi pengajuan ini?')">✓ Verifikasi</button>
+                        <button type="submit" class="btn btn-success" onclick="return confirm('Verifikasi pengajuan ini?')">✓
+                            Verifikasi</button>
                     </form>
-                    <button type="button" class="btn btn-danger" onclick="showRejectModal()">✗ Tolak</button>
-                @endif
+                @endcan
 
-                @if ($assetRequest->status === 'Diverifikasi' && auth()->user()->level === 'Rektor')
+                @can('approve', $assetRequest)
                     <form action="{{ route('requests.approve', $assetRequest) }}" method="POST" style="display: inline;">
                         @csrf
                         <button type="submit" class="btn btn-success" onclick="return confirm('Setujui pengajuan?')">✓
                             Setujui</button>
                     </form>
-                    <button type="button" class="btn btn-danger" onclick="showRejectModal()">✗ Tolak</button>
-                @endif
+                @endcan
 
-                @if ($assetRequest->status === 'Disetujui' && auth()->user()->level === 'Keuangan')
+                @can('reject', $assetRequest)
+                    <button type="button" class="btn btn-danger" onclick="showRejectModal()">✗ Tolak</button>
+                @endcan
+
+                @can('disburse', $assetRequest)
                     <form action="{{ route('requests.disburse', $assetRequest) }}" method="POST" style="display: inline;">
                         @csrf
                         <button type="submit" class="btn btn-success"
-                            onclick="return confirm('Konfirmasi dana sudah dicairkan?')">Konfirmasi Dana Cair</button>
+                            onclick="return confirm('Konfirmasi dana sudah dicairkan?')">✓ Konfirmasi Dana Cair</button>
                     </form>
-                @endif
+                @endcan
 
-                @if ($assetRequest->status === 'Dana Cair' && auth()->user()->level === 'PJ Pengadaan')
+                @can('confirmPhysical', $assetRequest)
                     <form action="{{ route('requests.confirm', $assetRequest) }}" method="POST" style="display: inline;">
                         @csrf
                         <button type="submit" class="btn btn-success"
-                            onclick="return confirm('Konfirmasi barang sudah diterima secara fisik?')">Konfirmasi
+                            onclick="return confirm('Konfirmasi barang sudah diterima secara fisik?')">✓ Konfirmasi
                             Fisik</button>
                     </form>
-                @endif
+                @endcan
 
-                @if ($assetRequest->status === 'Dikonfirmasi' && in_array(auth()->user()->level, ['Sarpras', 'Admin']))
-                    <a href="{{ route('requests.receive.form', $assetRequest) }}" class="btn btn-success">Registrasi
-                        Aset</a>
-                @endif
+                @can('receive', $assetRequest)
+                    <a href="{{ route('requests.receive.form', $assetRequest) }}" class="btn btn-success">Registrasi Aset</a>
+                @endcan
             </div>
         </div>
     </div>

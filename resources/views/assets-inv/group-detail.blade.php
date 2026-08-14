@@ -53,6 +53,17 @@
                                         class="btn btn-secondary">Detail</a>
                                     <a href="{{ route('assets-inv.edit', ['asset' => $unit->id, 'group_name' => $groupName, 'group_type_id' => $unit->asset_type_id, 'group_brand' => $groupBrand]) }}"
                                         class="btn btn-primary">Edit</a>
+                                    @can('delete', $unit)
+                                        <form action="{{ route('assets-inv.destroy', $unit) }}" method="POST"
+                                            style="display: inline;" onsubmit="return confirm('Hapus unit ini?')">
+                                            @csrf
+                                            @method('DELETE')
+                                            <input type="hidden" name="group_name" value="{{ $groupName }}">
+                                            <input type="hidden" name="group_type_id" value="{{ $unit->asset_type_id }}">
+                                            <input type="hidden" name="group_brand" value="{{ $groupBrand }}">
+                                            <button type="submit" class="btn btn-danger">Hapus</button>
+                                        </form>
+                                    @endcan
                                 </div>
                             </td>
                         </tr>

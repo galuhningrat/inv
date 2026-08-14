@@ -13,6 +13,13 @@ class MaintenanceController extends Controller
     {
         $query = Maintenance::with('asset', 'recorder');
 
+        $user = auth()->user();
+        if ($user->level === 'Kalab') {
+            $query->whereHas('asset', fn($q) => $q->where('unit_id', $user->unit_id));
+        } elseif (in_array($user->level, ['Aslab', 'Karyawan', 'Mahasiswa'])) {
+            $query->where('recorded_by', $user->id);
+        }
+
         if ($request->has('status') && $request->status) {
             $query->where('status', $request->status);
         }
@@ -38,6 +45,8 @@ class MaintenanceController extends Controller
 
     public function store(Request $request)
     {
+        $this->authorize('create', Maintenance::class);
+        
         $validated = $request->validate([
             'asset_id' => 'required|exists:assets,id',
             'type' => 'required|in:Preventif,Kuratif,Emergensi',
@@ -61,11 +70,13 @@ class MaintenanceController extends Controller
 
     public function update(Request $request, Maintenance $maintenance)
     {
+        $this->authorize('update', $maintenance);
+
         $validated = $request->validate([
             'status' => 'required|in:Diterima,Dalam Proses,Menunggu Komponen,Selesai',
             'cost' => 'nullable|numeric|min:0',
             'description' => 'nullable|string',
-            'technician' => 'nullable|string|max:255', // ✅ tambahan
+            'technician' => 'nullable|string|max:255',
         ]);
 
         $maintenance->update($validated);
@@ -80,16 +91,18 @@ class MaintenanceController extends Controller
 
     public function show(Maintenance $maintenance)
     {
+        $this->authorize('view', $maintenance);
+
         $maintenance->load('asset', 'recorder');
         return view('maintenances.show', compact('maintenance'));
     }
 
     public function destroy(Maintenance $maintenance)
     {
-        $maintenance->delete();
+        $this->authorize('delete', $maintenance); 
 
-        return redirect()->route('maintenances.index')
-            ->with('success', 'Catatan pemeliharaan berhasil dihapus!');
+        $maintenance->delete();
+        return redirect()->route('maintenances.index')->with('success', 'Catatan pemeliharaan berhasil dihapus!');
     }
 
     public function showAssetDetail($id)

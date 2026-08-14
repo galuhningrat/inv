@@ -112,4 +112,21 @@ class AssetRequest extends Model
     {
         return $this->belongsTo(User::class, 'disbursed_by');
     }
+    public function unit()
+    {
+        return $this->belongsTo(Unit::class);
+    }
+    public function getStatusLabelAttribute(): string
+    {
+        return match ($this->status) {
+            'Pending' => 'Menunggu Verifikasi PJ Pengadaan',
+            'Diverifikasi' => 'Menunggu Persetujuan Ketua STTI',
+            'Disetujui' => 'Menunggu Konfirmasi Dana Cair oleh Keuangan',
+            'Dana Cair' => 'Menunggu Konfirmasi Penerimaan Barang oleh PJ Pengadaan',
+            'Dikonfirmasi' => 'Menunggu Registrasi Aset oleh Sarpras',
+            'Diterima' => 'Aset Telah Terdaftar ke Inventaris',
+            'Ditolak' => 'Pengajuan Ditolak',
+            default => $this->status,
+        };
+    }
 }

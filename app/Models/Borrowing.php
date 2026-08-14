@@ -16,18 +16,23 @@ class Borrowing extends Model
         'asset_id',
         'borrower_name',
         'borrower_role',
+        'borrower_user_id',
         'borrow_date',
         'return_date',
         'actual_return_date',
         'purpose',
         'status',
         'approved_by',
+        'kalab_approved_by',
+        'kalab_approved_at',
+        'kalab_rejection_notes',
     ];
 
     protected $casts = [
         'borrow_date' => 'date',
         'return_date' => 'date',
         'actual_return_date' => 'date',
+        'kalab_approved_at' => 'datetime',
     ];
 
     protected static function boot()
@@ -67,5 +72,10 @@ class Borrowing extends Model
     public function approver()
     {
         return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function kalabApprover()
+    {
+        return $this->belongsTo(User::class, 'kalab_approved_by');
     }
 }

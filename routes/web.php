@@ -11,6 +11,7 @@ use App\Http\Controllers\AssetRequestController;
 use App\Http\Controllers\QrCodeController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\Api\AssetDetailController;
+use App\Http\Controllers\IntangibleAssetController;
 
 // Public routes
 Route::get('/', function () {
@@ -41,6 +42,11 @@ Route::middleware(['auth'])->group(function () {
         Route::put('/assets-inv/{asset}', [AssetController::class, 'update'])->name('assets-inv.update');
         Route::delete('/assets-inv/{asset}', [AssetController::class, 'destroy'])->name('assets-inv.destroy');
 
+        Route::get('/intangible-assets', [IntangibleAssetController::class, 'index'])->name('intangible-assets.index');
+        Route::get('/intangible-assets/create', [IntangibleAssetController::class, 'create'])->name('intangible-assets.create');
+        Route::post('/intangible-assets', [IntangibleAssetController::class, 'store'])->name('intangible-assets.store');
+        Route::get('/intangible-assets/{intangibleAsset}', [IntangibleAssetController::class, 'show'])->name('intangible-assets.show');
+
         // API for modal
         Route::get('/api/assets/{asset}/detail', [AssetController::class, 'showModal'])->name('api.assets.detail');
 
@@ -52,11 +58,13 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware(['level:borrowing'])->group(function () {
         Route::resource('borrowings', BorrowingController::class)->except(['edit', 'update']);
         Route::post('/borrowings/{borrowing}/return', [BorrowingController::class, 'returnAsset'])->name('borrowings.return');
+        Route::post('/borrowings/{borrowing}/approve-cross-unit', [BorrowingController::class, 'approveCrossUnit'])->name('borrowings.approve-cross-unit');
+        Route::post('/borrowings/{borrowing}/reject-cross-unit', [BorrowingController::class, 'rejectCrossUnit'])->name('borrowings.reject-cross-unit');
     });
 
     // Maintenance Management
     Route::middleware(['level:maintenance'])->group(function () {
-        Route::resource('maintenances', MaintenanceController::class)->except(['edit']); // ✅ update diaktifkan lagi
+        Route::resource('maintenances', MaintenanceController::class)->except(['edit']); // update diaktifkan lagi
         Route::get('/maintenances/asset/{id}', [MaintenanceController::class, 'showAssetDetail'])->name('maintenances.asset.detail');
     });
 

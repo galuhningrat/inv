@@ -7,7 +7,9 @@
     <div class="data-table-container">
         <div class="table-header">
             <h3 class="table-title">Pengajuan Aset</h3>
-            <a href="{{ route('requests.create') }}" class="btn btn-primary">+ Ajukan Aset</a>
+            @can('create', App\Models\AssetRequest::class)
+                <a href="{{ route('requests.create') }}" class="btn btn-primary">+ Ajukan Aset</a>
+            @endcan
         </div>
         <div class="table-wrapper">
             <table class="data-table">
@@ -50,31 +52,34 @@
                                         default => 'pending',
                                     };
                                 @endphp
-                                <span class="status-badge {{ $statusClass }}">{{ $request->status }}</span>
+                                <span class="status-badge {{ $statusClass }}">{{ $request->status_label }}</span>
                             </td>
                             <td>
                                 <div class="action-buttons">
-                                    @if ($request->status === 'Pending' && in_array(auth()->user()->level, ['PJ Pengadaan', 'Admin']))
+                                    @can('verify', $request)
                                         <form action="{{ route('requests.verify', $request) }}" method="POST"
                                             style="display: inline;">
                                             @csrf
                                             <button type="submit" class="btn btn-success"
                                                 onclick="return confirm('Verifikasi pengajuan ini?')">Verifikasi</button>
                                         </form>
-                                    @endif
+                                    @endcan
 
-                                    @if ($request->status === 'Diverifikasi' && auth()->user()->level === 'Rektor')
+                                    @can('approve', $request)
                                         <form action="{{ route('requests.approve', $request) }}" method="POST"
                                             style="display: inline;">
                                             @csrf
                                             <button type="submit" class="btn btn-success"
                                                 onclick="return confirm('Setujui pengajuan ini?')">Setujui</button>
                                         </form>
+                                    @endcan
+
+                                    @can('reject', $request)
                                         <button type="button" class="btn btn-danger"
                                             onclick="showRejectModal({{ $request->id }})">Tolak</button>
-                                    @endif
+                                    @endcan
 
-                                    @if ($request->status === 'Disetujui' && auth()->user()->level === 'Keuangan')
+                                    @can('disburse', $request)
                                         <form action="{{ route('requests.disburse', $request) }}" method="POST"
                                             style="display: inline;">
                                             @csrf
@@ -82,9 +87,9 @@
                                                 onclick="return confirm('Konfirmasi dana sudah dicairkan?')">Konfirmasi Dana
                                                 Cair</button>
                                         </form>
-                                    @endif
+                                    @endcan
 
-                                    @if ($request->status === 'Dana Cair' && auth()->user()->level === 'PJ Pengadaan')
+                                    @can('confirmPhysical', $request)
                                         <form action="{{ route('requests.confirm', $request) }}" method="POST"
                                             style="display: inline;">
                                             @csrf
@@ -92,14 +97,16 @@
                                                 onclick="return confirm('Konfirmasi barang sudah diterima secara fisik?')">Konfirmasi
                                                 Fisik</button>
                                         </form>
-                                    @endif
+                                    @endcan
 
-                                    @if ($request->status === 'Dikonfirmasi' && in_array(auth()->user()->level, ['Sarpras', 'Admin']))
+                                    @can('receive', $request)
                                         <a href="{{ route('requests.receive.form', $request) }}"
                                             class="btn btn-success">Registrasi Aset</a>
-                                    @endif
+                                    @endcan
 
-                                    <a href="{{ route('requests.show', $request) }}" class="btn btn-secondary">Detail</a>
+                                    @can('view', $request)
+                                        <a href="{{ route('requests.show', $request) }}" class="btn btn-secondary">Detail</a>
+                                    @endcan
                                 </div>
                             </td>
                         </tr>

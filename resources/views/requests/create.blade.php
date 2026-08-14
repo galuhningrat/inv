@@ -9,8 +9,8 @@
     {{-- ============================================================ --}}
     <style>
         /* =============================================
-                           ITEM TYPE PICKER – VERSION 2 (AESTHETIC)
-                           ============================================= */
+                               ITEM TYPE PICKER – VERSION 2 (AESTHETIC)
+                               ============================================= */
         .item-type-picker {
             display: flex;
             gap: 1rem;
@@ -162,6 +162,46 @@
             <h3 class="table-title">Ajukan Aset Baru</h3>
             <a href="{{ route('requests.index') }}" class="btn btn-secondary">← Kembali</a>
         </div>
+        {{-- Banner Prosedur Bulanan --}}
+        <div
+            style="background: var(--light-bg); border-radius: 12px; padding: 1rem 1.5rem; margin-bottom: 1.5rem; border-left: 4px solid var(--primary-color);">
+            <p style="margin: 0; font-size: 0.9rem;">
+                <strong>📢 Prosedur Pengajuan Bulanan</strong><br>
+                Pengajuan aset dilakukan per bulan sesuai anggaran unit.
+                Anda hanya dapat mengajukan <strong>1 kali</strong> per bulan.
+                Periode: <strong>{{ now()->translatedFormat('F Y') }}</strong>
+            </p>
+        </div>
+
+        {{-- Notifikasi Rollover (jika ada) --}}
+        @if (session('rollover_notification'))
+            @php $notif = session('rollover_notification'); @endphp
+            <div
+                style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 1rem 1.5rem; margin-bottom: 1.5rem;">
+                <p style="margin: 0; font-size: 0.9rem;">
+                    <strong>🔄 Rollover Item Ditangguhkan</strong><br>
+                    Terdapat <strong>{{ $notif['count'] }}</strong> aset dari pengajuan bulan lalu yang ditangguhkan oleh
+                    Ketua STTI.
+                    Aset tersebut telah otomatis dimasukkan ke dalam draft pengajuan bulan ini untuk Anda tinjau kembali.
+                    <br><small style="color: #92400e;">Silakan periksa dan edit jika diperlukan sebelum mengajukan.</small>
+                </p>
+            </div>
+        @endif
+
+        {{-- Tombol Ajukan — Auto-lock --}}
+        @php
+            $hasRequestThisMonth = \App\Models\AssetRequest::hasRequestThisMonth(auth()->user()->unit_id);
+        @endphp
+        @if ($hasRequestThisMonth)
+            <div
+                style="background: #fee2e2; border: 1px solid #ef4444; border-radius: 12px; padding: 1rem 1.5rem; margin-bottom: 1.5rem;">
+                <p style="margin: 0; font-size: 0.9rem; color: #991b1b;">
+                    🔒 Anda telah melakukan pengajuan untuk periode <strong>{{ now()->translatedFormat('F Y') }}</strong>.
+                    Akses pengajuan baru akan dibuka kembali pada
+                    <strong>{{ now()->addMonth()->translatedFormat('F Y') }}</strong>.
+                </p>
+            </div>
+        @endif
         <div style="padding: 2rem;">
             <template id="assetTypeOptionsTemplate">
                 <option value="">Pilih Jenis</option>
@@ -193,7 +233,8 @@
                         <select id="kategori_barang" name="kategori_barang"
                             class="form-control @error('kategori_barang') error @enderror" required>
                             @foreach ($kategoriBarangOptions as $opt)
-                                <option value="{{ $opt }}" {{ old('kategori_barang') === $opt ? 'selected' : '' }}>
+                                <option value="{{ $opt }}"
+                                    {{ old('kategori_barang') === $opt ? 'selected' : '' }}>
                                     {{ $opt }}</option>
                             @endforeach
                         </select>

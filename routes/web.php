@@ -85,6 +85,8 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/requests/{assetRequest}/receive', [AssetRequestController::class, 'receive'])->name('requests.receive');
         Route::post('/requests/{assetRequest}/confirm', [AssetRequestController::class, 'confirmPhysical'])->name('requests.confirm');
         Route::post('/requests/{assetRequest}/disburse', [AssetRequestController::class, 'disburseFund'])->name('requests.disburse');
+        Route::get('/requests/{assetRequest}/approval', [AssetRequestController::class, 'approval'])->name('requests.approval');
+        Route::post('/requests/{assetRequest}/items/{item}/approve', [AssetRequestController::class, 'approveItem'])->name('requests.approve-item');
     });
 
     // Reports

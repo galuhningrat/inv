@@ -28,7 +28,7 @@
                                 default => 'pending',
                             };
                         @endphp
-                        <span class="status-badge {{ $statusClass }}">{{ $assetRequest->status }}</span>
+                        <span class="status-badge {{ $statusClass }}">{{ $assetRequest->status_label }}</span>
                     </p>
                 </div>
 

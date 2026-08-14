@@ -7,6 +7,7 @@ use App\Models\AssetRequestItem;
 use App\Models\AssetType;
 use App\Models\Asset;
 use App\Models\QrCode;
+use App\Models\RolloverLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -55,6 +56,13 @@ class AssetRequestController extends Controller
     {
         $this->authorize('create', AssetRequest::class);
 
+        // Cek apakah sudah ada pengajuan bulan ini untuk unit ini
+        if (AssetRequest::hasRequestThisMonth(Auth::user()->unit_id)) {
+            return redirect()->back()
+                ->withInput()
+                ->with('error', 'Anda telah melakukan pengajuan untuk bulan ini. Akses dibuka kembali bulan depan.');
+        }
+
         $validated = $request->validate([
             'jenis_barang' => 'required|in:Habis Pakai,Tidak Habis Pakai,Jasa',
             'kategori_barang' => 'required|in:ATK,Konsumsi,Alat,Furniture,Lainnya',
@@ -77,6 +85,8 @@ class AssetRequestController extends Controller
             $assetRequest = AssetRequest::create([
                 'requester_id' => Auth::id(),
                 'unit_id' => Auth::user()->unit_id,
+                'period_month' => now()->month,
+                'period_year' => now()->year,
                 'jenis_barang' => $validated['jenis_barang'],
                 'kategori_barang' => $validated['kategori_barang'],
                 'alasan_pengajuan' => $validated['alasan_pengajuan'],
@@ -87,7 +97,15 @@ class AssetRequestController extends Controller
             ]);
 
             foreach ($validated['items'] as $item) {
-                $assetRequest->items()->create($item);
+                $assetRequest->items()->create([
+                    'item_type' => $item['item_type'],
+                    'asset_type_id' => $item['asset_type_id'] ?? null,
+                    'item_name' => $item['item_name'],
+                    'specification' => $item['specification'] ?? null,
+                    'quantity' => $item['quantity'],
+                    'unit' => $item['unit'],
+                    'estimated_price_per_unit' => $item['estimated_price_per_unit'] ?? null,
+                ]);
             }
 
             DB::commit();
@@ -337,4 +355,159 @@ class AssetRequestController extends Controller
         return redirect()->route('requests.index')
             ->with('success', 'Penerimaan fisik dikonfirmasi, diteruskan ke Sarpras untuk registrasi!');
     }
+
+    public function approval(AssetRequest $assetRequest)
+    {
+        if (Auth::user()->level !== 'Rektor') {
+            abort(403, 'Hanya Rektor yang dapat mengakses halaman approval.');
+        }
+
+        if ($assetRequest->status !== 'Diverifikasi') {
+            return redirect()->route('requests.index')->with('error', 'Pengajuan belum diverifikasi.');
+        }
+
+        $assetRequest->load('items.assetType', 'requester', 'unit');
+
+        return view('requests.approval', compact('assetRequest'));
+    }
+
+    public function approveItem(Request $request, AssetRequest $assetRequest, AssetRequestItem $item)
+    {
+        if (Auth::user()->level !== 'Rektor') {
+            abort(403);
+        }
+
+        if ($item->asset_request_id !== $assetRequest->id) {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'action' => 'required|in:approved,rejected,deferred',
+            'approval_notes' => 'required_if:action,rejected,deferred|nullable|string',
+        ]);
+
+        $item->update([
+            'approval_status' => $validated['action'],
+            'approval_notes' => $validated['approval_notes'] ?? null,
+            'approved_by' => Auth::id(),
+            'approved_at' => now(),
+        ]);
+
+        // Jika semua item sudah diproses, update status header
+        $this->updateRequestStatus($assetRequest);
+
+        $message = match ($validated['action']) {
+            'approved' => 'Item disetujui.',
+            'rejected' => 'Item ditolak.',
+            'deferred' => 'Item ditangguhkan dan akan di-rollover ke bulan depan.',
+        };
+
+        return redirect()->back()->with('success', $message);
+    }
+
+    private function updateRequestStatus(AssetRequest $assetRequest)
+    {
+        $assetRequest->load('items');
+
+        $pending = $assetRequest->items->where('approval_status', 'pending')->count();
+        $rejected = $assetRequest->items->where('approval_status', 'rejected')->count();
+        $approved = $assetRequest->items->where('approval_status', 'approved')->count();
+
+        if ($pending > 0) {
+            // Masih ada yang pending, status tetap Diverifikasi
+            return;
+        }
+
+        if ($rejected > 0 && $approved === 0) {
+            // Semua ditolak
+            $assetRequest->update([
+                'status' => 'Ditolak',
+                'approved_by' => Auth::id(),
+                'approved_at' => now(),
+                'approval_notes' => 'Semua item ditolak.',
+            ]);
+        } else {
+            // Ada yang disetujui
+            $assetRequest->update([
+                'status' => 'Disetujui',
+                'approved_by' => Auth::id(),
+                'approved_at' => now(),
+            ]);
+        }
+
+        // Jika ada item ditangguhkan, jalankan rollover
+        $deferredItems = $assetRequest->items->where('approval_status', 'deferred');
+        if ($deferredItems->count() > 0) {
+            $this->rolloverDeferredItems($assetRequest, $deferredItems);
+        }
+    }
+
+    private function rolloverDeferredItems(AssetRequest $assetRequest, $deferredItems)
+    {
+        $nextMonth = now()->addMonth();
+        $targetMonth = $nextMonth->month;
+        $targetYear = $nextMonth->year;
+
+        // Buat draft pengajuan baru untuk bulan depan (jika belum ada)
+        $existingDraft = AssetRequest::where('unit_id', $assetRequest->unit_id)
+            ->where('period_month', $targetMonth)
+            ->where('period_year', $targetYear)
+            ->whereIn('status', ['Pending', 'Diverifikasi'])
+            ->first();
+
+        if (!$existingDraft) {
+            $existingDraft = AssetRequest::create([
+                'requester_id' => $assetRequest->requester_id,
+                'unit_id' => $assetRequest->unit_id,
+                'period_month' => $targetMonth,
+                'period_year' => $targetYear,
+                'jenis_barang' => $assetRequest->jenis_barang,
+                'kategori_barang' => $assetRequest->kategori_barang,
+                'alasan_pengajuan' => $assetRequest->alasan_pengajuan,
+                'priority' => $assetRequest->priority,
+                'reason' => $assetRequest->reason . ' (Rollover dari bulan ' . $assetRequest->period_month . '/' . $assetRequest->period_year . ')',
+                'status' => 'Pending',
+            ]);
+        }
+
+        foreach ($deferredItems as $item) {
+            // Duplikat item ke draft baru
+            $newItem = $existingDraft->items()->create([
+                'item_type' => $item->item_type,
+                'asset_type_id' => $item->asset_type_id,
+                'item_name' => $item->item_name,
+                'specification' => $item->specification,
+                'quantity' => $item->quantity,
+                'unit' => $item->unit,
+                'estimated_price_per_unit' => $item->estimated_price_per_unit,
+                'approval_status' => 'pending',
+                'approval_notes' => 'Rollover dari item #' . $item->id . ' (Alasan: ' . ($item->approval_notes ?? 'Ditangguhkan') . ')',
+            ]);
+
+            // Catat di rollover_logs
+            RolloverLog::create([
+                'original_item_id' => $item->id,
+                'new_item_id' => $newItem->id,
+                'source_month' => $assetRequest->period_month,
+                'source_year' => $assetRequest->period_year,
+                'target_month' => $targetMonth,
+                'target_year' => $targetYear,
+                'reason' => $item->approval_notes ?? 'Ditangguhkan oleh Rektor',
+            ]);
+
+            // Tandai item asal sebagai sudah di-rollover
+            $item->update([
+                'rolled_from_item_id' => $item->id, // menandai bahwa item ini sudah di-rollover
+            ]);
+        }
+
+        // Kirim notifikasi ke user (bisa pakai event atau session)
+        session()->flash('rollover_notification', [
+            'count' => $deferredItems->count(),
+            'month' => $targetMonth,
+            'year' => $targetYear,
+        ]);
+    }
+
+
 }

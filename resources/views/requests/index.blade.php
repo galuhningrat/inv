@@ -104,6 +104,11 @@
                                             class="btn btn-success">Registrasi Aset</a>
                                     @endcan
 
+                                    @can('approve', $request)
+                                        <a href="{{ route('requests.approval', $request) }}"
+                                            class="btn btn-primary">Approval</a>
+                                    @endcan
+
                                     @can('view', $request)
                                         <a href="{{ route('requests.show', $request) }}" class="btn btn-secondary">Detail</a>
                                     @endcan

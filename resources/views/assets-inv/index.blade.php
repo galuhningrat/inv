@@ -4,7 +4,6 @@
 @section('page-title', 'Manajemen Aset')
 
 @section('content')
-@section('content')
     <style>
         .view-toggle-wrapper {
             padding: 0 2rem;
@@ -64,7 +63,6 @@
             color: #2563eb;
         }
 
-        /* Dark mode */
         body.dark-mode .view-toggle {
             background: #1f2937;
             border-color: #374151;
@@ -79,7 +77,6 @@
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
         }
 
-        /* Responsive */
         @media screen and (max-width: 640px) {
             .view-toggle-wrapper {
                 padding: 0 1rem;
@@ -173,6 +170,9 @@
                     <option value="Tersedia" {{ request('status') === 'Tersedia' ? 'selected' : '' }}>Tersedia</option>
                     <option value="Dipinjam" {{ request('status') === 'Dipinjam' ? 'selected' : '' }}>Dipinjam</option>
                     <option value="Maintenance" {{ request('status') === 'Maintenance' ? 'selected' : '' }}>Maintenance
+                    </option>
+                    <option value="Diganti" {{ request('status') === 'Diganti' ? 'selected' : '' }}>Diganti</option>
+                    <option value="Kadaluarsa" {{ request('status') === 'Kadaluarsa' ? 'selected' : '' }}>Kadaluarsa
                     </option>
                 </select>
                 <select class="form-control" id="filterType" style="width: auto; min-width: 150px;">
@@ -299,6 +299,9 @@
                                         @if ($group->maintenance_count > 0)
                                             <br>{{ $group->maintenance_count }} Maintenance
                                         @endif
+                                        @if ($group->diganti_count > 0)
+                                            <br><span style="color: #dc2626;">{{ $group->diganti_count }} Diganti</span>
+                                        @endif
                                     </td>
                                     <td><span class="price-display">Rp
                                             {{ number_format($group->price, 0, ',', '.') }}</span></td>
@@ -339,16 +342,40 @@
                                     <td>{{ $asset->name }}</td>
                                     <td>{{ $asset->assetType->name ?? '-' }}</td>
                                     <td>{{ $asset->brand }}</td>
-                                    <td>{{ $asset->location }}</td>
                                     <td>
-                                        <span
-                                            class="status-badge {{ $asset->condition === 'Baik' ? 'available' : ($asset->condition === 'Rusak Ringan' ? 'borrowed' : 'maintenance') }}">
+                                        @if ($asset->location_id)
+                                            {{ $asset->location_ref->name ?? '' }}
+                                            @if ($asset->location_detail)
+                                                - {{ $asset->location_detail }}
+                                            @endif
+                                        @else
+                                            {{ $asset->location }}
+                                        @endif
+                                    </td>
+                                    <td>
+                                        @php
+                                            $conditionClass = match ($asset->condition) {
+                                                'Baik' => 'available',
+                                                'Rusak Ringan' => 'borrowed',
+                                                'Rusak Berat' => 'maintenance',
+                                                default => 'pending',
+                                            };
+                                        @endphp
+                                        <span class="status-badge {{ $conditionClass }}">
                                             {{ $asset->condition }}
                                         </span>
                                     </td>
                                     <td>
-                                        <span
-                                            class="status-badge {{ $asset->status === 'Tersedia' ? 'available' : ($asset->status === 'Dipinjam' ? 'borrowed' : 'maintenance') }}">
+                                        @php
+                                            $statusClass = match ($asset->status) {
+                                                'Tersedia' => 'available',
+                                                'Dipinjam' => 'borrowed',
+                                                'Maintenance' => 'maintenance',
+                                                'Diganti' => 'rejected',
+                                                default => 'pending',
+                                            };
+                                        @endphp
+                                        <span class="status-badge {{ $statusClass }}">
                                             {{ $asset->status }}
                                         </span>
                                     </td>
@@ -534,7 +561,6 @@
             if (status) params.append('status', status);
             if (type) params.append('type', type);
             if (unitId) params.append('unit_id', unitId);
-            // preserve view
             const view = '{{ $view }}';
             if (view) params.append('view', view);
             window.location.href = '{{ route('assets-inv.index') }}?' + params.toString();

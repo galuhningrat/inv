@@ -256,67 +256,150 @@ class AssetRequestController extends Controller
         }
 
         $assetRequest->load('items');
+        $hasPhysical = $assetRequest->items->contains('item_type', 'Fisik');
 
         $rules = [
-            'brand' => 'required|array',
             'purchase_date' => 'required|date',
-            'location' => 'required|string|max:255',
             'penanggung_jawab_id' => 'nullable|exists:users,id',
         ];
 
-        foreach ($assetRequest->items as $item) {
-            $rules["brand.{$item->id}"] = 'required|string|max:255';
-            $rules["prices.{$item->id}"] = 'required|numeric|min:0';
+        if ($hasPhysical) {
+            $rules['unit_id'] = 'required|exists:units,id';
+            $rules['location_id'] = 'nullable|exists:locations,id';
+            $rules['location_detail'] = 'nullable|string|max:255';
+        }
 
-            for ($i = 0; $i < $item->quantity; $i++) {
-                $rules["unit_names.{$item->id}.{$i}"] = 'nullable|string|max:255';
-                $rules["images.{$item->id}.{$i}"] = 'required|image|mimes:jpg,jpeg,png,webp|max:2048'; // ✅ per-unit sekarang
-                $rules["serial_numbers.{$item->id}.{$i}"] = 'required|string|distinct|unique:assets,serial_number';
-                $rules["conditions.{$item->id}.{$i}"] = 'required|in:Baik,Rusak Ringan,Rusak Berat';
-                $rules["expired_dates.{$item->id}.{$i}"] = 'nullable|date'; // ✅ baru
+        foreach ($assetRequest->items as $item) {
+            if ($item->item_type === 'Fisik') {
+                $rules["brand.{$item->id}"] = 'required|string|max:255';
+                $rules["prices.{$item->id}"] = 'required|numeric|min:0';
+                for ($i = 0; $i < $item->quantity; $i++) {
+                    $rules["images.{$item->id}.{$i}"] = 'required|image|mimes:jpg,jpeg,png,webp|max:2048';
+                    $rules["serial_numbers.{$item->id}.{$i}"] = 'required|string|distinct|unique:assets,serial_number';
+                    $rules["conditions.{$item->id}.{$i}"] = 'required|in:Baik,Rusak Ringan,Rusak Berat';
+                    $rules["expired_dates.{$item->id}.{$i}"] = 'nullable|date';
+                    $rules["unit_names.{$item->id}.{$i}"] = 'nullable|string|max:255';
+                }
+            } else {
+                $rules["categories.{$item->id}"] = 'required|in:Software,HAKI/Paten,Jurnal Ilmiah,Domain/Hosting,Kurikulum';
+                $rules["vendors.{$item->id}"] = 'required|string|max:255';
+                $rules["prices.{$item->id}"] = 'required|numeric|min:0';
+                $rules["funding_sources.{$item->id}"] = 'nullable|string|max:255';
+                $rules["contract_numbers.{$item->id}"] = 'nullable|string|max:255';
+                $rules["license_types.{$item->id}"] = 'required|in:Berlangganan,Selamanya';
+                $rules["expiry_dates.{$item->id}"] = 'required_if:license_types.' . $item->id . ',Berlangganan|nullable|date';
+                $rules["access_urls.{$item->id}"] = 'nullable|url|max:255';
+                $rules["certificate_files.{$item->id}"] = 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120';
+                for ($i = 0; $i < $item->quantity; $i++) {
+                    $rules["product_keys.{$item->id}.{$i}"] = 'nullable|string|max:255';
+                    $rules["assigned_emails.{$item->id}.{$i}"] = 'nullable|email|max:255';
+                }
             }
         }
 
         $validated = $request->validate($rules);
 
+        $locationName = $hasPhysical && !empty($validated['location_id']) ? \App\Models\Location::find($validated['location_id'])->name : null;
+        $locationString = trim(collect([$locationName, $validated['location_detail'] ?? null])->filter()->implode(' - '));
+
         DB::beginTransaction();
         try {
+            $createdAssets = [];
+
             foreach ($assetRequest->items as $item) {
-                for ($i = 0; $i < $item->quantity; $i++) {
-                    $imagePath = $request->file("images.{$item->id}.{$i}")->store('assets', 'public'); // ✅ per-unit
+                if ($item->item_type === 'Fisik') {
+                    for ($i = 0; $i < $item->quantity; $i++) {
+                        $unitImagePath = $request->file("images.{$item->id}.{$i}")->store('assets', 'public');
 
-                    $asset = new Asset();
-                    $asset->name = !empty($validated['unit_names'][$item->id][$i])
-                        ? $validated['unit_names'][$item->id][$i] // ✅ override nama per-unit kalau diisi
-                        : $item->item_name; // fallback ke nama generik item
-                    $asset->asset_type_id = $item->asset_type_id;
-                    $asset->brand = $validated['brand'][$item->id];
-                    $asset->serial_number = $validated['serial_numbers'][$item->id][$i];
-                    $asset->price = $validated['prices'][$item->id];
-                    $asset->purchase_date = $validated['purchase_date'];
-                    $asset->expired_at = $validated['expired_dates'][$item->id][$i] ?? null; // ✅ baru
-                    $asset->location = $validated['location'];
-                    $asset->condition = $validated['conditions'][$item->id][$i];
-                    $asset->status = 'Tersedia';
-                    $asset->image = $imagePath;
-                    $asset->penanggung_jawab_id = $validated['penanggung_jawab_id'] ?? $assetRequest->requester_id;
-                    $asset->asset_request_id = $assetRequest->id;
-                    $asset->unit_id = $assetRequest->unit_id; // ✅ ikut unit dari pengajuannya
-                    $asset->qr_code = QrCode::generateCodeContent($item->assetType->code);
-                    $asset->save();
+                        $asset = new Asset();
+                        $asset->name = !empty($validated['unit_names'][$item->id][$i] ?? null)
+                            ? $validated['unit_names'][$item->id][$i]
+                            : $item->item_name;
+                        $asset->asset_type_id = $item->asset_type_id;
+                        $asset->brand = $validated['brand'][$item->id];
+                        $asset->serial_number = $validated['serial_numbers'][$item->id][$i];
+                        $asset->price = $validated['prices'][$item->id];
+                        $asset->purchase_date = $validated['purchase_date'];
+                        $asset->expired_at = $validated['expired_dates'][$item->id][$i] ?? null;
+                        $asset->location = $locationString;
+                        $asset->location_id = $validated['location_id'] ?? null;
+                        $asset->location_detail = $validated['location_detail'] ?? null;
+                        $asset->unit_id = $validated['unit_id'];
+                        $asset->condition = $validated['conditions'][$item->id][$i];
+                        $asset->status = 'Tersedia';
+                        $asset->image = $unitImagePath;
+                        $asset->penanggung_jawab_id = $validated['penanggung_jawab_id'] ?? $assetRequest->requester_id;
+                        $asset->asset_request_id = $assetRequest->id;
+                        $asset->qr_code = QrCode::generateCodeContent($item->assetType->code);
+                        $asset->save();
 
-                    QrCode::create([
-                        'asset_id' => $asset->id,
-                        'code_content' => $asset->qr_code,
-                        'status' => 'Aktif',
-                    ]);
+                        $createdAssets[] = $asset;
+
+                        QrCode::create(['asset_id' => $asset->id, 'code_content' => $asset->qr_code, 'status' => 'Aktif']);
+                    }
+                } else { // Non-Fisik
+                    $certificatePath = $request->hasFile("certificate_files.{$item->id}")
+                        ? $request->file("certificate_files.{$item->id}")->store('intangible-certificates', 'public')
+                        : null;
+
+                    for ($i = 0; $i < $item->quantity; $i++) {
+                        $intangible = \App\Models\IntangibleAsset::create([
+                            'name' => $item->item_name,
+                            'category' => $validated['categories'][$item->id],
+                            'vendor' => $validated['vendors'][$item->id],
+                            'price' => $validated['prices'][$item->id],
+                            'activation_date' => $validated['purchase_date'],
+                            'funding_source' => $validated['funding_sources'][$item->id] ?? null,
+                            'contract_number' => $validated['contract_numbers'][$item->id] ?? null,
+                            'license_type' => $validated['license_types'][$item->id],
+                            'expiry_date' => $validated['expiry_dates'][$item->id] ?? null,
+                            'quota' => null,
+                            'unit_id' => $assetRequest->unit_id,
+                            'pic_id' => $validated['penanggung_jawab_id'] ?? null,
+                            'access_url' => $validated['access_urls'][$item->id] ?? null,
+                            'certificate_file' => $certificatePath,
+                            'product_key' => $validated['product_keys'][$item->id][$i] ?? null,
+                            'assigned_user_email' => $validated['assigned_emails'][$item->id][$i] ?? null,
+                            'status' => 'Aktif',
+                            'created_by' => Auth::id(),
+                            'asset_request_id' => $assetRequest->id,
+                        ]);
+                        $createdAssets[] = $intangible;
+                    }
+                }
+            }
+
+            if ($assetRequest->alasan_pengajuan === 'Penggantian' && $assetRequest->related_asset_id) {
+                $oldAsset = Asset::find($assetRequest->related_asset_id);
+
+                if ($oldAsset) {
+                    // Cari aset baru pertama yang dibuat (untuk penggantian)
+                    $newAsset = $createdAssets[0] ?? null;
+
+                    if ($newAsset && $newAsset instanceof Asset) {
+                        // Update aset lama menjadi "Diganti"
+                        $oldAsset->update([
+                            'status' => 'Diganti',
+                            'replaces_asset_id' => $newAsset->id,
+                            'updated_at' => now(),
+                        ]);
+
+                        // Opsional: simpan log di session
+                        session()->flash('replacement_notification', [
+                            'old_asset_id' => $oldAsset->asset_id,
+                            'old_asset_name' => $oldAsset->name,
+                            'new_asset_id' => $newAsset->asset_id,
+                            'new_asset_name' => $newAsset->name,
+                        ]);
+                    }
                 }
             }
 
             $assetRequest->update(['status' => 'Diterima']);
             DB::commit();
 
-            return redirect()->route('requests.index')->with('success', 'Semua item berhasil diregistrasi ke inventaris!');
+            return redirect()->route('requests.index')
+                ->with('success', 'Semua item berhasil diregistrasi ke inventaris!');
         } catch (\Exception $e) {
             DB::rollback();
             return redirect()->back()->withInput()->with('error', 'Gagal memproses registrasi: ' . $e->getMessage());

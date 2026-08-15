@@ -33,6 +33,7 @@ class Asset extends Model
         'location_id',
         'location_detail',
         'expired_at',
+        'replaces_asset_id',
     ];
 
     protected $casts = [
@@ -146,5 +147,24 @@ class Asset extends Model
     public function location_ref()
     {
         return $this->belongsTo(Location::class, 'location_id');
+    }
+    public function replaces()
+    {
+        return $this->belongsTo(Asset::class, 'replaces_asset_id');
+    }
+
+    public function replacement()
+    {
+        return $this->hasOne(Asset::class, 'replaces_asset_id');
+    }
+
+    public function scopeActive($query)
+    {
+        return $query->where('status', '!=', 'Diganti');
+    }
+
+    public function scopeReplaced($query)
+    {
+        return $query->where('status', 'Diganti');
     }
 }

@@ -21,7 +21,28 @@
                 @csrf
 
                 <h4 style="margin-bottom: 1rem;">Data Umum</h4>
-
+                @if ($assetRequest->alasan_pengajuan === 'Penggantian' && $assetRequest->relatedAsset)
+                    <div
+                        style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 1rem 1.5rem; margin-bottom: 1.5rem;">
+                        <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+                            <span style="font-size: 1.5rem;">⚠️</span>
+                            <div>
+                                <p style="margin: 0; font-weight: 600; color: #92400e;">Pengajuan Penggantian Aset</p>
+                                <p style="margin: 0.25rem 0 0; font-size: 0.9rem; color: #78350f;">
+                                    Aset yang akan diganti:
+                                    <strong>{{ $assetRequest->relatedAsset->asset_id }} —
+                                        {{ $assetRequest->relatedAsset->name }}</strong>
+                                    <br>
+                                    <small style="color: #92400e;">
+                                        🔄 Setelah registrasi selesai, aset lama akan otomatis berstatus
+                                        <strong>"Diganti"</strong>
+                                        dan tidak bisa dipinjam lagi.
+                                    </small>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                @endif
                 <div class="form-row">
                     <div class="form-group">
                         <label for="purchase_date">Tanggal Terima <span style="color:red;">*</span></label>

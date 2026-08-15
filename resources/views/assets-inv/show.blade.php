@@ -34,7 +34,16 @@
                             <p><strong>Jenis:</strong> {{ $asset->assetType->name ?? '-' }}</p>
                             <p><strong>Merek:</strong> {{ $asset->brand }}</p>
                             <p><strong>Nomor Seri:</strong> {{ $asset->serial_number }}</p>
-                            <p><strong>Lokasi:</strong> {{ $asset->location }}</p>
+                            <p><strong>Lokasi:</strong>
+                                @if ($asset->location_id)
+                                    {{ $asset->location_ref->name ?? '' }}
+                                    @if ($asset->location_detail)
+                                        - {{ $asset->location_detail }}
+                                    @endif
+                                @else
+                                    {{ $asset->location }}
+                                @endif
+                            </p>
                             <p><strong>Kode QR:</strong> {{ $asset->qr_code }}</p>
                             <p><strong>Status:</strong>
                                 <span
@@ -48,6 +57,28 @@
                                     {{ $asset->condition }}
                                 </span>
                             </p>
+                            @if ($asset->status === 'Diganti' && $asset->replacement)
+                                <p>
+                                    <strong>Diganti Oleh:</strong>
+                                    <a href="{{ route('assets-inv.show', $asset->replacement) }}"
+                                        style="color: var(--primary-color);">
+                                        {{ $asset->replacement->asset_id }} — {{ $asset->replacement->name }}
+                                    </a>
+                                </p>
+                            @endif
+
+                            @if ($asset->replaces)
+                                <p>
+                                    <strong>Menggantikan:</strong>
+                                    <a href="{{ route('assets-inv.show', $asset->replaces) }}"
+                                        style="color: var(--primary-color);">
+                                        {{ $asset->replaces->asset_id }} — {{ $asset->replaces->name }}
+                                    </a>
+                                    <br>
+                                    <small style="color: var(--text-secondary);">(Status aset lama: <span
+                                            class="status-badge maintenance">Diganti</span>)</small>
+                                </p>
+                            @endif
                             <p><strong>Harga:</strong> <span class="price-display">Rp
                                     {{ number_format($asset->price, 0, ',', '.') }}</span></p>
                             <p><strong>Tanggal Pembelian:</strong> {{ $asset->purchase_date->format('d F Y') }}</p>

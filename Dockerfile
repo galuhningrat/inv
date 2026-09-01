@@ -1,11 +1,14 @@
 FROM php:8.2
 
-RUN apt-get update -y && apt-get install -y openssl zip unzip git libonig-dev libpq-dev && docker-php-ext-install pdo pdo_pgsql pgsql mbstring
+RUN apt-get update -y && apt-get install -y openssl zip unzip git libonig-dev libpq-dev libpng-dev libjpeg-dev libfreetype6-dev \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install pdo pdo_pgsql pgsql mbstring gd
 
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
 WORKDIR /var/www/html
 COPY . /var/www/html
+RUN git config --global --add safe.directory /var/www/html
 
 RUN composer install
 

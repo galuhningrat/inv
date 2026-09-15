@@ -10,6 +10,22 @@ class IntangibleAsset extends Model
 {
     use HasFactory, SoftDeletes;
 
+    // Sumber tunggal daftar kategori aset non-fisik (value => label). Dipakai di
+    // form pengajuan (requests.create), form registrasi (requests.receive), dan
+    // form input langsung (intangible-assets.create) supaya ketiganya konsisten
+    // dan tidak lagi drift satu sama lain.
+    public const CATEGORIES = [
+        'Software' => 'Perangkat Lunak / Software',
+        'Cloud/SaaS' => 'Lisensi Cloud / SaaS',
+        'Akun Digital' => 'Akun Digital / Subscription',
+        'Domain/Hosting' => 'Domain & Hosting',
+        'Jurnal Ilmiah' => 'Jurnal Ilmiah & Database',
+        'HAKI/Paten' => 'HAKI / Paten / Hak Cipta',
+        'Sertifikat Digital' => 'Sertifikat Digital / SSL',
+        'Kurikulum' => 'Lisensi Kurikulum / Konten',
+        'Lainnya' => 'Lainnya',
+    ];
+
     protected $fillable = [
         'asset_code',
         'name',

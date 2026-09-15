@@ -30,10 +30,13 @@
                     <div class="detail-info">
                         <h2 style="margin-bottom: 1rem; color: var(--text-primary);">{{ $asset->name }}</h2>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                            <p><strong>ID Aset:</strong> {{ $asset->asset_id }}</p>
+                            <p><strong>Label Aset Kampus:</strong> {{ $asset->asset_id }}</p>
                             <p><strong>Jenis:</strong> {{ $asset->assetType->name ?? '-' }}</p>
                             <p><strong>Merek:</strong> {{ $asset->brand }}</p>
-                            <p><strong>Nomor Seri:</strong> {{ $asset->serial_number }}</p>
+                            @if ($asset->model)
+                                <p><strong>Tipe / Model:</strong> {{ $asset->model }}</p>
+                            @endif
+                            <p><strong>Nomor Seri Pabrik (S/N):</strong> {{ $asset->serial_number }}</p>
                             <p><strong>Lokasi:</strong>
                                 @if ($asset->location_id)
                                     {{ $asset->location_ref->name ?? '' }}
@@ -82,6 +85,18 @@
                             <p><strong>Harga:</strong> <span class="price-display">Rp
                                     {{ number_format($asset->price, 0, ',', '.') }}</span></p>
                             <p><strong>Tanggal Pembelian:</strong> {{ $asset->purchase_date->format('d F Y') }}</p>
+                            {{-- Data akuntansi cuma ditampilkan kalau memang diisi — supaya aset
+                                 lama yang belum punya data ini tidak menampilkan baris kosong. --}}
+                            @if ($asset->funding_source)
+                                <p><strong>Sumber Pendanaan:</strong> {{ $asset->funding_source }}</p>
+                            @endif
+                            @if ($asset->economic_life_years)
+                                <p><strong>Umur Ekonomis:</strong> {{ $asset->economic_life_years }} tahun</p>
+                            @endif
+                            @if (!is_null($asset->residual_value))
+                                <p><strong>Nilai Residu:</strong> Rp
+                                    {{ number_format($asset->residual_value, 0, ',', '.') }}</p>
+                            @endif
                         </div>
                     </div>
                 </div>

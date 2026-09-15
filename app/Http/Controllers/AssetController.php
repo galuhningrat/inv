@@ -13,6 +13,7 @@ use App\Models\Unit;
 use App\Models\Location;
 use App\Models\IntangibleAsset;
 use App\Models\AssetRequest;
+use Illuminate\Validation\Rule;
 
 class AssetController extends Controller
 {
@@ -276,6 +277,9 @@ class AssetController extends Controller
         $assetTypes = AssetType::all();
         $units = Unit::with('locations')->whereNotNull('category')->orderBy('category')->orderBy('name')->get();
         $usersByLevel = \App\Models\User::orderBy('name')->get()->groupBy('level');
+        // Daftar yang sama persis dengan IntangibleAssetController, supaya Sumber
+        // Pendanaan konsisten antara aset fisik dan non-fisik.
+        $fundingSources = ['Dana Yayasan', 'Hibah/Bantuan Pemerintah (LLDIKTI)', 'Dana Mandiri/UKT Mahasiswa', 'Kerja Sama Industri'];
 
         $unitsForJs = $units->map(function ($u) {
             return [
@@ -288,7 +292,7 @@ class AssetController extends Controller
             ];
         })->values();
 
-        return view('assets-inv.create', compact('assetTypes', 'units', 'usersByLevel', 'unitsForJs'));
+        return view('assets-inv.create', compact('assetTypes', 'units', 'usersByLevel', 'unitsForJs', 'fundingSources'));
     }
 
     public function store(Request $request)
@@ -302,14 +306,26 @@ class AssetController extends Controller
             'name' => 'required|string|max:255',
             'asset_type_id' => 'required|exists:asset_types,id',
             'brand' => 'required|string|max:255',
+            'model' => 'nullable|string|max:255',
             'price' => 'required|numeric|min:0',
+            'funding_source' => 'nullable|string|max:100',
+            'economic_life_years' => 'nullable|integer|min:1|max:100',
+            'residual_value' => 'nullable|numeric|min:0',
             'purchase_date' => 'required|date',
             'unit_id' => 'required|exists:units,id',
             'location_id' => $hasLocations ? 'required|exists:locations,id' : 'nullable',
             'location_detail' => $hasLocations ? 'nullable|string|max:255' : 'required|string|max:255',
             'quantity' => 'required|integer|min:1|max:100',
             'serial_numbers' => 'required|array|size:' . $request->input('quantity', 1),
-            'serial_numbers.*' => 'required|string|distinct|unique:assets,serial_number',
+            // whereNull('deleted_at') WAJIB: rule "unique" query langsung ke tabel
+            // tanpa lewat global scope SoftDeletes, jadi tanpa ini nomor seri milik
+            // aset yang SUDAH DIHAPUS tetap dianggap "sudah dipakai". Akibatnya aset
+            // pengganti dengan nomor seri fisik yang sama (mis. barang lama dihapus
+            // lalu didata ulang) ditolak dengan pesan yang membingungkan — padahal
+            // di layar aset itu sudah tidak ada. Ini keluarga bug yang sama dengan
+            // penomoran QR/asset_id yang sudah diperbaiki sebelumnya, cuma kebalikan
+            // arahnya: di sini soft-deleted harus DIKECUALIKAN, bukan disertakan.
+            'serial_numbers.*' => ['required', 'string', 'distinct', Rule::unique('assets', 'serial_number')->whereNull('deleted_at')],
             'conditions' => 'required|array',
             'conditions.*' => 'required|in:Baik,Rusak Ringan,Rusak Berat',
             'images.*' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
@@ -327,22 +343,27 @@ class AssetController extends Controller
             $created = 0;
 
             foreach ($validated['serial_numbers'] as $index => $serialNumber) {
-                $year = date('Y');
-                $month = date('m');
-                $maxAssetId = DB::select("SELECT MAX(CAST(SUBSTRING(asset_id FROM '[0-9]+$') AS INTEGER)) as max_num FROM assets WHERE asset_id LIKE ? AND deleted_at IS NULL", ["{$year}/{$month}/{$assetType->code}-%"]);
-                $counter = ($maxAssetId[0]->max_num ?? 0) + 1;
-
                 $imagePath = $request->hasFile("images.$index")
                     ? $request->file("images.$index")->store('assets', 'public')
                     : null;
 
+                // asset_id TIDAK di-set manual di sini lagi — dibiarkan kosong supaya
+                // Asset::boot()'s creating hook yang generate lewat
+                // Asset::generateAssetId(), yang sekarang sudah benar (withTrashed()).
+                // Sebelumnya di sini ada logika hitung nomor sendiri lewat raw SQL
+                // yang terpisah dari generateAssetId() dan punya bug persis yang sama
+                // (mengecualikan baris yang soft-deleted) — dua implementasi untuk hal
+                // yang sama gampang saling menyimpang; sekarang cuma ada satu.
                 $asset = Asset::create([
-                    'asset_id' => sprintf('%s/%s/%s-%04d', $year, $month, $assetType->code, $counter),
                     'name' => $validated['name'],
                     'asset_type_id' => $validated['asset_type_id'],
                     'brand' => $validated['brand'],
+                    'model' => $validated['model'] ?? null,
                     'serial_number' => $serialNumber,
                     'price' => $validated['price'],
+                    'funding_source' => $validated['funding_source'] ?? null,
+                    'economic_life_years' => $validated['economic_life_years'] ?? null,
+                    'residual_value' => $validated['residual_value'] ?? null,
                     'purchase_date' => $validated['purchase_date'],
                     'location' => $locationString,
                     'location_id' => $validated['location_id'] ?? null,
@@ -392,6 +413,7 @@ class AssetController extends Controller
         $assetTypes = AssetType::all();
         $units = Unit::with('locations')->whereNotNull('category')->orderBy('category')->orderBy('name')->get();
         $usersByLevel = \App\Models\User::orderBy('name')->get()->groupBy('level');
+        $fundingSources = ['Dana Yayasan', 'Hibah/Bantuan Pemerintah (LLDIKTI)', 'Dana Mandiri/UKT Mahasiswa', 'Kerja Sama Industri'];
 
         $unitsForJs = $units->map(function ($u) {
             return [
@@ -404,7 +426,7 @@ class AssetController extends Controller
             ];
         })->values();
 
-        return view('assets-inv.edit', compact('asset', 'assetTypes', 'units', 'usersByLevel', 'unitsForJs'));
+        return view('assets-inv.edit', compact('asset', 'assetTypes', 'units', 'usersByLevel', 'unitsForJs', 'fundingSources'));
     }
 
     public function update(Request $request, Asset $asset)
@@ -416,12 +438,18 @@ class AssetController extends Controller
             'name' => 'required|string|max:255',
             'asset_type_id' => 'required|exists:asset_types,id',
             'brand' => 'required|string|max:255',
+            'model' => 'nullable|string|max:255',
             'price' => 'required|numeric|min:0',
+            'funding_source' => 'nullable|string|max:100',
+            'economic_life_years' => 'nullable|integer|min:1|max:100',
+            'residual_value' => 'nullable|numeric|min:0',
             'purchase_date' => 'required|date',
             'unit_id' => 'required|exists:units,id',
             'location_id' => 'nullable|exists:locations,id',
             'location_detail' => 'nullable|string|max:255',
-            'serial_number' => 'required|string|unique:assets,serial_number,' . $asset->id,
+            // Sama seperti di store(): kecualikan aset yang sudah soft-deleted supaya
+            // nomor seri milik aset terhapus tidak memblokir aset aktif.
+            'serial_number' => ['required', 'string', Rule::unique('assets', 'serial_number')->ignore($asset->id)->whereNull('deleted_at')],
             'condition' => 'required|in:Baik,Rusak Ringan,Rusak Berat',
             'penanggung_jawab_id' => 'nullable|exists:users,id',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
@@ -454,7 +482,11 @@ class AssetController extends Controller
         $asset->name = $validated['name'];
         $asset->asset_type_id = $validated['asset_type_id'];
         $asset->brand = $validated['brand'];
+        $asset->model = $validated['model'] ?? null;
         $asset->price = $validated['price'];
+        $asset->funding_source = $validated['funding_source'] ?? null;
+        $asset->economic_life_years = $validated['economic_life_years'] ?? null;
+        $asset->residual_value = $validated['residual_value'] ?? null;
         $asset->purchase_date = $validated['purchase_date'];
         $asset->unit_id = $validated['unit_id'];
         $asset->location_id = $validated['location_id'] ?? null;

@@ -5,7 +5,7 @@
 
 @section('content')
     {{-- ============================================================ --}}
-    {{--  PEMILIH JENIS ASET – HERO CARD                              --}}
+    {{-- PEMILIH JENIS ASET – HERO CARD --}}
     {{-- ============================================================ --}}
     <div class="asset-type-selector">
         <div class="asset-type-selector__inner">
@@ -50,7 +50,7 @@
     </div>
 
     {{-- ============================================================ --}}
-    {{--  FORM TAMBAH ASET FISIK                                      --}}
+    {{-- FORM TAMBAH ASET FISIK --}}
     {{-- ============================================================ --}}
     <div class="data-table-container" style="margin-top: 2rem;">
         <div class="table-header">
@@ -76,7 +76,30 @@
                         <select id="asset_type_id" name="asset_type_id"
                             class="form-control @error('asset_type_id') error @enderror" required>
                             <option value="">Pilih Jenis</option>
-                            @foreach ($assetTypes as $type)
+
+                            @php
+                                $orderedCodes = [
+                                    'KOM',
+                                    'JAR',
+                                    'ELK',
+                                    'LAB',
+                                    'MEB',
+                                    'ARS',
+                                    'OTO',
+                                    'TNH',
+                                    'GDG',
+                                    'PRS',
+                                    'FUR',
+                                    'ATK',
+                                    'LAN',
+                                ];
+                                $sortedAssetTypes = $assetTypes->sortBy(function ($type) use ($orderedCodes) {
+                                    $pos = array_search($type->code, $orderedCodes);
+                                    return $pos === false ? 999 : $pos;
+                                });
+                            @endphp
+
+                            @foreach ($sortedAssetTypes as $type)
                                 <option value="{{ $type->id }}"
                                     {{ old('asset_type_id') == $type->id ? 'selected' : '' }}>
                                     {{ $type->name }} ({{ $type->code }})
@@ -99,6 +122,11 @@
                         @enderror
                     </div>
                     <div class="form-group">
+                        <label for="model">Tipe / Model <small style="font-weight: normal;">(opsional)</small></label>
+                        <input type="text" id="model" name="model" class="form-control"
+                            value="{{ old('model') }}" placeholder="mis. ExpertCenter D700">
+                    </div>
+                    <div class="form-group">
                         <label for="price">Harga Pembelian <span style="color: red;">*</span></label>
                         <input type="number" id="price" name="price"
                             class="form-control @error('price') error @enderror" value="{{ old('price') }}" min="0"
@@ -117,6 +145,36 @@
                     @error('purchase_date')
                         <div class="error-message" style="display: block;">{{ $message }}</div>
                     @enderror
+                </div>
+
+                {{-- Data akuntansi — semua opsional, tidak ada yang diwajibkan (lihat catatan
+                di migration 2026_09_07_000000_add_accounting_fields_to_assets.php). --}}
+                <hr style="margin: 1.5rem 0;">
+                <h4 style="margin-bottom: 1rem;">Data Akuntansi <small
+                        style="font-weight: normal; color: var(--text-secondary);">(opsional)</small></h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="funding_source">Sumber Pendanaan</label>
+                        <select id="funding_source" name="funding_source" class="form-control">
+                            <option value="">-- Tidak ditentukan --</option>
+                            @foreach ($fundingSources as $fs)
+                                <option value="{{ $fs }}" {{ old('funding_source') === $fs ? 'selected' : '' }}>
+                                    {{ $fs }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="economic_life_years">Umur Ekonomis (Tahun)</label>
+                        <input type="number" id="economic_life_years" name="economic_life_years" class="form-control"
+                            value="{{ old('economic_life_years') }}" min="1" max="100"
+                            placeholder="mis. 5">
+                    </div>
+                    <div class="form-group">
+                        <label for="residual_value">Nilai Residu (Rp)</label>
+                        <input type="number" id="residual_value" name="residual_value" class="form-control"
+                            value="{{ old('residual_value') }}" min="0">
+                    </div>
                 </div>
 
                 <div class="form-group">
@@ -194,7 +252,22 @@
                         min="1" max="100" onchange="renderUnitBlocks()" required>
                 </div>
 
-                <div id="unitBlocksContainer"></div>
+                {{-- Layout tabel horizontal, bukan tumpukan kotak vertikal — dulu kalau
+                kuantitas > 3 form jadi sangat panjang ke bawah. Tabel ini scroll
+                horizontal sendiri di layar sempit (lihat CSS .unit-table-wrapper). --}}
+                <div class="unit-table-wrapper">
+                    <table class="unit-table" id="unitTable">
+                        <thead>
+                            <tr>
+                                <th style="width: 4rem;">Unit Ke</th>
+                                <th>Nomor Seri Pabrik (S/N) <span style="color: red;">*</span></th>
+                                <th style="width: 10rem;">Kondisi <span style="color: red;">*</span></th>
+                                <th style="width: 14rem;">Foto Unit</th>
+                            </tr>
+                        </thead>
+                        <tbody id="unitBlocksContainer"></tbody>
+                    </table>
+                </div>
 
                 <div class="btn-group">
                     <a href="{{ route('assets-inv.index') }}" class="btn btn-secondary">Batal</a>
@@ -205,15 +278,15 @@
     </div>
 
     <script id="unitsData" type="application/json">
-        @json($unitsForJs)
-    </script>
+            @json($unitsForJs)
+        </script>
 @endsection
 
 @push('styles')
     <style>
         /* =============================================
-                   ASSET TYPE SELECTOR (Hero Card)
-                ============================================= */
+                           ASSET TYPE SELECTOR (Hero Card)
+                        ============================================= */
         .asset-type-selector {
             background: var(--card-background);
             border-radius: 16px;
@@ -361,6 +434,47 @@
                 height: 52px;
             }
         }
+
+        /* =============================================
+                   TABEL HORIZONTAL UNTUK DETAIL PER UNIT
+                   Ganti tumpukan kotak vertikal — dulu kalau kuantitas
+                   besar (>3) form jadi sangat panjang ke bawah.
+                ============================================= */
+        .unit-table-wrapper {
+            overflow-x: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+        }
+
+        .unit-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 640px;
+        }
+
+        .unit-table th,
+        .unit-table td {
+            padding: 0.6rem 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+            vertical-align: middle;
+        }
+
+        .unit-table thead th {
+            background: var(--light-bg);
+            font-size: 0.85rem;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .unit-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .unit-table .form-control {
+            margin: 0;
+        }
     </style>
 @endpush
 
@@ -436,31 +550,20 @@
             container.innerHTML = '';
 
             for (let i = 0; i < qty; i++) {
-                const block = document.createElement('div');
-                block.style.cssText =
-                    'border: 1px dashed var(--border-color); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;';
-                block.innerHTML = `
-                    <p style="font-weight: 600; margin-bottom: 0.75rem;">Unit #${i + 1}</p>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Nomor Seri <span style="color:red;">*</span></label>
-                            <input type="text" name="serial_numbers[]" class="form-control" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Kondisi <span style="color:red;">*</span></label>
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                        <td style="font-weight: 600; text-align: center;">#${i + 1}</td>
+                        <td><input type="text" name="serial_numbers[]" class="form-control" required></td>
+                        <td>
                             <select name="conditions[]" class="form-control" required>
                                 <option value="Baik">Baik</option>
                                 <option value="Rusak Ringan">Rusak Ringan</option>
                                 <option value="Rusak Berat">Rusak Berat</option>
                             </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Foto Unit</label>
-                            <input type="file" name="images[${i}]" class="form-control" accept="image/*">
-                        </div>
-                    </div>
-                `;
-                container.appendChild(block);
+                        </td>
+                        <td><input type="file" name="images[${i}]" class="form-control" accept="image/*"></td>
+                    `;
+                container.appendChild(row);
             }
         }
 

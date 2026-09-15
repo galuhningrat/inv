@@ -1,0 +1,128 @@
+========== FOLDER: app ========== 
+Folder PATH listing
+Volume serial number is 0000018E D4E7:B2C4
+C:\USERS\PC 18\DOCUMENTS\GALUH NINGRAT\PROJECT\INV-STTI\APP
++---Exports
+¦       AssetsExport.php
+¦       BorrowingsExport.php
+¦       FinancialExport.php
+¦       MaintenancesExport.php
+¦       
++---Http
+¦   +---Controllers
+¦   ¦   ¦   AssetController.php
+¦   ¦   ¦   AssetRequestController.php
+¦   ¦   ¦   BorrowingController.php
+¦   ¦   ¦   Controller.php
+¦   ¦   ¦   DashboardController.php
+¦   ¦   ¦   IntangibleAssetController.php
+¦   ¦   ¦   MaintenanceController.php
+¦   ¦   ¦   QrCodeController.php
+¦   ¦   ¦   ReportController.php
+¦   ¦   ¦   UserController.php
+¦   ¦   ¦   
+¦   ¦   +---Api
+¦   ¦   ¦       AssetDetailController.php
+¦   ¦   ¦       
+¦   ¦   +---Auth
+¦   ¦           LoginController.php
+¦   ¦           
+¦   +---Middleware
+¦           CheckUserLevel.php
+¦           
++---Models
+¦       Asset.php
+¦       AssetRequest.php
+¦       AssetRequestItem.php
+¦       AssetType.php
+¦       Borrowing.php
+¦       IntangibleAsset.php
+¦       Location.php
+¦       Maintenance.php
+¦       QrCode.php
+¦       RolloverLog.php
+¦       Unit.php
+¦       User.php
+¦       
++---Policies
+¦       AssetPolicy.php
+¦       AssetRequestPolicy.php
+¦       BorrowingPolicy.php
+¦       MaintenancePolicy.php
+¦       
++---Providers
+        AppServiceProvider.php
+        
+ 
+========== FOLDER: database ========== 
+Folder PATH listing
+Volume serial number is 000001E0 D4E7:B2C4
+C:\USERS\PC 18\DOCUMENTS\GALUH NINGRAT\PROJECT\INV-STTI\DATABASE
+¦   .gitignore
+¦   
++---factories
+¦       UserFactory.php
+¦       
++---migrations
+¦       0001_01_01_000000_create_users_table.php.BAK
+¦       0001_01_01_000001_create_cache_table.php
+¦       0001_01_01_000002_create_jobs_table.php
+¦       2025_11_21_025007_create_users_table.php
+¦       2025_11_21_025019_create_asset_types_table.php
+¦       2025_11_21_025021_create_assets_table.php
+¦       2025_11_21_025024_create_borrowings_table.php
+¦       2025_11_21_025027_create_maintenances_table.php
+¦       2025_11_21_025030_create_asset_requests_table.php
+¦       2025_11_21_025541_create_qr_codes_table.php
+¦       2025_11_21_104445_create_sessions_table.php
+¦       2026_08_04_015043_expand_level_and_add_missing_fields.php
+¦       2026_08_04_023934_rebuild_maintenance_ticket_status.php
+¦       2026_08_04_035610_link_assets_to_requests_and_add_received_status.php
+¦       2026_08_04_072621_redesign_asset_requests_with_line_items.php
+¦       2026_08_06_031337_add_physical_confirmation_stage.php
+¦       2026_08_06_034350_add_disbursement_stage.php
+¦       2026_08_07_070427_create_units_table.php
+¦       2026_08_07_073821_add_karyawan_mahasiswa_roles.php
+¦       2026_08_07_073846_add_borrower_user_id_to_borrowings.php
+¦       2026_08_08_050013_add_expired_at_to_assets.php
+¦       2026_08_11_021750_add_cross_unit_approval_to_borrowings.php
+¦       2026_08_11_064226_create_locations_table.php
+¦       2026_08_11_080125_add_category_to_units_and_restructure.php
+¦       2026_08_11_092023_create_intangible_assets_table.php
+¦       2026_08_11_154929_add_pic_and_procurement_fields_to_intangible_assets.php
+¦       2026_08_11_155740_add_item_type_to_asset_request_items.php
+¦       2026_08_14_041123_add_period_and_approval_fields_to_asset_requests.php
+¦       2026_08_14_041124_add_approval_status_to_asset_request_items.php
+¦       2026_08_14_041125_create_rollover_logs_table.php
+¦       2026_08_14_071208_add_replaces_asset_id_and_update_status_to_assets.php
+¦       2026_09_03_011527_add_category_to_items_and_expand_intangible_categories.php
+¦
++---seeders
+        AssetSeeder.php
+        AssetTypeSeeder.php
+        AssignUnitSeeder.php
+        DatabaseSeeder.php
+        ElektroMesinDummySeeder.php
+        LocationSeeder.php
+        RestructureUnitsSeeder.php
+        UnitSeeder.php
+        UserSeeder.php
+        
+ 
+========== FOLDER: resource ========== 
+Folder PATH listing
+Volume serial number is 000002A5 D4E7:B2C4
+C:\USERS\PC 18\DOCUMENTS\GALUH NINGRAT\PROJECT\INV-STTI\RESOURCE
+Invalid path - \USERS\PC 18\DOCUMENTS\GALUH NINGRAT\PROJECT\INV-STTI\RESOURCE
+No subfolders exist 
+
+ 
+========== FOLDER: routes ========== 
+Folder PATH listing
+Volume serial number is 00000269 D4E7:B2C4
+C:\USERS\PC 18\DOCUMENTS\GALUH NINGRAT\PROJECT\INV-STTI\ROUTES
+    console.php
+    web.php
+    
+No subfolders exist 
+

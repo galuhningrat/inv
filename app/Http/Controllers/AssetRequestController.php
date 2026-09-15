@@ -35,20 +35,47 @@ class AssetRequestController extends Controller
 
     public function create()
     {
+        $user = Auth::user();
         $assetTypes = AssetType::all();
         $priorities = ['Normal', 'Mendesak', 'Sangat Mendesak'];
-        $jenisBarangOptions = ['Habis Pakai', 'Tidak Habis Pakai', 'Jasa'];
-        $kategoriBarangOptions = ['ATK', 'Konsumsi', 'Alat', 'Furniture', 'Lainnya'];
         $alasanOptions = ['Pengadaan Baru', 'Penggantian', 'Pengisian Kembali'];
         $assets = Asset::orderBy('name')->get(); // untuk dropdown "aset terkait" kasus Penggantian
+
+        // Unit tujuan pengajuan. Sarpras/Admin boleh memilih unit mana pun (mis.
+        // membantu unit yang tidak punya akses) — role lain (Kaprodi/Kalab) terkunci
+        // ke unit akun sendiri, jadi tidak perlu dropdown sungguhan untuk mereka,
+        // cukup ditampilkan sebagai info. Penegakan sebenarnya tetap di store().
+        $canChooseUnit = in_array($user->level, ['Sarpras', 'Admin']);
+        $units = $canChooseUnit
+            ? \App\Models\Unit::whereNotNull('category')->orderBy('category')->orderBy('name')->get()
+            : collect();
+        $currentUnitName = $user->unit_id ? \App\Models\Unit::find($user->unit_id)?->name : null;
+
+        // Klasifikasi per item (bukan header lagi — lihat migration
+        // 2026_09_05_000000_add_sifat_barang_and_light_receipt_columns.php untuk alasannya).
+        // Semua sumbernya konstanta di model supaya tetap sinkron dengan requests.receive,
+        // requests.show, requests.approval, dan intangible-assets.create.
+        $nonFisikCategories = \App\Models\IntangibleAsset::CATEGORIES;
+        $habisPakaiCategories = AssetRequestItem::HABIS_PAKAI_CATEGORIES;
+        $unitsFisik = AssetRequestItem::UNITS_FISIK;
+        $unitsNonFisik = AssetRequestItem::UNITS_NON_FISIK;
+        $sifatBarangFisik = AssetRequestItem::SIFAT_BARANG_FISIK;
+        $sifatBarangNonFisik = AssetRequestItem::SIFAT_BARANG_NON_FISIK;
 
         return view('requests.create', compact(
             'assetTypes',
             'priorities',
-            'jenisBarangOptions',
-            'kategoriBarangOptions',
             'alasanOptions',
-            'assets'
+            'assets',
+            'canChooseUnit',
+            'units',
+            'currentUnitName',
+            'nonFisikCategories',
+            'habisPakaiCategories',
+            'unitsFisik',
+            'unitsNonFisik',
+            'sifatBarangFisik',
+            'sifatBarangNonFisik'
         ));
     }
 
@@ -56,39 +83,109 @@ class AssetRequestController extends Controller
     {
         $this->authorize('create', AssetRequest::class);
 
-        // Cek apakah sudah ada pengajuan bulan ini untuk unit ini
-        if (AssetRequest::hasRequestThisMonth(Auth::user()->unit_id)) {
-            return redirect()->back()
-                ->withInput()
-                ->with('error', 'Anda telah melakukan pengajuan untuk bulan ini. Akses dibuka kembali bulan depan.');
-        }
+        // Batasan "1x pengajuan per bulan per unit" DIHAPUS — dikonfirmasi langsung
+        // oleh PJ Pengadaan bahwa itu cuma kebiasaan batching operasional mereka,
+        // bukan aturan anggaran. AssetRequest::hasRequestThisMonth() sengaja TIDAK
+        // dihapus dari model, hanya tidak lagi dipanggil di sini — tetap tersedia
+        // untuk kebutuhan laporan/filter di masa depan kalau diperlukan.
+
+        $user = Auth::user();
+        // Sarpras/Admin boleh mengajukan atas nama unit mana pun (mis. membantu unit
+        // yang tidak punya akses). Kaprodi/Kalab (role lain yang punya izin create)
+        // TIDAK boleh mengajukan atas nama unit lain — unit_id mereka dipaksa dari
+        // akun sendiri di bawah, terlepas dari apa pun yang terkirim di form. Dropdown
+        // unit di UI cuma ditampilkan untuk Sarpras/Admin (lihat create.blade.php),
+        // tapi validasi tetap dipaksa di sini juga — jangan percaya input form begitu
+        // saja hanya karena UI-nya sudah membatasi pilihan.
+        $canChooseUnit = in_array($user->level, ['Sarpras', 'Admin']);
 
         $validated = $request->validate([
-            'jenis_barang' => 'required|in:Habis Pakai,Tidak Habis Pakai,Jasa',
-            'kategori_barang' => 'required|in:ATK,Konsumsi,Alat,Furniture,Lainnya',
+            'unit_id' => $canChooseUnit ? 'required|exists:units,id' : 'nullable|exists:units,id',
+            // Sengaja "sometimes" (bukan "required"): jenis_barang & kategori_barang
+            // tidak lagi diminta di form pengajuan baru — klasifikasi sekarang per
+            // item lewat "sifat_barang" (lihat migration
+            // 2026_09_05_000000_add_sifat_barang_and_light_receipt_columns.php).
+            // Rule "in:" tetap dipertahankan untuk berjaga-jaga kalau ada integrasi
+            // lama yang masih mengirim nilai ini — supaya tidak tersimpan nilai sampah.
+            'jenis_barang' => 'sometimes|nullable|in:Habis Pakai,Tidak Habis Pakai,Jasa',
+            'kategori_barang' => 'sometimes|nullable|in:ATK,Konsumsi,Alat,Furniture,Lainnya',
             'alasan_pengajuan' => 'required|in:Pengadaan Baru,Penggantian,Pengisian Kembali',
             'related_asset_id' => 'required_if:alasan_pengajuan,Penggantian|nullable|exists:assets,id',
             'priority' => 'required|in:Normal,Mendesak,Sangat Mendesak',
             'reason' => 'required|string',
             'items' => 'required|array|min:1',
             'items.*.item_type' => 'required|in:Fisik,Non-Fisik',
-            'items.*.asset_type_id' => 'required_if:items.*.item_type,Fisik|nullable|exists:asset_types,id',
+            'items.*.sifat_barang' => 'required|in:Tidak Habis Pakai,Habis Pakai,Jasa',
+            // Kewajiban asset_type_id/category yang sebenarnya (tergantung KOMBINASI
+            // item_type + sifat_barang, bukan cuma item_type saja) dicek manual di
+            // loop di bawah — Laravel tidak bisa menyatakan "daftar nilai valid
+            // tergantung field lain" lewat rule string untuk array bersarang begini.
+            'items.*.asset_type_id' => 'nullable|exists:asset_types,id',
             'items.*.item_name' => 'required|string|max:255',
             'items.*.specification' => 'nullable|string|max:255',
+            'items.*.category' => 'nullable|string|max:100',
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.unit' => 'required|string|max:50',
             'items.*.estimated_price_per_unit' => 'nullable|numeric|min:0',
         ]);
 
+        // Validasi silang per item: kombinasi item_type + sifat_barang harus valid,
+        // dan kategori wajib diisi + nilainya harus dari daftar yang benar untuk
+        // kombinasi tersebut. Item dengan kombinasi yang tidak masuk akal (mis.
+        // "Jasa" tapi item_type-nya Fisik) ditolak di sini, bukan diloloskan dengan
+        // default yang menyesatkan.
+        foreach ($validated['items'] as $idx => $item) {
+            $itemType = $item['item_type'];
+            $sifat = $item['sifat_barang'];
+
+            $comboValid = ($itemType === 'Fisik' && in_array($sifat, AssetRequestItem::SIFAT_BARANG_FISIK))
+                || ($itemType === 'Non-Fisik' && in_array($sifat, AssetRequestItem::SIFAT_BARANG_NON_FISIK));
+
+            if (!$comboValid) {
+                return back()->withInput()->withErrors([
+                    "items.$idx.sifat_barang" => 'Kombinasi Jenis Item dan Sifat Barang tidak valid.',
+                ]);
+            }
+
+            if ($itemType === 'Fisik' && $sifat !== 'Habis Pakai') {
+                // Tidak Habis Pakai (Fisik) -> tetap wajib pilih Jenis Aset seperti sebelumnya.
+                if (empty($item['asset_type_id'])) {
+                    return back()->withInput()->withErrors(["items.$idx.asset_type_id" => 'Jenis Aset wajib dipilih.']);
+                }
+            } elseif ($itemType === 'Fisik' && $sifat === 'Habis Pakai') {
+                if (empty($item['category']) || !array_key_exists($item['category'], AssetRequestItem::HABIS_PAKAI_CATEGORIES)) {
+                    return back()->withInput()->withErrors(["items.$idx.category" => 'Kategori Habis Pakai wajib dipilih.']);
+                }
+            } elseif ($itemType === 'Non-Fisik' && $sifat !== 'Jasa') {
+                // Tidak Habis Pakai (Non-Fisik) -> tetap wajib pilih Kategori Non-Fisik seperti sebelumnya.
+                if (empty($item['category']) || !array_key_exists($item['category'], \App\Models\IntangibleAsset::CATEGORIES)) {
+                    return back()->withInput()->withErrors(["items.$idx.category" => 'Kategori Non-Fisik wajib dipilih.']);
+                }
+            }
+            // Non-Fisik + Jasa: sengaja tidak ada kategori terstruktur — nama barang
+            // + spesifikasi sudah cukup untuk jasa.
+        }
+
+        // Unit tujuan pengajuan: Sarpras/Admin pakai pilihan dari form (sudah
+        // divalidasi exists:units,id di atas), role lain dipaksa pakai unit akun
+        // sendiri — lihat penjelasan $canChooseUnit di atas kenapa ini tidak boleh
+        // sekadar mengikuti input form.
+        $unitId = $canChooseUnit ? $validated['unit_id'] : $user->unit_id;
+        if (empty($unitId)) {
+            return back()->withInput()->withErrors([
+                'unit_id' => 'Unit pengaju wajib ditentukan. Akun Anda belum terhubung ke unit mana pun — hubungi Admin.',
+            ]);
+        }
+
         DB::beginTransaction();
         try {
             $assetRequest = AssetRequest::create([
                 'requester_id' => Auth::id(),
-                'unit_id' => Auth::user()->unit_id,
+                'unit_id' => $unitId,
                 'period_month' => now()->month,
                 'period_year' => now()->year,
-                'jenis_barang' => $validated['jenis_barang'],
-                'kategori_barang' => $validated['kategori_barang'],
+                'jenis_barang' => $validated['jenis_barang'] ?? null,
+                'kategori_barang' => $validated['kategori_barang'] ?? null,
                 'alasan_pengajuan' => $validated['alasan_pengajuan'],
                 'related_asset_id' => $validated['related_asset_id'] ?? null,
                 'priority' => $validated['priority'],
@@ -99,9 +196,11 @@ class AssetRequestController extends Controller
             foreach ($validated['items'] as $item) {
                 $assetRequest->items()->create([
                     'item_type' => $item['item_type'],
+                    'sifat_barang' => $item['sifat_barang'],
                     'asset_type_id' => $item['asset_type_id'] ?? null,
                     'item_name' => $item['item_name'],
                     'specification' => $item['specification'] ?? null,
+                    'category' => $item['category'] ?? null,
                     'quantity' => $item['quantity'],
                     'unit' => $item['unit'],
                     'estimated_price_per_unit' => $item['estimated_price_per_unit'] ?? null,
@@ -123,7 +222,7 @@ class AssetRequestController extends Controller
     {
         $this->authorize('view', $assetRequest);
 
-        $assetRequest->load('requester', 'items.assetType', 'verifier', 'approver', 'relatedAsset');
+        $assetRequest->load('requester', 'items.assetType', 'items.rolledFrom.approver', 'verifier', 'approver', 'relatedAsset');
         return view('requests.show', compact('assetRequest'));
     }
 
@@ -226,11 +325,26 @@ class AssetRequestController extends Controller
             return redirect()->route('requests.index')->with('error', 'Barang belum dikonfirmasi diterima secara fisik oleh PJ Pengadaan.');
         }
 
-        $assetRequest->load('items.assetType');
+        // Hanya item yang lolos approval yang boleh muncul di halaman Penerimaan Barang.
+        $assetRequest->load([
+            'items' => function ($query) {
+                $query->receivable()->with('assetType');
+            }
+        ]);
 
         $usersByLevel = \App\Models\User::orderBy('name')->get()->groupBy('level');
-        $hasPhysical = $assetRequest->items->contains('item_type', 'Fisik');
+        // "Fisik penuh" (Tidak Habis Pakai) adalah satu-satunya kombinasi yang benar-benar
+        // butuh Lokasi Penempatan — item Habis Pakai tidak menjadi Asset yang dipantau
+        // lokasinya, jadi tidak perlu bagian ini meskipun item_type-nya tetap "Fisik".
+        // Item lama (dibuat sebelum kolom sifat_barang ada) punya sifat_barang = null,
+        // yang aman diperlakukan sebagai "Tidak Habis Pakai" (alur penuh, seperti semula).
+        $hasPhysical = $assetRequest->items->contains(
+            fn($item) => $item->item_type === 'Fisik' && $item->sifat_barang !== 'Habis Pakai'
+        );
         $units = $hasPhysical ? \App\Models\Unit::with('locations')->whereNotNull('category')->orderBy('category')->orderBy('name')->get() : collect();
+        $categories = \App\Models\IntangibleAsset::CATEGORIES;
+        $habisPakaiCategories = AssetRequestItem::HABIS_PAKAI_CATEGORIES;
+        $reminderOptions = ['' => 'Tidak ada pengingat', '30' => '30 hari sebelum', '14' => '14 hari sebelum', '7' => '7 hari sebelum'];
 
         $unitsForJs = $units->map(function ($u) {
             return [
@@ -243,7 +357,7 @@ class AssetRequestController extends Controller
             ];
         })->values();
 
-        return view('requests.receive', compact('assetRequest', 'usersByLevel', 'units', 'hasPhysical', 'unitsForJs'));
+        return view('requests.receive', compact('assetRequest', 'usersByLevel', 'units', 'hasPhysical', 'unitsForJs', 'categories', 'habisPakaiCategories', 'reminderOptions'));
     }
 
     public function receive(Request $request, AssetRequest $assetRequest)
@@ -255,8 +369,18 @@ class AssetRequestController extends Controller
             return redirect()->route('requests.index')->with('error', 'Barang belum dikonfirmasi diterima secara fisik.');
         }
 
-        $assetRequest->load('items');
-        $hasPhysical = $assetRequest->items->contains('item_type', 'Fisik');
+        // Sama seperti showReceiveForm(): item yang ditolak/ditangguhkan tidak boleh
+        // ikut divalidasi atau diregistrasi jadi aset, meskipun form di-submit ulang manual.
+        $assetRequest->load([
+            'items' => function ($query) {
+                $query->receivable();
+            }
+        ]);
+        // Sama seperti showReceiveForm(): "Fisik penuh" (bukan Habis Pakai) adalah
+        // satu-satunya kombinasi yang butuh Lokasi Penempatan.
+        $hasPhysical = $assetRequest->items->contains(
+            fn($item) => $item->item_type === 'Fisik' && $item->sifat_barang !== 'Habis Pakai'
+        );
 
         $rules = [
             'purchase_date' => 'required|date',
@@ -270,7 +394,14 @@ class AssetRequestController extends Controller
         }
 
         foreach ($assetRequest->items as $item) {
-            if ($item->item_type === 'Fisik') {
+            if ($item->isLightReceipt()) {
+                // Habis Pakai (Fisik) atau Jasa (Non-Fisik): registrasi ringan, tidak
+                // masuk tabel assets/intangible_assets — Opsi A / graceful degradation
+                // yang sudah disepakati, supaya tidak perlu membangun modul stok penuh.
+                $rules["received_quantities.{$item->id}"] = 'nullable|integer|min:0';
+                $rules["receipt_notes.{$item->id}"] = 'nullable|string|max:1000';
+                $rules["receipt_proof_files.{$item->id}"] = 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120';
+            } elseif ($item->item_type === 'Fisik') {
                 $rules["brand.{$item->id}"] = 'required|string|max:255';
                 $rules["prices.{$item->id}"] = 'required|numeric|min:0';
                 for ($i = 0; $i < $item->quantity; $i++) {
@@ -281,13 +412,15 @@ class AssetRequestController extends Controller
                     $rules["unit_names.{$item->id}.{$i}"] = 'nullable|string|max:255';
                 }
             } else {
-                $rules["categories.{$item->id}"] = 'required|in:Software,HAKI/Paten,Jurnal Ilmiah,Domain/Hosting,Kurikulum';
+                $rules["categories.{$item->id}"] = 'required|in:' . implode(',', array_keys(\App\Models\IntangibleAsset::CATEGORIES));
                 $rules["vendors.{$item->id}"] = 'required|string|max:255';
                 $rules["prices.{$item->id}"] = 'required|numeric|min:0';
                 $rules["funding_sources.{$item->id}"] = 'nullable|string|max:255';
                 $rules["contract_numbers.{$item->id}"] = 'nullable|string|max:255';
                 $rules["license_types.{$item->id}"] = 'required|in:Berlangganan,Selamanya';
                 $rules["expiry_dates.{$item->id}"] = 'required_if:license_types.' . $item->id . ',Berlangganan|nullable|date';
+                // Pengingat hanya relevan kalau ada tanggal kedaluwarsa (Berlangganan).
+                $rules["reminder_days.{$item->id}"] = 'nullable|in:30,14,7';
                 $rules["access_urls.{$item->id}"] = 'nullable|url|max:255';
                 $rules["certificate_files.{$item->id}"] = 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120';
                 for ($i = 0; $i < $item->quantity; $i++) {
@@ -307,7 +440,21 @@ class AssetRequestController extends Controller
             $createdAssets = [];
 
             foreach ($assetRequest->items as $item) {
-                if ($item->item_type === 'Fisik') {
+                if ($item->isLightReceipt()) {
+                    // Habis Pakai / Jasa: registrasi ringan, tidak masuk tabel
+                    // assets/intangible_assets. Cukup catat jumlah yang benar-benar
+                    // diterima (default = jumlah yang diajukan kalau tidak diisi
+                    // beda) + catatan dan bukti yang opsional.
+                    $proofPath = $request->hasFile("receipt_proof_files.{$item->id}")
+                        ? $request->file("receipt_proof_files.{$item->id}")->store('receipt-proofs', 'public')
+                        : null;
+
+                    $item->update([
+                        'received_quantity' => $validated['received_quantities'][$item->id] ?? $item->quantity,
+                        'receipt_notes' => $validated['receipt_notes'][$item->id] ?? null,
+                        'receipt_proof_file' => $proofPath,
+                    ]);
+                } elseif ($item->item_type === 'Fisik') {
                     for ($i = 0; $i < $item->quantity; $i++) {
                         $unitImagePath = $request->file("images.{$item->id}.{$i}")->store('assets', 'public');
 
@@ -353,6 +500,7 @@ class AssetRequestController extends Controller
                             'contract_number' => $validated['contract_numbers'][$item->id] ?? null,
                             'license_type' => $validated['license_types'][$item->id],
                             'expiry_date' => $validated['expiry_dates'][$item->id] ?? null,
+                            'reminder_days' => $validated['reminder_days'][$item->id] ?? null,
                             'quota' => null,
                             'unit_id' => $assetRequest->unit_id,
                             'pic_id' => $validated['penanggung_jawab_id'] ?? null,
@@ -449,7 +597,7 @@ class AssetRequestController extends Controller
             return redirect()->route('requests.index')->with('error', 'Pengajuan belum diverifikasi.');
         }
 
-        $assetRequest->load('items.assetType', 'requester', 'unit');
+        $assetRequest->load('items.assetType', 'items.rolledFrom', 'requester', 'unit');
 
         return view('requests.approval', compact('assetRequest'));
     }
@@ -554,17 +702,22 @@ class AssetRequestController extends Controller
         }
 
         foreach ($deferredItems as $item) {
-            // Duplikat item ke draft baru
+            // Duplikat item ke draft baru. rolled_from_item_id menunjuk BALIK ke item
+            // asli (bukan ke dirinya sendiri) supaya alasan penangguhan Ketua tetap bisa
+            // ditelusuri lewat relasi rolledFrom() di halaman Detail Pengajuan / Approval,
+            // alih-alih ditumpuk sebagai teks di approval_notes yang tidak pernah ditampilkan.
             $newItem = $existingDraft->items()->create([
                 'item_type' => $item->item_type,
+                'sifat_barang' => $item->sifat_barang,
                 'asset_type_id' => $item->asset_type_id,
                 'item_name' => $item->item_name,
                 'specification' => $item->specification,
+                'category' => $item->category,
                 'quantity' => $item->quantity,
                 'unit' => $item->unit,
                 'estimated_price_per_unit' => $item->estimated_price_per_unit,
                 'approval_status' => 'pending',
-                'approval_notes' => 'Rollover dari item #' . $item->id . ' (Alasan: ' . ($item->approval_notes ?? 'Ditangguhkan') . ')',
+                'rolled_from_item_id' => $item->id,
             ]);
 
             // Catat di rollover_logs
@@ -577,11 +730,6 @@ class AssetRequestController extends Controller
                 'target_year' => $targetYear,
                 'reason' => $item->approval_notes ?? 'Ditangguhkan oleh Rektor',
             ]);
-
-            // Tandai item asal sebagai sudah di-rollover
-            $item->update([
-                'rolled_from_item_id' => $item->id, // menandai bahwa item ini sudah di-rollover
-            ]);
         }
 
         // Kirim notifikasi ke user (bisa pakai event atau session)
@@ -591,6 +739,4 @@ class AssetRequestController extends Controller
             'year' => $targetYear,
         ]);
     }
-
-
 }

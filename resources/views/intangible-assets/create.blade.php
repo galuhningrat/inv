@@ -82,10 +82,16 @@
                     </div>
                     <div class="form-group">
                         <label for="category">Kategori <span style="color:red;">*</span></label>
+                        {{-- Sebelumnya daftar ini hardcode 5 nilai lama di sini, terpisah dari
+                             IntangibleAsset::CATEGORIES (sudah 9 nilai sejak kategori non-fisik
+                             diperluas) — controller sebenarnya SUDAH mengirim $categories sejak
+                             perubahan itu, cuma file ini belum pernah diupdate untuk memakainya.
+                             Akibatnya kategori yang bisa dipilih di sini (jalur input langsung)
+                             tidak sinkron dengan yang bisa dipilih di form pengajuan/registrasi. --}}
                         <select id="category" name="category" class="form-control @error('category') error @enderror"
                             required>
                             <option value="">Pilih Kategori</option>
-                            @foreach (['Software' => 'Perangkat Lunak / Software', 'HAKI/Paten' => 'Hak Kekayaan Intelektual (HAKI/Paten/Hak Cipta)', 'Jurnal Ilmiah' => 'Langganan Jurnal / Database Akademik', 'Domain/Hosting' => 'Domain & Layanan Cloud/Hosting', 'Kurikulum' => 'Lisensi Kurikulum / Hak Waralaba Pendidikan'] as $val => $label)
+                            @foreach ($categories as $val => $label)
                                 <option value="{{ $val }}" {{ old('category') === $val ? 'selected' : '' }}>
                                     {{ $label }}
                                 </option>

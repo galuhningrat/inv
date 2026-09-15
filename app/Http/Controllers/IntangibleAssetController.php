@@ -24,9 +24,10 @@ class IntangibleAssetController extends Controller
 
         $units = Unit::whereNotNull('category')->orderBy('category')->orderBy('name')->get();
         $fundingSources = ['Dana Yayasan', 'Hibah/Bantuan Pemerintah (LLDIKTI)', 'Dana Mandiri/UKT Mahasiswa', 'Kerja Sama Industri'];
-        $usersByLevel = \App\Models\User::orderBy('name')->get()->groupBy('level'); 
+        $usersByLevel = \App\Models\User::orderBy('name')->get()->groupBy('level');
+        $categories = IntangibleAsset::CATEGORIES;
 
-        return view('intangible-assets.create', compact('units', 'fundingSources', 'usersByLevel'));
+        return view('intangible-assets.create', compact('units', 'fundingSources', 'usersByLevel', 'categories'));
     }
 
     public function store(Request $request)
@@ -35,7 +36,7 @@ class IntangibleAssetController extends Controller
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'category' => 'required|in:Software,HAKI/Paten,Jurnal Ilmiah,Domain/Hosting,Kurikulum',
+            'category' => 'required|in:' . implode(',', array_keys(IntangibleAsset::CATEGORIES)),
             'vendor' => 'required|string|max:255',
             'price' => 'required|numeric|min:0',
             'activation_date' => 'required|date',

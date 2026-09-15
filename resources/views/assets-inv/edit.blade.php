@@ -76,6 +76,15 @@
                     </div>
                 </div>
 
+                {{-- Read-only — asset_id auto-generate saat aset dibuat, tidak pernah diedit
+                     manual. Ditampilkan di sini sebagai "Label Aset Kampus" (bisa dicetak jadi
+                     stiker), untuk dibedakan dari Nomor Seri Pabrik (dari produsen) di bawah. --}}
+                <div class="form-group">
+                    <label>Label Aset Kampus</label>
+                    <input type="text" class="form-control" value="{{ $asset->asset_id }}" disabled
+                        style="font-family: monospace; background: var(--light-bg);">
+                </div>
+
                 <div class="form-row">
                     <div class="form-group">
                         <label for="brand">Merek <span style="color: red;">*</span></label>
@@ -85,6 +94,11 @@
                         @error('brand')
                             <div class="error-message" style="display: block;">{{ $message }}</div>
                         @enderror
+                    </div>
+                    <div class="form-group">
+                        <label for="model">Tipe / Model <small style="font-weight: normal;">(opsional)</small></label>
+                        <input type="text" id="model" name="model" class="form-control"
+                            value="{{ old('model', $asset->model) }}" placeholder="mis. ExpertCenter D700">
                     </div>
                     <div class="form-group">
                         <label for="price">Harga Pembelian <span style="color: red;">*</span></label>
@@ -105,6 +119,34 @@
                     @error('purchase_date')
                         <div class="error-message" style="display: block;">{{ $message }}</div>
                     @enderror
+                </div>
+
+                {{-- Data akuntansi — semua opsional, sama seperti di form Tambah. --}}
+                <hr style="margin: 1.5rem 0;">
+                <h4 style="margin-bottom: 1rem;">Data Akuntansi <small
+                        style="font-weight: normal; color: var(--text-secondary);">(opsional)</small></h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="funding_source">Sumber Pendanaan</label>
+                        <select id="funding_source" name="funding_source" class="form-control">
+                            <option value="">-- Tidak ditentukan --</option>
+                            @foreach ($fundingSources as $fs)
+                                <option value="{{ $fs }}"
+                                    {{ old('funding_source', $asset->funding_source) === $fs ? 'selected' : '' }}>
+                                    {{ $fs }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="economic_life_years">Umur Ekonomis (Tahun)</label>
+                        <input type="number" id="economic_life_years" name="economic_life_years" class="form-control"
+                            value="{{ old('economic_life_years', $asset->economic_life_years) }}" min="1" max="100">
+                    </div>
+                    <div class="form-group">
+                        <label for="residual_value">Nilai Residu (Rp)</label>
+                        <input type="number" id="residual_value" name="residual_value" class="form-control"
+                            value="{{ old('residual_value', $asset->residual_value) }}" min="0">
+                    </div>
                 </div>
 
                 <div class="form-group">
@@ -185,7 +227,7 @@
                 {{-- ============================================================ --}}
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="serial_number">Nomor Seri / Kode Unik <span style="color: red;">*</span></label>
+                        <label for="serial_number">Nomor Seri Pabrik (S/N) <span style="color: red;">*</span></label>
                         <input type="text" id="serial_number" name="serial_number"
                             class="form-control @error('serial_number') error @enderror"
                             value="{{ old('serial_number', $asset->serial_number) }}" required>

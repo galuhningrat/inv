@@ -67,7 +67,17 @@ class AssetRequest extends Model
     public static function generateRequestId()
     {
         return DB::transaction(function () {
-            $last = self::where('request_id', 'LIKE', 'REQ-%')
+            // withTrashed() WAJIB: AssetRequest pakai SoftDeletes, dan
+            // AssetRequestPolicy::delete() mengizinkan Sarpras/Admin menghapus
+            // pengajuan berstatus Pending — soft-delete, bukan hilang permanen. Tanpa
+            // withTrashed() di sini, REQ-XXX dengan nomor tertinggi yang kebetulan
+            // terhapus akan terlewat dari pencarian "nomor terakhir", dan nomor yang
+            // sama bisa dicoba dipakai lagi — bug yang persis sama yang baru saja
+            // bikin "qr_codes_qr_code_id_unique" collide di modul Aset Fisik, cuma
+            // di sini belum sempat terjadi karena belum ada yang menghapus request
+            // dengan nomor tertinggi.
+            $last = self::withTrashed()
+                ->where('request_id', 'LIKE', 'REQ-%')
                 ->lockForUpdate()
                 ->orderByRaw("CAST(SUBSTRING(request_id FROM '[0-9]+$') AS INTEGER) DESC")
                 ->first();
@@ -87,30 +97,37 @@ class AssetRequest extends Model
     {
         return $this->belongsTo(User::class, 'requester_id');
     }
+
     public function verifier()
     {
         return $this->belongsTo(User::class, 'verified_by');
     }
+
     public function approver()
     {
         return $this->belongsTo(User::class, 'approved_by');
     }
+
     public function confirmer()
     {
         return $this->belongsTo(User::class, 'confirmed_by');
     }
+
     public function disburser()
     {
         return $this->belongsTo(User::class, 'disbursed_by');
     }
+
     public function unit()
     {
         return $this->belongsTo(Unit::class);
     }
+
     public function relatedAsset()
     {
         return $this->belongsTo(Asset::class, 'related_asset_id');
     }
+
     public function items()
     {
         return $this->hasMany(AssetRequestItem::class);
@@ -130,13 +147,13 @@ class AssetRequest extends Model
     {
         return $this->items
             ->where('approval_status', 'approved')
-            ->sum(fn($item) => $item->subtotal);
+            ->sum(fn ($item) => $item->subtotal);
     }
 
     // Total estimasi harga (semua item)
     public function getTotalEstimatedPriceAttribute()
     {
-        return $this->items->sum(fn($item) => $item->subtotal);
+        return $this->items->sum(fn ($item) => $item->subtotal);
     }
 
     public function getTotalQuantityAttribute()
@@ -157,6 +174,15 @@ class AssetRequest extends Model
 
     public function getStatusLabelAttribute(): string
     {
+        // Pengajuan hasil rollover (berisi item yang ditangguhkan Ketua bulan sebelumnya)
+        // diberi label berbeda supaya PJ Pengadaan tidak menganggapnya pengajuan baru biasa.
+        if (
+            $this->status === 'Pending' &&
+            $this->items->contains(fn ($item) => ! is_null($item->rolled_from_item_id))
+        ) {
+            return 'Menunggu Verifikasi PJ Pengadaan untuk Pengadaan Bulan Berikutnya';
+        }
+
         return match ($this->status) {
             'Pending' => 'Menunggu Verifikasi PJ Pengadaan',
             'Diverifikasi' => 'Menunggu Persetujuan Ketua STTI',

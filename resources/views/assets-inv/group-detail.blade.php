@@ -16,7 +16,7 @@
                     <tr>
                         <th>ID Aset</th>
                         <th>Gambar</th>
-                        <th>Nomor Seri</th>
+                        <th>Nomor Seri Pabrik</th>
                         <th>Lokasi</th>
                         <th>Kondisi</th>
                         <th>Status</th>
@@ -93,8 +93,11 @@
 
                                     {{-- Tombol Hapus --}}
                                     @can('delete', $unit)
+                                        {{-- Konfirmasi menyebut jumlah unit yang tersisa supaya jelas bahwa yang
+                                             dihapus HANYA baris ini, bukan seluruh grup. --}}
                                         <form action="{{ route('assets-inv.destroy', $unit) }}" method="POST"
-                                            style="display: inline;" onsubmit="return confirm('Hapus unit ini?')">
+                                            style="display: inline;"
+                                            onsubmit="return confirm('Hapus 1 unit ({{ $unit->asset_id }}) dari total {{ $units->count() }} unit pada grup ini?\n\nUnit lain pada grup ini tidak akan terpengaruh.')">
                                             @csrf
                                             @method('DELETE')
                                             <input type="hidden" name="group_name" value="{{ $groupName }}">

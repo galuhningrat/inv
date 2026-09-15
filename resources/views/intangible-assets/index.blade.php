@@ -29,7 +29,7 @@
                         <tr>
                             <td><strong>{{ $item->asset_code }}</strong></td>
                             <td>{{ $item->name }}</td>
-                            <td>{{ $item->category }}</td>
+                            <td>{{ \App\Models\IntangibleAsset::CATEGORIES[$item->category] ?? $item->category }}</td>
                             <td>{{ $item->vendor }}</td>
                             <td>{{ $item->license_type }}</td>
                             <td>{{ $item->expiry_date ? $item->expiry_date->format('d M Y') : '-' }}</td>

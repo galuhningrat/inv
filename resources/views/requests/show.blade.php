@@ -35,8 +35,19 @@
                 <div>
                     <h4 style="margin-bottom: 1rem; border-bottom: 2px solid var(--primary-color); padding-bottom: 0.5rem;">
                         Klasifikasi</h4>
-                    <p><strong>Jenis Barang:</strong> {{ $assetRequest->jenis_barang }}</p>
-                    <p><strong>Kategori Barang:</strong> {{ $assetRequest->kategori_barang }}</p>
+                    {{-- Jenis Barang (header) tidak lagi diminta untuk pengajuan baru — klasifikasi
+                         sekarang per item lewat "Sifat Barang" (lihat kolom Jenis/Kategori di tabel
+                         rincian di bawah). Baris ini tetap tampil untuk pengajuan historis yang masih
+                         punya nilainya, dan otomatis hilang untuk pengajuan baru. --}}
+                    @if ($assetRequest->jenis_barang)
+                        <p><strong>Jenis Barang:</strong> {{ $assetRequest->jenis_barang }}</p>
+                    @endif
+                    {{-- Kategori Barang tidak lagi diminta untuk pengajuan baru (lihat create.blade.php)
+                         — kolom & data lama tetap tersimpan, jadi baris ini tetap tampil untuk pengajuan
+                         historis yang masih punya nilainya, dan otomatis hilang untuk pengajuan baru. --}}
+                    @if ($assetRequest->kategori_barang)
+                        <p><strong>Kategori Barang:</strong> {{ $assetRequest->kategori_barang }}</p>
+                    @endif
                     <p><strong>Alasan Pengajuan:</strong> {{ $assetRequest->alasan_pengajuan }}</p>
                     @if ($assetRequest->relatedAsset)
                         <p><strong>Aset Terkait:</strong> {{ $assetRequest->relatedAsset->asset_id }} —
@@ -51,6 +62,32 @@
                 </div>
             </div>
 
+            @php
+                $rolledOverItems = $assetRequest->items->whereNotNull('rolled_from_item_id');
+            @endphp
+            @if ($rolledOverItems->isNotEmpty())
+                <div
+                    style="margin-bottom: 2rem; background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 1.5rem;">
+                    <h4 style="margin: 0 0 1rem; color: #92400e;">📋 Riwayat Penangguhan oleh Ketua</h4>
+                    @foreach ($rolledOverItems as $item)
+                        @php $original = $item->rolledFrom; @endphp
+                        @if ($original)
+                            <div
+                                style="{{ !$loop->last ? 'margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px dashed #f59e0b;' : '' }}">
+                                <p style="margin: 0; color: #92400e;"><strong>Barang:</strong> {{ $item->item_name }}</p>
+                                <p style="margin: 0; color: #92400e;"><strong>Ditangguhkan oleh:</strong>
+                                    {{ optional($original->approver)->name ?? '-' }}</p>
+                                <p style="margin: 0; color: #92400e;"><strong>Tanggal:</strong>
+                                    {{ $original->approved_at ? $original->approved_at->format('d F Y H:i') : '-' }}
+                                </p>
+                                <p style="margin: 0.5rem 0 0; color: #92400e;"><strong>Alasan:</strong>
+                                    {{ $original->approval_notes ?? '-' }}</p>
+                            </div>
+                        @endif
+                    @endforeach
+                </div>
+            @endif
+
             <div style="margin-bottom: 2rem;">
                 <h4 style="margin-bottom: 1rem; border-bottom: 2px solid var(--primary-color); padding-bottom: 0.5rem;">
                     Rincian Barang yang Diajukan</h4>
@@ -60,7 +97,7 @@
                             <th>No</th>
                             <th>Nama Barang</th>
                             <th>Spesifikasi</th>
-                            <th>Jenis Aset</th>
+                            <th>Jenis / Kategori</th>
                             <th>Jumlah</th>
                             <th>Satuan</th>
                             <th>Est. Harga/Unit</th>
@@ -71,9 +108,39 @@
                         @foreach ($assetRequest->items as $item)
                             <tr>
                                 <td>{{ $loop->iteration }}</td>
-                                <td>{{ $item->item_name }}</td>
+                                <td>
+                                    {{ $item->item_name }}
+                                    @if ($item->rolled_from_item_id)
+                                        <br><small style="color: #f59e0b;">🔄 Rollover dari item sebelumnya</small>
+                                    @endif
+                                </td>
                                 <td>{{ $item->specification ?? '-' }}</td>
-                                <td>{{ $item->assetType->name ?? '-' }}</td>
+                                <td>
+                                    {{-- Fisik + Tidak Habis Pakai pakai Jenis Aset (assetType). Fisik + Habis
+                                         Pakai dan Non-Fisik pakai Kategori yang dipilih pemohon saat mengajukan.
+                                         Sebelumnya kolom ini selalu "-" untuk Non-Fisik karena assetType memang
+                                         tidak pernah diisi untuk item jenis itu. --}}
+                                    @if ($item->item_type === 'Fisik' && $item->sifat_barang === 'Habis Pakai')
+                                        {{ \App\Models\AssetRequestItem::HABIS_PAKAI_CATEGORIES[$item->category] ?? ($item->category ?? '-') }}
+                                    @elseif ($item->item_type === 'Fisik')
+                                        {{ $item->assetType->name ?? '-' }}
+                                    @else
+                                        {{ \App\Models\IntangibleAsset::CATEGORIES[$item->category] ?? ($item->category ?? '-') }}
+                                    @endif
+                                    {{-- Sifat Barang cuma ditampilkan kalau bukan default "Tidak Habis Pakai" —
+                                         supaya tidak menambah noise untuk mayoritas item yang lewat alur biasa. --}}
+                                    @if ($item->sifat_barang && $item->sifat_barang !== 'Tidak Habis Pakai')
+                                        <br><small style="color: var(--text-secondary);">({{ $item->sifat_barang }})</small>
+                                    @endif
+                                    @if (!is_null($item->received_quantity))
+                                        <br><small style="color: var(--success-color);">
+                                            ✅ Diterima: {{ $item->received_quantity }} {{ $item->unit }}
+                                            @if ($item->receipt_notes)
+                                                — {{ $item->receipt_notes }}
+                                            @endif
+                                        </small>
+                                    @endif
+                                </td>
                                 <td>{{ $item->quantity }}</td>
                                 <td>{{ $item->unit }}</td>
                                 <td>{{ $item->estimated_price_per_unit ? 'Rp ' . number_format($item->estimated_price_per_unit, 0, ',', '.') : '-' }}

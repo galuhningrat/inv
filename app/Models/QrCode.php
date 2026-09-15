@@ -33,7 +33,18 @@ class QrCode extends Model
     public static function generateQrCodeId()
     {
         return DB::transaction(function () {
-            $lastQrCode = self::where('qr_code_id', 'LIKE', 'QCD-%')
+            // withTrashed() WAJIB di sini: QrCode pakai SoftDeletes, dan
+            // AssetController::destroy() soft-delete QR code bersamaan dengan asetnya.
+            // Tanpa withTrashed(), nomor QR code yang paling tinggi tapi sudah
+            // soft-deleted akan terlewat dari pencarian "nomor terakhir", sehingga
+            // nomor yang sama coba dipakai lagi — padahal baris lamanya (yang cuma
+            // soft-deleted, bukan benar-benar hilang) masih menahan slot itu di
+            // unique constraint. lockForUpdate() di bawah TIDAK menyelesaikan
+            // masalah ini — itu cuma mencegah dua request BERBARENGAN menghitung
+            // nomor yang sama; bug ini muncul bahkan dengan satu user, tanpa
+            // concurrency sama sekali.
+            $lastQrCode = self::withTrashed()
+                ->where('qr_code_id', 'LIKE', 'QCD-%')
                 ->lockForUpdate()
                 ->orderByRaw("CAST(SUBSTRING(qr_code_id FROM '[0-9]+$') AS INTEGER) DESC")
                 ->first();

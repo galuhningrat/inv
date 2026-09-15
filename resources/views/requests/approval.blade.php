@@ -65,11 +65,31 @@
                                         <br><small style="color: var(--text-secondary);">{{ $item->specification }}</small>
                                     @endif
                                     @if ($item->rolled_from_item_id)
-                                        <br><small style="color: #f59e0b;">🔄 Rollover dari item sebelumnya</small>
+                                        <br><small style="color: #f59e0b;">
+                                            🔄 Rollover dari item sebelumnya
+                                            @if ($item->rolledFrom && $item->rolledFrom->approval_notes)
+                                                — Alasan ditangguhkan: {{ $item->rolledFrom->approval_notes }}
+                                            @endif
+                                        </small>
                                     @endif
                                 </td>
-                                <td><span
+                                <td>
+                                    <span
                                         class="status-badge {{ $item->item_type === 'Fisik' ? 'available' : 'borrowed' }}">{{ $item->item_type }}</span>
+                                    @if ($item->item_type === 'Non-Fisik' && $item->sifat_barang !== 'Jasa' && $item->category)
+                                        <br><small style="color: var(--text-secondary);">
+                                            {{ \App\Models\IntangibleAsset::CATEGORIES[$item->category] ?? $item->category }}
+                                        </small>
+                                    @elseif ($item->item_type === 'Fisik' && $item->sifat_barang === 'Habis Pakai' && $item->category)
+                                        <br><small style="color: var(--text-secondary);">
+                                            {{ \App\Models\AssetRequestItem::HABIS_PAKAI_CATEGORIES[$item->category] ?? $item->category }}
+                                        </small>
+                                    @endif
+                                    {{-- Sifat Barang cuma ditampilkan kalau bukan default "Tidak Habis Pakai",
+                                    supaya Rektor langsung tahu ini bukan pengajuan aset tetap/lisensi biasa. --}}
+                                    @if ($item->sifat_barang && $item->sifat_barang !== 'Tidak Habis Pakai')
+                                        <br><small style="color: #f59e0b;">{{ $item->sifat_barang }}</small>
+                                    @endif
                                 </td>
                                 <td>{{ $item->quantity }} {{ $item->unit }}</td>
                                 <td>Rp {{ number_format($item->estimated_price_per_unit ?? 0, 0, ',', '.') }}</td>
@@ -79,8 +99,7 @@
                                         {{ $item->approval_status_label }}
                                     </span>
                                     @if ($item->approval_notes)
-                                        <br><small
-                                            style="color: var(--text-secondary);">{{ $item->approval_notes }}</small>
+                                        <br><small style="color: var(--text-secondary);">{{ $item->approval_notes }}</small>
                                     @endif
                                 </td>
                                 <td>
@@ -90,15 +109,12 @@
                                                 method="POST" style="display: inline;">
                                                 @csrf
                                                 <input type="hidden" name="action" value="approved">
-                                                <button type="submit" class="btn btn-success btn-sm"
-                                                    title="Setujui">✅</button>
+                                                <button type="submit" class="btn btn-success btn-sm" title="Setujui">✅</button>
                                             </form>
                                             <button type="button" class="btn btn-danger btn-sm"
-                                                onclick="showActionModal({{ $item->id }}, 'rejected')"
-                                                title="Tolak">❌</button>
+                                                onclick="showActionModal({{ $item->id }}, 'rejected')" title="Tolak">❌</button>
                                             <button type="button" class="btn btn-warning btn-sm"
-                                                onclick="showActionModal({{ $item->id }}, 'deferred')"
-                                                title="Tangguhkan">⏳</button>
+                                                onclick="showActionModal({{ $item->id }}, 'deferred')" title="Tangguhkan">⏳</button>
                                         </div>
                                     @else
                                         <span style="color: var(--text-secondary); font-size: 0.8rem;">Sudah diproses</span>

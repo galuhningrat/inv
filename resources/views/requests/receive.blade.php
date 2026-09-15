@@ -130,15 +130,23 @@
                         {{-- ========================================================= --}}
                         {{--  PENJELASAN JENIS ASET (FISIK vs NON-FISIK)              --}}
                         {{-- ========================================================= --}}
-                        @if ($item->item_type === 'Fisik')
+                        @if ($item->isLightReceipt())
+                            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1rem;">
+                                {{ $item->item_type === 'Fisik' ? '📝' : '⚙️' }}
+                                Item ini bersifat <strong>{{ $item->sifat_barang }}</strong> — registrasi ringan,
+                                {{ $item->item_type === 'Fisik' ? 'tidak perlu nomor seri/foto unit dan' : 'tidak menjadi lisensi berjangka dan' }}
+                                tidak masuk ke tabel Manajemen Aset. Cukup catat jumlah yang benar-benar diterima.
+                            </p>
+                        @elseif ($item->item_type === 'Fisik')
                             <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1rem;">
                                 📦 Item ini akan otomatis terdaftar sebagai <strong>Aset Fisik</strong> di Manajemen Aset,
                                 sesuai kategori yang dipilih saat pengajuan.
                             </p>
                         @else
                             <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1rem;">
-                                💾 Item ini akan otomatis terdaftar sebagai <strong>Aset Non-Fisik</strong>,
-                                sesuai kategori yang dipilih saat pengajuan — tidak perlu input ulang jenisnya.
+                                💾 Item ini akan otomatis terdaftar sebagai <strong>Aset Non-Fisik</strong>.
+                                Kategori di bawah sudah diisi otomatis dari kategori yang dipilih pemohon saat
+                                mengajukan (jika ada) — silakan periksa dan sesuaikan bila perlu.
                             </p>
                         @endif
 
@@ -147,7 +155,46 @@
                                 {{ $item->specification }}</p>
                         @endif
 
-                        @if ($item->item_type === 'Fisik')
+                        @if ($item->isLightReceipt())
+                            {{-- Registrasi ringan (Opsi A / graceful degradation): tidak ada nomor
+                                 seri/foto unit untuk Habis Pakai, tidak ada vendor/lisensi untuk Jasa.
+                                 Cukup jumlah yang diterima + catatan & bukti yang opsional. Tidak masuk
+                                 tabel assets/intangible_assets — cuma disimpan di item pengajuan ini. --}}
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Jumlah Diterima <span style="color:red;">*</span></label>
+                                    <input type="number" name="received_quantities[{{ $item->id }}]"
+                                        class="form-control @error('received_quantities.' . $item->id) error @enderror"
+                                        value="{{ old('received_quantities.' . $item->id, $item->quantity) }}" min="0"
+                                        required>
+                                    <small style="color: var(--text-secondary);">Default sesuai jumlah yang
+                                        diajukan ({{ $item->quantity }} {{ $item->unit }}) — ubah kalau yang
+                                        diterima berbeda.</small>
+                                    @error('received_quantities.' . $item->id)
+                                        <div class="error-message" style="display:block;">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Catatan <small style="font-weight: normal;">(opsional)</small></label>
+                                    <textarea name="receipt_notes[{{ $item->id }}]" class="form-control" rows="2"
+                                        placeholder="{{ $item->item_type === 'Fisik' ? 'Contoh: diterima dalam kondisi baik, disimpan di gudang ATK' : 'Contoh: vendor PT ABC, dikerjakan tanggal ..., BAST terlampir' }}">{{ old('receipt_notes.' . $item->id) }}</textarea>
+                                    @error('receipt_notes.' . $item->id)
+                                        <div class="error-message" style="display:block;">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                                <div class="form-group">
+                                    <label>Bukti Penerimaan / Nota / BAST <small
+                                            style="font-weight: normal;">(opsional)</small></label>
+                                    <input type="file" name="receipt_proof_files[{{ $item->id }}]" class="form-control"
+                                        accept=".pdf,.jpg,.jpeg,.png">
+                                    @error('receipt_proof_files.' . $item->id)
+                                        <div class="error-message" style="display:block;">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                            </div>
+                        @elseif ($item->item_type === 'Fisik')
                             <div class="form-row">
                                 <div class="form-group">
                                     <label>Merek <span style="color:red;">*</span></label>
@@ -224,12 +271,16 @@
                             <div class="form-row">
                                 <div class="form-group">
                                     <label>Kategori <span style="color:red;">*</span></label>
+                                    {{-- Nilai default diambil dari kategori yang sudah dipilih pemohon saat
+                                         mengajukan ($item->category) — Sarpras tinggal mengonfirmasi/mengoreksi,
+                                         bukan menebak dari nol seperti sebelumnya. Daftar kategori bersumber dari
+                                         IntangibleAsset::CATEGORIES yang sama dipakai di form Ajukan Aset. --}}
                                     <select name="categories[{{ $item->id }}]"
                                         class="form-control @error('categories.' . $item->id) error @enderror" required>
                                         <option value="">Pilih Kategori</option>
-                                        @foreach (['Software' => 'Perangkat Lunak / Software', 'HAKI/Paten' => 'HAKI / Paten', 'Jurnal Ilmiah' => 'Jurnal Ilmiah', 'Domain/Hosting' => 'Domain & Hosting', 'Kurikulum' => 'Lisensi Kurikulum'] as $val => $label)
+                                        @foreach ($categories as $val => $label)
                                             <option value="{{ $val }}"
-                                                {{ old('categories.' . $item->id) === $val ? 'selected' : '' }}>
+                                                {{ old('categories.' . $item->id, $item->category) === $val ? 'selected' : '' }}>
                                                 {{ $label }}</option>
                                         @endforeach
                                     </select>
@@ -290,6 +341,26 @@
                                     <input type="date" name="expiry_dates[{{ $item->id }}]"
                                         class="form-control @error('expiry_dates.' . $item->id) error @enderror">
                                     @error('expiry_dates.' . $item->id)
+                                        <div class="error-message" style="display:block;">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                                {{-- Sebelumnya tidak ada di form ini sama sekali — akun/lisensi terdaftar lewat
+                                     alur pengajuan tidak pernah dapat pengingat kedaluwarsa, padahal form input
+                                     langsung (intangible-assets.create) sudah punya field ini. --}}
+                                <div class="form-group" id="reminderGroup_{{ $item->id }}" style="display: none;">
+                                    <label>Pengingat Kedaluwarsa</label>
+                                    <select name="reminder_days[{{ $item->id }}]"
+                                        class="form-control @error('reminder_days.' . $item->id) error @enderror">
+                                        @foreach ($reminderOptions as $val => $label)
+                                            {{-- Perbandingan pakai == (bukan ===): PHP mengubah key array '30'/'14'/'7'
+                                                 jadi integer secara otomatis, sedangkan old() selalu mengembalikan
+                                                 string, jadi === tidak akan pernah cocok untuk pilihan selain "". --}}
+                                            <option value="{{ $val }}"
+                                                {{ old('reminder_days.' . $item->id) == $val ? 'selected' : '' }}>
+                                                {{ $label }}</option>
+                                        @endforeach
+                                    </select>
+                                    @error('reminder_days.' . $item->id)
                                         <div class="error-message" style="display:block;">{{ $message }}</div>
                                     @enderror
                                 </div>
@@ -407,6 +478,15 @@
             const group = document.getElementById(`expiryGroup_${itemId}`);
             group.style.display = isSubscription ? 'block' : 'none';
             group.querySelector('input').required = isSubscription;
+
+            // Pengingat hanya masuk akal kalau ada tanggal kedaluwarsa untuk dihitung mundur.
+            const reminderGroup = document.getElementById(`reminderGroup_${itemId}`);
+            if (reminderGroup) {
+                reminderGroup.style.display = isSubscription ? 'block' : 'none';
+                if (!isSubscription) {
+                    reminderGroup.querySelector('select').value = '';
+                }
+            }
         }
     </script>
 @endpush

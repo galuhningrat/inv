@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -19,8 +19,12 @@ class Asset extends Model
         'name',
         'asset_type_id',
         'brand',
+        'model',
         'serial_number',
         'price',
+        'funding_source',
+        'economic_life_years',
+        'residual_value',
         'purchase_date',
         'location',
         'condition',
@@ -39,6 +43,8 @@ class Asset extends Model
     protected $casts = [
         'purchase_date' => 'date',
         'price' => 'decimal:2',
+        'residual_value' => 'decimal:2',
+        'economic_life_years' => 'integer',
     ];
 
     protected static function boot()
@@ -59,8 +65,14 @@ class Asset extends Model
             $year = date('Y');
             $month = date('m');
 
-            // Cari asset terakhir dengan lock untuk prevent race condition
-            $lastAsset = self::where('asset_id', 'LIKE', "$year/$month/{$type->code}-%")
+            // withTrashed() WAJIB: Asset pakai SoftDeletes, dan menghapus aset
+            // (AssetController::destroy()) cuma soft-delete. Tanpa ini, asset_id
+            // dengan nomor tertinggi yang sudah soft-deleted akan terlewat dari
+            // pencarian "nomor terakhir", lalu nomor yang sama dicoba dipakai lagi
+            // untuk aset baru — persis bug yang sama yang barusan bikin
+            // "qr_codes_qr_code_id_unique" collide, cuma di kolom asset_id.
+            $lastAsset = self::withTrashed()
+                ->where('asset_id', 'LIKE', "$year/$month/{$type->code}-%")
                 ->lockForUpdate()
                 ->orderBy('asset_id', 'desc')
                 ->first();
@@ -80,11 +92,12 @@ class Asset extends Model
             return "$year/$month/{$type->code}-$newNumberFormatted";
         });
     }
+
     protected function imageUrl(): Attribute
     {
         return Attribute::make(
             get: function () {
-                if (!$this->image) {
+                if (! $this->image) {
                     return asset('assets/logo-stti.png');
                 }
 
@@ -100,8 +113,8 @@ class Asset extends Model
 
                 // Kasus 2: gambar dari seeder, fisik di public/assets/products/
                 $filename = basename($this->image);
-                if (file_exists(public_path('assets/products/' . $filename))) {
-                    return asset('assets/products/' . $filename);
+                if (file_exists(public_path('assets/products/'.$filename))) {
+                    return asset('assets/products/'.$filename);
                 }
 
                 // Fallback terakhir kalau benar-benar tidak ditemukan
@@ -115,22 +128,27 @@ class Asset extends Model
     {
         return $this->belongsTo(AssetType::class);
     }
+
     public function borrowings()
     {
         return $this->hasMany(Borrowing::class);
     }
+
     public function maintenances()
     {
         return $this->hasMany(Maintenance::class);
     }
+
     public function qrCode()
     {
         return $this->hasOne(QrCode::class);
     }
+
     public function qrCodes()
     {
         return $this->hasMany(QrCode::class, 'asset_id');
     }
+
     public function penanggungJawab()
     {
         return $this->belongsTo(User::class, 'penanggung_jawab_id');
@@ -140,14 +158,17 @@ class Asset extends Model
     {
         return $this->belongsTo(AssetRequest::class);
     }
+
     public function unit()
     {
         return $this->belongsTo(Unit::class);
     }
+
     public function location_ref()
     {
         return $this->belongsTo(Location::class, 'location_id');
     }
+
     public function replaces()
     {
         return $this->belongsTo(Asset::class, 'replaces_asset_id');

@@ -21,7 +21,8 @@
                     <p style="font-weight: 600;">{{ $asset->brand }}</p>
                 </div>
                 <div>
-                    <p style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Nomor Seri</p>
+                    <p style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Nomor Seri
+                        Pabrik</p>
                     <p style="font-weight: 600; font-size: 0.875rem;">{{ $asset->serial_number }}</p>
                 </div>
                 <div>
@@ -31,7 +32,8 @@
                 <div>
                     <p style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Harga</p>
                     <p style="font-weight: 600; color: var(--success-color);">Rp
-                        {{ number_format($asset->price, 0, ',', '.') }}</p>
+                        {{ number_format($asset->price, 0, ',', '.') }}
+                    </p>
                 </div>
                 <div>
                     <p style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Status</p>

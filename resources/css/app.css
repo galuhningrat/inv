@@ -24,6 +24,14 @@
     --header-height: 64px;
 }
 
+#loginPage {
+    background-image: url("/assets/bg-logo-002.jpg");
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    min-height: 100vh; /* Memastikan background memenuhi tinggi layar */
+}
+
 /* Dark Mode Variables */
 .dark-mode {
     --primary-color: #60a5fa;
@@ -55,7 +63,9 @@ body {
     color: var(--text-primary);
     line-height: 1.6;
     overflow-x: hidden;
-    transition: background-color 0.3s ease, color 0.3s ease;
+    transition:
+        background-color 0.3s ease,
+        color 0.3s ease;
 }
 
 /* ==================== RESPONSIVE CONTAINERS ==================== */
@@ -73,7 +83,8 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(rgba(255, 255, 255, 0.7), rgba(0, 0, 0, 0.7)),
+    background:
+        linear-gradient(rgba(255, 255, 255, 0.7), rgba(0, 0, 0, 0.7)),
         url("/images/bg-logo-002.jpg");
     background-size: cover;
     background-position: center;
@@ -81,7 +92,8 @@ body {
 }
 
 .dark-mode .login-container {
-    background: linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.9)),
+    background:
+        linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.9)),
         url("/images/bg-logo-002.jpg");
     background-size: cover;
     background-position: center;
@@ -95,7 +107,10 @@ body {
     width: 100%;
     max-width: 420px;
     text-align: center;
-    transition: transform 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
+    transition:
+        transform 0.3s ease,
+        box-shadow 0.3s ease,
+        background 0.3s ease;
 }
 
 .login-card:hover {
@@ -113,7 +128,9 @@ body {
     border-radius: 50%;
     object-fit: cover;
     margin-bottom: 1rem;
-    box-shadow: 0 0 0 4px var(--card-bg), 0 0 0 6px var(--primary-color);
+    box-shadow:
+        0 0 0 4px var(--card-bg),
+        0 0 0 6px var(--primary-color);
 }
 
 .login-card h1 {
@@ -262,8 +279,10 @@ body {
     background: var(--card-bg);
     border-right: 1px solid var(--border-color);
     transform: translateX(0);
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-        width 0.3s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s ease,
+    transition:
+        transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+        width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+        background 0.3s ease,
         border-color 0.3s ease;
     z-index: 1000;
     overflow-y: auto;
@@ -281,7 +300,9 @@ body {
     align-items: center;
     justify-content: center;
     height: var(--header-height);
-    transition: padding 0.3s ease, border-color 0.3s ease;
+    transition:
+        padding 0.3s ease,
+        border-color 0.3s ease;
 }
 
 .sidebar.collapsed .sidebar-header {
@@ -310,7 +331,9 @@ body {
     color: var(--text-primary);
     white-space: nowrap;
     opacity: 1;
-    transition: opacity 0.2s ease, color 0.3s ease;
+    transition:
+        opacity 0.2s ease,
+        color 0.3s ease;
 }
 
 .sidebar.collapsed .logo-text {
@@ -331,7 +354,9 @@ body {
     text-decoration: none;
     border-radius: 8px;
     margin: 0.125rem 0.5rem;
-    transition: all 0.2s ease, color 0.3s ease;
+    transition:
+        all 0.2s ease,
+        color 0.3s ease;
     position: relative;
     overflow: hidden;
     white-space: nowrap;
@@ -368,7 +393,9 @@ body {
     width: 20px;
     height: 20px;
     flex-shrink: 0;
-    transition: transform 0.2s ease, stroke 0.3s ease;
+    transition:
+        transform 0.2s ease,
+        stroke 0.3s ease;
 }
 
 .nav-link:hover svg {
@@ -424,7 +451,8 @@ body {
     z-index: 999;
     backdrop-filter: blur(10px);
     border-bottom: 1px solid var(--border-color);
-    transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+    transition:
+        transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
         background 0.3s ease;
 }
 
@@ -459,7 +487,9 @@ body {
     border-radius: 8px;
     cursor: pointer;
     color: var(--text-primary);
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s ease;
+    transition:
+        all 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+        color 0.3s ease;
     position: relative;
 }
 
@@ -482,7 +512,9 @@ body {
 }
 
 .menu-toggle svg {
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.3s ease;
+    transition:
+        all 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+        stroke 0.3s ease;
     transform-origin: center;
 }
 
@@ -552,7 +584,10 @@ body {
     padding: 1.5rem;
     border-radius: 12px;
     box-shadow: var(--shadow);
-    transition: transform 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
+    transition:
+        transform 0.3s ease,
+        box-shadow 0.3s ease,
+        background 0.3s ease;
 }
 
 .stat-card:hover {
@@ -633,7 +668,9 @@ body {
     box-shadow: var(--shadow);
     overflow: hidden;
     margin-bottom: 2rem;
-    transition: background 0.3s ease, box-shadow 0.3s ease;
+    transition:
+        background 0.3s ease,
+        box-shadow 0.3s ease;
 }
 
 .table-wrapper {
@@ -664,7 +701,9 @@ body {
     font-size: 0.8rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    transition: background 0.3s ease, color 0.3s ease;
+    transition:
+        background 0.3s ease,
+        color 0.3s ease;
 }
 
 .data-table td {
@@ -712,8 +751,11 @@ body {
     border: 1px solid var(--border-color);
     border-radius: 8px;
     font-size: 0.875rem;
-    transition: border-color 0.3s ease, box-shadow 0.3s ease,
-        background 0.3s ease, color 0.3s ease;
+    transition:
+        border-color 0.3s ease,
+        box-shadow 0.3s ease,
+        background 0.3s ease,
+        color 0.3s ease;
     background-color: var(--card-bg);
     color: var(--text-primary);
 }
@@ -874,7 +916,9 @@ body {
     max-height: 90vh;
     overflow-y: auto;
     transform: scale(0.9);
-    transition: transform 0.3s ease, background 0.3s ease;
+    transition:
+        transform 0.3s ease,
+        background 0.3s ease;
 }
 
 .modal.active .modal-content {
@@ -928,7 +972,9 @@ body {
     box-shadow: var(--shadow);
     margin-bottom: 2rem;
     height: 300px;
-    transition: background 0.3s ease, box-shadow 0.3s ease;
+    transition:
+        background 0.3s ease,
+        box-shadow 0.3s ease;
 }
 
 /* ==================== OVERLAY STYLES ==================== */
@@ -1035,7 +1081,9 @@ body {
     justify-content: center;
     cursor: grab;
     z-index: 9999;
-    transition: opacity 0.3s, transform 0.2s;
+    transition:
+        opacity 0.3s,
+        transform 0.2s;
 }
 
 .easy-touch-button:active {
@@ -1138,7 +1186,9 @@ body {
     border-top: 1px solid var(--border-color);
     margin-top: auto;
     box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.05);
-    transition: background 0.3s ease, border-color 0.3s ease;
+    transition:
+        background 0.3s ease,
+        border-color 0.3s ease;
 }
 
 .footer--dashboard {
@@ -1450,7 +1500,10 @@ body {
     box-shadow: var(--shadow-lg);
     z-index: 3000;
     transform: translateX(100%);
-    transition: transform 0.3s ease, background 0.3s ease, color 0.3s ease;
+    transition:
+        transform 0.3s ease,
+        background 0.3s ease,
+        color 0.3s ease;
 }
 
 .toast.show {

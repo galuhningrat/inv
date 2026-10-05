@@ -5,12 +5,9 @@
 
 @section('content')
     {{-- ============================================================ --}}
-    {{--  CSS UNTUK KARTU PILIHAN YANG AESTHETIC                      --}}
+    {{-- CSS UNTUK KARTU PILIHAN YANG AESTHETIC --}}
     {{-- ============================================================ --}}
     <style>
-        /* =============================================
-                               ITEM TYPE PICKER – VERSION 2 (AESTHETIC)
-                               ============================================= */
         .item-type-picker {
             display: flex;
             gap: 1rem;
@@ -108,7 +105,6 @@
             transform: scale(1);
         }
 
-        /* Dark mode support */
         body.dark-mode .item-type-option {
             background: var(--dark-card, #1f2937);
             border-color: var(--dark-border, #374151);
@@ -135,7 +131,6 @@
             color: #9ca3af;
         }
 
-        /* Responsive */
         @media screen and (max-width: 640px) {
             .item-type-picker {
                 flex-direction: column;
@@ -155,7 +150,7 @@
     </style>
 
     {{-- ============================================================ --}}
-    {{--  ISI KONTEN UTAMA                                            --}}
+    {{-- ISI KONTEN UTAMA --}}
     {{-- ============================================================ --}}
     <div class="data-table-container">
         <div class="table-header">
@@ -178,12 +173,7 @@
             </div>
         @endif
 
-        {{-- Info periode — sekadar catatan untuk histori/laporan, BUKAN pembatasan.
-             Batasan "1x pengajuan per bulan per unit" sebelumnya sudah dihapus:
-             dikonfirmasi oleh PJ Pengadaan bahwa itu cuma kebiasaan batching mereka
-             mengambil pengajuan beberapa unit sekaligus, bukan aturan anggaran —
-             dan itu sempat bertabrakan dengan adanya opsi Prioritas "Sangat
-             Mendesak" yang seharusnya bisa diajukan kapan saja. --}}
+        {{-- Info periode --}}
         <div
             style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 1rem 1.5rem; margin-bottom: 1.5rem;">
             <p style="margin: 0; font-size: 0.9rem; color: #1e40af;">
@@ -193,34 +183,7 @@
 
         @php $oldItems = old('items', [[]]); @endphp
         <div style="padding: 2rem;">
-            {{-- Unit tujuan pengajuan. Sarpras/Admin bisa memilih unit mana pun (mis.
-                 membantu unit yang tidak punya akses) — role lain (Kaprodi/Kalab)
-                 selalu terkunci ke unit akun sendiri, jadi cukup ditampilkan sebagai
-                 info read-only, tidak perlu dropdown sungguhan. Penegakan yang
-                 sebenarnya tetap ada di AssetRequestController::store() — bukan cuma
-                 mengandalkan field mana yang ditampilkan di sini. --}}
-            <div class="form-group" style="margin-bottom: 1.5rem;">
-                <label for="unit_id">Unit Pengaju <span style="color: red;">*</span></label>
-                @if ($canChooseUnit)
-                    <select id="unit_id" name="unit_id"
-                        class="form-control @error('unit_id') error @enderror" required>
-                        <option value="">Pilih Unit</option>
-                        @foreach ($units as $unit)
-                            <option value="{{ $unit->id }}" {{ old('unit_id') == $unit->id ? 'selected' : '' }}>
-                                {{ $unit->name }} ({{ $unit->category ?? '-' }})</option>
-                        @endforeach
-                    </select>
-                    @error('unit_id')
-                        <div class="error-message" style="display: block;">{{ $message }}</div>
-                    @enderror
-                @else
-                    <input type="text" class="form-control"
-                        value="{{ $currentUnitName ?? 'Belum terhubung ke unit mana pun — hubungi Admin' }}" disabled>
-                    <small style="color: var(--text-secondary);">Pengajuan otomatis tercatat atas nama unit
-                        Anda.</small>
-                @endif
-            </div>
-
+            {{-- ============ TEMPLATE OPSI ============ --}}
             <template id="assetTypeOptionsTemplate">
                 <option value="">Pilih Jenis</option>
                 @foreach ($assetTypes as $type)
@@ -239,78 +202,42 @@
                     <option value="{{ $val }}">{{ $label }}</option>
                 @endforeach
             </template>
+            <template id="unitOptionsTemplate">
+                <option value="">Pilih Unit</option>
+                @foreach ($units as $unit)
+                    <option value="{{ $unit->id }}">{{ $unit->name }} ({{ $unit->category ?? '-' }})</option>
+                @endforeach
+            </template>
+            <template id="priorityOptionsTemplate">
+                @foreach ($priorities as $p)
+                    <option value="{{ $p }}" {{ $p === 'Normal' ? 'selected' : '' }}>{{ $p }}
+                    </option>
+                @endforeach
+            </template>
+            <template id="alasanOptionsTemplate">
+                @foreach ($alasanOptions as $opt)
+                    <option value="{{ $opt }}">{{ $opt }}</option>
+                @endforeach
+            </template>
+            <template id="relatedAssetOptionsTemplate">
+                <option value="">-- Pilih Aset --</option>
+                @foreach ($assets as $a)
+                    <option value="{{ $a->id }}">{{ $a->asset_id }} — {{ $a->name }}</option>
+                @endforeach
+            </template>
+
+            {{-- Config untuk JS --}}
+            <script>
+                window.CAN_CHOOSE_UNIT = {{ $canChooseUnit ? 'true' : 'false' }};
+                window.CURRENT_UNIT = {
+                    id: {{ Auth::user()->unit_id ?? 'null' }},
+                    name: @json($currentUnitName ?? '-')
+                };
+            </script>
+
             <form action="{{ route('requests.store') }}" method="POST" id="requestForm">
                 @csrf
 
-                <h4 style="margin-bottom: 1rem;">Informasi Umum</h4>
-
-                {{-- "Jenis Barang" (Habis Pakai/Tidak Habis Pakai/Jasa) dan "Kategori Barang"
-                     (ATK/Konsumsi/Alat/Furniture/Lainnya) sengaja tidak lagi diminta di header
-                     sini. Klasifikasi sekarang per item lewat "Sifat Barang" + "Jenis
-                     Aset"/"Kategori Non-Fisik"/"Kategori Habis Pakai" di level item di bawah —
-                     satu pengajuan bisa berisi banyak item campuran, jadi satu nilai untuk
-                     seluruh pengajuan secara struktural tidak representatif (lihat migration
-                     2026_09_04_000000_make_kategori_barang_nullable.php dan
-                     2026_09_05_000000_add_sifat_barang_and_light_receipt_columns.php).
-                     Kolom & data lama tetap ada di database untuk pengajuan sebelum perubahan ini. --}}
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="priority">Prioritas <span style="color: red;">*</span></label>
-                        <select id="priority" name="priority" class="form-control @error('priority') error @enderror"
-                            required>
-                            @foreach ($priorities as $p)
-                                <option value="{{ $p }}"
-                                    {{ old('priority', 'Normal') === $p ? 'selected' : '' }}>{{ $p }}</option>
-                            @endforeach
-                        </select>
-                        @error('priority')
-                            <div class="error-message" style="display: block;">{{ $message }}</div>
-                        @enderror
-                    </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="alasan_pengajuan">Alasan Pengajuan <span style="color: red;">*</span></label>
-                        <select id="alasan_pengajuan" name="alasan_pengajuan"
-                            class="form-control @error('alasan_pengajuan') error @enderror" required
-                            onchange="toggleRelatedAsset()">
-                            @foreach ($alasanOptions as $opt)
-                                <option value="{{ $opt }}"
-                                    {{ old('alasan_pengajuan') === $opt ? 'selected' : '' }}>{{ $opt }}</option>
-                            @endforeach
-                        </select>
-                        @error('alasan_pengajuan')
-                            <div class="error-message" style="display: block;">{{ $message }}</div>
-                        @enderror
-                    </div>
-                    <div class="form-group" id="relatedAssetGroup"
-                        style="display: {{ old('alasan_pengajuan') === 'Penggantian' ? 'block' : 'none' }};">
-                        <label for="related_asset_id">Aset yang Diganti</label>
-                        <select id="related_asset_id" name="related_asset_id"
-                            class="form-control @error('related_asset_id') error @enderror">
-                            <option value="">-- Pilih Aset --</option>
-                            @foreach ($assets as $a)
-                                <option value="{{ $a->id }}"
-                                    {{ old('related_asset_id') == $a->id ? 'selected' : '' }}>{{ $a->asset_id }} —
-                                    {{ $a->name }}</option>
-                            @endforeach
-                        </select>
-                        @error('related_asset_id')
-                            <div class="error-message" style="display: block;">{{ $message }}</div>
-                        @enderror
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label for="reason">Alasan / Latar Belakang Pengajuan <span style="color: red;">*</span></label>
-                    <textarea id="reason" name="reason" class="form-control @error('reason') error @enderror" rows="3" required>{{ old('reason') }}</textarea>
-                    @error('reason')
-                        <div class="error-message" style="display: block;">{{ $message }}</div>
-                    @enderror
-                </div>
-
-                <hr style="margin: 1.5rem 0;">
                 <h4 style="margin-bottom: 1rem;">Rincian Barang yang Diajukan</h4>
 
                 <div id="itemsContainer">
@@ -323,8 +250,6 @@
                                 : \App\Models\AssetRequestItem::SIFAT_BARANG_NON_FISIK;
                             $sifatBarang = $oldItem['sifat_barang'] ?? 'Tidak Habis Pakai';
                             if (!in_array($sifatBarang, $sifatOptions)) {
-                                // Fallback aman kalau old() menyimpan kombinasi yang sudah
-                                // tidak valid (mis. browser back setelah tipe item diganti).
                                 $sifatBarang = 'Tidak Habis Pakai';
                             }
                             $showAssetType = $isPhysical && $sifatBarang !== 'Habis Pakai';
@@ -334,9 +259,7 @@
                         <div class="item-row"
                             style="border: 1px solid var(--border-color); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
 
-                            {{-- ============================================= --}}
-                            {{--  PEMILIH JENIS ASET (KARTU AESTHETIC)         --}}
-                            {{-- ============================================= --}}
+                            {{-- ===== PEMILIH JENIS ASET ===== --}}
                             <div class="item-type-picker">
                                 <div class="item-type-option {{ $isPhysical ? 'active' : '' }}"
                                     data-index="{{ $index }}" data-value="Fisik"
@@ -358,7 +281,6 @@
                                     </span>
                                     <span class="item-type-check">✓</span>
                                 </div>
-                                {{-- hidden input untuk menyimpan nilai --}}
                                 <input type="hidden" name="items[{{ $index }}][item_type]"
                                     value="{{ $itemType }}" id="item_type_hidden_{{ $index }}">
                             </div>
@@ -366,19 +288,15 @@
                             <div class="form-row">
                                 <div class="form-group">
                                     <label>Sifat Barang <span style="color: red;">*</span></label>
-                                    {{-- Menentukan alur registrasi di Sarpras nanti. "Tidak Habis Pakai" =
-                                         alur penuh (nomor seri/kondisi untuk Fisik, atau vendor/lisensi untuk
-                                         Non-Fisik) seperti yang sudah berjalan sekarang. "Habis Pakai"
-                                         (khusus Aset Fisik) dan "Jasa" (khusus Aset Non-Fisik) = registrasi
-                                         ringan, tidak masuk tabel aset permanen, cukup dicatat jumlah yang
-                                         diterima. Opsi menyesuaikan otomatis mengikuti Aset Fisik/Non-Fisik
-                                         yang dipilih di atas. --}}
-                                    <select id="sifat_barang_{{ $index }}" name="items[{{ $index }}][sifat_barang]"
+                                    <select id="sifat_barang_{{ $index }}"
+                                        name="items[{{ $index }}][sifat_barang]"
                                         class="form-control @error('items.' . $index . '.sifat_barang') error @enderror"
                                         onchange="updateClassificationGroups({{ $index }})" required>
                                         @foreach ($sifatOptions as $opt)
-                                            <option value="{{ $opt }}" {{ $sifatBarang === $opt ? 'selected' : '' }}>
-                                                {{ $opt }}</option>
+                                            <option value="{{ $opt }}"
+                                                {{ $sifatBarang === $opt ? 'selected' : '' }}>
+                                                {{ $opt }}
+                                            </option>
                                         @endforeach
                                     </select>
                                     @error('items.' . $index . '.sifat_barang')
@@ -407,15 +325,14 @@
                                         @foreach ($assetTypes as $type)
                                             <option value="{{ $type->id }}"
                                                 {{ ($oldItem['asset_type_id'] ?? '') == $type->id ? 'selected' : '' }}>
-                                                {{ $type->name }}</option>
+                                                {{ $type->name }}
+                                            </option>
                                         @endforeach
                                     </select>
                                     @error('items.' . $index . '.asset_type_id')
                                         <div class="error-message" style="display: block;">{{ $message }}</div>
                                     @enderror
                                 </div>
-                                {{-- Khusus Aset Fisik + Habis Pakai (ATK, dsb.) — barang ini tidak akan
-                                     didaftarkan ke tabel aset permanen, jadi tidak perlu "Jenis Aset". --}}
                                 <div class="form-group" id="habisPakaiCategoryGroup_{{ $index }}"
                                     style="display: {{ $showHabisPakaiCategory ? 'block' : 'none' }};">
                                     <label>Kategori Habis Pakai <span style="color: red;">*</span></label>
@@ -426,20 +343,14 @@
                                         @foreach (\App\Models\AssetRequestItem::HABIS_PAKAI_CATEGORIES as $val => $label)
                                             <option value="{{ $val }}"
                                                 {{ ($oldItem['category'] ?? '') === $val ? 'selected' : '' }}>
-                                                {{ $label }}</option>
+                                                {{ $label }}
+                                            </option>
                                         @endforeach
                                     </select>
                                     @error('items.' . $index . '.category')
                                         <div class="error-message" style="display: block;">{{ $message }}</div>
                                     @enderror
                                 </div>
-                                {{-- Setara dengan "Jenis Aset" di atas, tapi untuk item Non-Fisik yang
-                                     sifatnya "Tidak Habis Pakai" (lisensi/software dengan masa berlaku).
-                                     Sebelumnya tidak ada field ini sama sekali di form pengajuan — kategori
-                                     baru ditentukan Sarpras belakangan saat registrasi, sehingga kolom
-                                     "Jenis Aset" di halaman Detail Pengajuan selalu tampil "-". Tidak
-                                     ditampilkan untuk sifat "Jasa" karena jasa tidak dikategorikan
-                                     selengkap itu — nama + spesifikasi sudah cukup. --}}
                                 <div class="form-group" id="nonFisikCategoryGroup_{{ $index }}"
                                     style="display: {{ $showNonFisikCategory ? 'block' : 'none' }};">
                                     <label>Kategori Non-Fisik <span style="color: red;">*</span></label>
@@ -450,7 +361,8 @@
                                         @foreach ($nonFisikCategories as $val => $label)
                                             <option value="{{ $val }}"
                                                 {{ ($oldItem['category'] ?? '') === $val ? 'selected' : '' }}>
-                                                {{ $label }}</option>
+                                                {{ $label }}
+                                            </option>
                                         @endforeach
                                     </select>
                                     @error('items.' . $index . '.category')
@@ -480,40 +392,122 @@
                                         $isCustomUnit = $oldUnit && !in_array($oldUnit, $unitOptions);
                                     @endphp
                                     <label>Satuan <span style="color: red;">*</span></label>
-                                    {{-- Select dan input manual berbagi nama field yang sama. Yang mana yang
-                                         benar-benar terkirim ke server diatur lewat atribut "disabled" (field
-                                         disabled tidak pernah ikut ter-submit) — jadi tidak perlu logika
-                                         tambahan di controller untuk membedakan asal nilainya. --}}
                                     <select id="unit_select_{{ $index }}" name="items[{{ $index }}][unit]"
                                         class="form-control @error('items.' . $index . '.unit') error @enderror"
                                         onchange="handleUnitChange({{ $index }})"
                                         {{ $isCustomUnit ? 'disabled' : 'required' }}>
                                         <option value="">-- Pilih Satuan --</option>
                                         @foreach ($unitOptions as $opt)
-                                            <option value="{{ $opt }}" {{ $oldUnit === $opt ? 'selected' : '' }}>
-                                                {{ $opt }}</option>
+                                            <option value="{{ $opt }}"
+                                                {{ $oldUnit === $opt ? 'selected' : '' }}>
+                                                {{ $opt }}
+                                            </option>
                                         @endforeach
                                         <option value="Lainnya" {{ $isCustomUnit ? 'selected' : '' }}>Lainnya (isi
                                             manual)</option>
                                     </select>
-                                    <input type="text" id="unit_manual_{{ $index }}" name="items[{{ $index }}][unit]"
-                                        class="form-control" style="display: {{ $isCustomUnit ? 'block' : 'none' }}; margin-top: 0.5rem;"
+                                    <input type="text" id="unit_manual_{{ $index }}"
+                                        name="items[{{ $index }}][unit]" class="form-control"
+                                        style="display: {{ $isCustomUnit ? 'block' : 'none' }}; margin-top: 0.5rem;"
                                         placeholder="Tulis satuan, contoh: Rim, Dus, Botol"
                                         value="{{ $isCustomUnit ? $oldUnit : '' }}"
+                                        oninput="updatePriceLabel({{ $index }})"
                                         {{ $isCustomUnit ? 'required' : 'disabled' }}>
                                     @error('items.' . $index . '.unit')
                                         <div class="error-message" style="display: block;">{{ $message }}</div>
                                     @enderror
                                 </div>
                                 <div class="form-group">
-                                    <label>Est. Harga/Unit (Rp)</label>
+                                    {{-- Label dinamis: JS akan mengubah teksnya mengikuti satuan yang dipilih --}}
+                                    <label id="price_label_{{ $index }}">Est. Harga Satuan (Rp)</label>
                                     <input type="number" name="items[{{ $index }}][estimated_price_per_unit]"
                                         class="form-control" value="{{ $oldItem['estimated_price_per_unit'] ?? '' }}"
                                         min="0">
                                 </div>
                             </div>
+
+                            {{-- ============ FASE 2: FIELD PER-ITEM ============ --}}
+                            <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed var(--border-color);">
+                                <p
+                                    style="font-weight: 600; margin-bottom: 0.75rem; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">
+                                    📌 Detail Pengajuan Item Ini
+                                </p>
+
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Unit Pengaju <span style="color: red;">*</span></label>
+                                        @if ($canChooseUnit)
+                                            <select name="items[{{ $index }}][unit_id]"
+                                                class="form-control @error('items.' . $index . '.unit_id') error @enderror"
+                                                required>
+                                                <option value="">Pilih Unit</option>
+                                                @foreach ($units as $unit)
+                                                    <option value="{{ $unit->id }}"
+                                                        {{ ($oldItem['unit_id'] ?? '') == $unit->id ? 'selected' : '' }}>
+                                                        {{ $unit->name }} ({{ $unit->category ?? '-' }})
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        @else
+                                            <input type="text" class="form-control"
+                                                value="{{ $currentUnitName ?? '-' }}" disabled>
+                                            <input type="hidden" name="items[{{ $index }}][unit_id]"
+                                                value="{{ Auth::user()->unit_id }}">
+                                        @endif
+                                        @error('items.' . $index . '.unit_id')
+                                            <div class="error-message" style="display: block;">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label>Prioritas <span style="color: red;">*</span></label>
+                                        <select name="items[{{ $index }}][priority]" class="form-control"
+                                            required>
+                                            @foreach ($priorities as $p)
+                                                <option value="{{ $p }}"
+                                                    {{ ($oldItem['priority'] ?? 'Normal') === $p ? 'selected' : '' }}>
+                                                    {{ $p }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="section-divider">
+                                    <p class="section-title">📌 Detail Pengajuan Item Ini</p>
+
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label>Unit Pengaju <span style="color: red;">*</span></label>
+                                            {{-- ... --}}
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Prioritas <span style="color: red;">*</span></label>
+                                            {{-- ... --}}
+                                        </div>
+                                    </div>
+
+                                    {{-- ← blok "Alasan Pengajuan" yang lama DIHAPUS di sini --}}
+
+                                    <div class="form-group">
+                                        <label>Alasan / Latar Belakang Item Ini <span style="color: red;">*</span></label>
+                                        <textarea name="items[{{ $index }}][reason]" class="form-control" rows="2"
+                                            placeholder="Jelaskan mengapa jasa ini dibutuhkan..." required>{{ $oldItem['reason'] ?? '' }}</textarea>
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Alasan / Latar Belakang Item Ini <span style="color: red;">*</span></label>
+                                    <textarea name="items[{{ $index }}][reason]"
+                                        class="form-control @error('items.' . $index . '.reason') error @enderror" rows="2"
+                                        placeholder="Jelaskan mengapa item ini diajukan..." required>{{ $oldItem['reason'] ?? '' }}</textarea>
+                                    @error('items.' . $index . '.reason')
+                                        <div class="error-message" style="display: block;">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                            </div>
+
                             @if (count($oldItems) > 1)
-                                <button type="button" class="btn btn-danger"
+                                <button type="button" class="btn btn-danger" style="margin-top: 1rem;"
                                     onclick="this.closest('.item-row').remove()">Hapus Item Ini</button>
                             @endif
                         </div>
@@ -537,13 +531,11 @@
         let itemIndex = {{ count($oldItems) }};
 
         // ============================================================
-        //  FUNGSI SELECT ITEM TYPE (PERBAIKAN FINAL)
+        //  FUNGSI SELECT ITEM TYPE
         // ============================================================
         function selectItemType(index, type) {
-            // 1. Cari hidden input dengan ID yang benar
             let hiddenInput = document.getElementById(`item_type_hidden_${index}`);
             if (!hiddenInput) {
-                // Fallback: cari berdasarkan nama input
                 hiddenInput = document.querySelector(`input[name="items[${index}][item_type]"]`);
             }
             if (!hiddenInput) {
@@ -552,48 +544,31 @@
             }
             hiddenInput.value = type;
 
-            // 2. Cari item-row terdekat dari hidden input
             const itemRow = hiddenInput.closest('.item-row');
             if (!itemRow) {
                 console.warn(`Item row for index ${index} not found`);
                 return;
             }
 
-            // 3. Cari picker di dalam item-row tersebut
             const picker = itemRow.querySelector('.item-type-picker');
             if (!picker) {
                 console.warn(`Picker for index ${index} not found`);
                 return;
             }
 
-            // 4. Update class aktif pada semua opsi di dalam picker ini
             const options = picker.querySelectorAll('.item-type-option');
             options.forEach(opt => {
                 const isActive = opt.getAttribute('data-value') === type;
                 opt.classList.toggle('active', isActive);
             });
 
-            // 5. Sifat Barang: opsi berbeda untuk Fisik ("Tidak Habis Pakai"/"Habis Pakai")
-            // vs Non-Fisik ("Tidak Habis Pakai"/"Jasa"). Selalu reset ke "Tidak Habis
-            // Pakai" (alur penuh) tiap kali tipe item berganti, supaya orang harus
-            // secara aktif memilih jalur ringan, bukan sebaliknya.
             populateSifatBarangOptions(index, type);
-
-            // 6. Tampilkan grup klasifikasi yang tepat (Jenis Aset / Kategori Habis
-            // Pakai / Kategori Non-Fisik) berdasarkan kombinasi item_type + sifat
-            // barang saat ini.
             updateClassificationGroups(index);
-
-            // 7. Satuan yang relevan berbeda untuk Fisik vs Non-Fisik (lihat
-            // populateUnitOptions), jadi opsi dropdown-nya perlu disegarkan setiap kali
-            // tipe item berganti.
             populateUnitOptions(index, type);
         }
 
         // ============================================================
         //  FUNGSI SIFAT BARANG + GRUP KLASIFIKASI
-        //  Daftar opsi harus tetap sinkron dengan AssetRequestItem::SIFAT_BARANG_FISIK
-        //  dan AssetRequestItem::SIFAT_BARANG_NON_FISIK di backend.
         // ============================================================
         const SIFAT_BARANG_OPTIONS = {
             'Fisik': {{ \Illuminate\Support\Js::from($sifatBarangFisik) }},
@@ -625,9 +600,6 @@
                 nonFisik: document.getElementById(`nonFisikCategoryGroup_${index}`),
             };
 
-            // Sembunyikan & lepas wajib-isi semua grup dulu, baru aktifkan satu yang
-            // relevan — supaya tidak ada nilai/required yang nyangkut dari kombinasi
-            // sebelumnya (mis. pindah dari Fisik ke Non-Fisik lalu balik lagi).
             Object.values(groups).forEach(g => {
                 if (!g) return;
                 g.style.display = 'none';
@@ -646,8 +618,6 @@
             } else if (itemType === 'Non-Fisik' && sifat !== 'Jasa') {
                 active = groups.nonFisik;
             }
-            // Non-Fisik + Jasa: sengaja tidak ada grup aktif — nama barang + spesifikasi
-            // sudah cukup untuk jasa, tidak perlu klasifikasi lebih detail.
 
             if (active) {
                 active.style.display = 'block';
@@ -657,9 +627,7 @@
         }
 
         // ============================================================
-        //  FUNGSI SATUAN: dropdown per tipe item + fallback isi manual
-        //  Daftar ini harus tetap sinkron dengan AssetRequestItem::UNITS_FISIK
-        //  dan AssetRequestItem::UNITS_NON_FISIK di backend.
+        //  FUNGSI SATUAN
         // ============================================================
         const UNIT_OPTIONS = {
             'Fisik': {{ \Illuminate\Support\Js::from($unitsFisik) }},
@@ -688,8 +656,6 @@
             lainnya.textContent = 'Lainnya (isi manual)';
             select.appendChild(lainnya);
 
-            // Reset ke mode dropdown (bukan manual) setiap kali tipe item berganti,
-            // supaya tidak ada nilai satuan dari tipe sebelumnya yang nyangkut.
             const manualInput = document.getElementById(`unit_manual_${index}`);
             if (manualInput) {
                 manualInput.style.display = 'none';
@@ -697,6 +663,9 @@
                 manualInput.value = '';
             }
             select.disabled = false;
+
+            // Reset label harga ke default karena dropdown baru saja di-reset
+            updatePriceLabel(index);
         }
 
         function handleUnitChange(index) {
@@ -705,9 +674,6 @@
             if (!select || !manualInput) return;
 
             if (select.value === 'Lainnya') {
-                // Select dan input manual berbagi "name" yang sama (lihat markup Blade) —
-                // atribut "disabled" yang menentukan mana yang benar-benar ikut ter-submit,
-                // jadi cukup tukar disabled di sini, tidak perlu utak-atik "name".
                 manualInput.style.display = 'block';
                 manualInput.disabled = false;
                 select.disabled = true;
@@ -718,17 +684,72 @@
                 manualInput.value = '';
                 select.disabled = false;
             }
+
+            updatePriceLabel(index);
         }
 
         // ============================================================
-        //  FUNGSI TAMBAH ITEM BARANG (dengan ID hidden yang benar)
+        //  FUNGSI LABEL HARGA DINAMIS
+        //  Menyesuaikan teks label "Est. Harga/xxx (Rp)" mengikuti
+        //  satuan yang dipilih (dropdown atau input manual).
+        // ============================================================
+        function updatePriceLabel(index) {
+            const label = document.getElementById(`price_label_${index}`);
+            if (!label) return;
+
+            const select = document.getElementById(`unit_select_${index}`);
+            const manualInput = document.getElementById(`unit_manual_${index}`);
+
+            let unitText = '';
+
+            // Prioritas 1: input manual aktif & ada isinya
+            if (manualInput && !manualInput.disabled && manualInput.value.trim() !== '') {
+                unitText = manualInput.value.trim();
+            }
+            // Prioritas 2: dropdown dipilih & bukan "Lainnya"
+            else if (select && !select.disabled && select.value && select.value !== 'Lainnya') {
+                unitText = select.value;
+            }
+            // Fallback: label default
+
+            label.textContent = unitText ?
+                `Est. Harga/${unitText} (Rp)` :
+                'Est. Harga Satuan (Rp)';
+        }
+
+        // ============================================================
+        //  FASE 2: TOGGLE ASET TERKAIT PER ITEM
+        // ============================================================
+        function toggleRelatedAssetForItem(index, selectEl) {
+            const group = document.getElementById(`relatedAssetGroup_${index}`);
+            if (!group) return;
+            const isPenggantian = selectEl.value === 'Penggantian';
+            group.style.display = isPenggantian ? 'block' : 'none';
+            const relatedSelect = group.querySelector('select');
+            if (relatedSelect) {
+                relatedSelect.required = isPenggantian;
+                if (!isPenggantian) relatedSelect.value = '';
+            }
+        }
+
+        // ============================================================
+        //  FUNGSI TAMBAH ITEM BARANG (FASE 2)
         // ============================================================
         function addItemRow() {
             const container = document.getElementById('itemsContainer');
             const assetTypeOptionsHtml = document.getElementById('assetTypeOptionsTemplate').innerHTML;
             const nonFisikCategoryOptionsHtml = document.getElementById('nonFisikCategoryOptionsTemplate').innerHTML;
             const habisPakaiCategoryOptionsHtml = document.getElementById('habisPakaiCategoryOptionsTemplate').innerHTML;
+            const unitOptionsHtml = document.getElementById('unitOptionsTemplate').innerHTML;
+            const priorityOptionsHtml = document.getElementById('priorityOptionsTemplate').innerHTML;
+            const alasanOptionsHtml = document.getElementById('alasanOptionsTemplate').innerHTML;
+            const relatedAssetOptionsHtml = document.getElementById('relatedAssetOptionsTemplate').innerHTML;
             const currentIndex = itemIndex;
+
+            const unitField = window.CAN_CHOOSE_UNIT ?
+                `<select name="items[${currentIndex}][unit_id]" class="form-control" required>${unitOptionsHtml}</select>` :
+                `<input type="text" class="form-control" value="${window.CURRENT_UNIT.name}" disabled>
+                       <input type="hidden" name="items[${currentIndex}][unit_id]" value="${window.CURRENT_UNIT.id}">`;
 
             const row = document.createElement('div');
             row.className = 'item-row';
@@ -736,97 +757,131 @@
                 'border: 1px solid var(--border-color); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;';
 
             row.innerHTML = `
-                <div class="item-type-picker">
-                    <div class="item-type-option active" data-index="${currentIndex}" data-value="Fisik"
-                        onclick="selectItemType(${currentIndex}, 'Fisik')">
-                        <span class="item-type-icon">📦</span>
-                        <span class="item-type-text">
-                            <strong>Aset Fisik</strong>
-                            <small>Barang berwujud: laptop, meja, mesin, peralatan lab</small>
-                        </span>
-                        <span class="item-type-check">✓</span>
+                    <div class="item-type-picker">
+                        <div class="item-type-option active" data-index="${currentIndex}" data-value="Fisik"
+                            onclick="selectItemType(${currentIndex}, 'Fisik')">
+                            <span class="item-type-icon">📦</span>
+                            <span class="item-type-text">
+                                <strong>Aset Fisik</strong>
+                                <small>Barang berwujud: laptop, meja, mesin, peralatan lab</small>
+                            </span>
+                            <span class="item-type-check">✓</span>
+                        </div>
+                        <div class="item-type-option" data-index="${currentIndex}" data-value="Non-Fisik"
+                            onclick="selectItemType(${currentIndex}, 'Non-Fisik')">
+                            <span class="item-type-icon">💾</span>
+                            <span class="item-type-text">
+                                <strong>Aset Non-Fisik</strong>
+                                <small>Lisensi software, akun digital, sertifikat/garansi</small>
+                            </span>
+                            <span class="item-type-check">✓</span>
+                        </div>
+                        <input type="hidden" name="items[${currentIndex}][item_type]" value="Fisik" id="item_type_hidden_${currentIndex}">
                     </div>
-                    <div class="item-type-option" data-index="${currentIndex}" data-value="Non-Fisik"
-                        onclick="selectItemType(${currentIndex}, 'Non-Fisik')">
-                        <span class="item-type-icon">💾</span>
-                        <span class="item-type-text">
-                            <strong>Aset Non-Fisik</strong>
-                            <small>Lisensi software, akun digital, sertifikat/garansi</small>
-                        </span>
-                        <span class="item-type-check">✓</span>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Sifat Barang <span style="color:red;">*</span></label>
+                            <select id="sifat_barang_${currentIndex}" name="items[${currentIndex}][sifat_barang]" class="form-control" onchange="updateClassificationGroups(${currentIndex})" required></select>
+                        </div>
                     </div>
-                    <input type="hidden" name="items[${currentIndex}][item_type]" value="Fisik" id="item_type_hidden_${currentIndex}">
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Sifat Barang <span style="color:red;">*</span></label>
-                        <select id="sifat_barang_${currentIndex}" name="items[${currentIndex}][sifat_barang]" class="form-control" onchange="updateClassificationGroups(${currentIndex})" required></select>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Nama Barang <span style="color:red;">*</span></label>
+                            <input type="text" name="items[${currentIndex}][item_name]" class="form-control" required>
+                        </div>
+                        <div class="form-group" id="assetTypeGroup_${currentIndex}">
+                            <label>Jenis Aset <span style="color:red;">*</span></label>
+                            <select name="items[${currentIndex}][asset_type_id]" class="form-control" required>
+                                ${assetTypeOptionsHtml}
+                            </select>
+                        </div>
+                        <div class="form-group" id="habisPakaiCategoryGroup_${currentIndex}" style="display:none;">
+                            <label>Kategori Habis Pakai <span style="color:red;">*</span></label>
+                            <select name="items[${currentIndex}][category]" class="form-control">
+                                ${habisPakaiCategoryOptionsHtml}
+                            </select>
+                        </div>
+                        <div class="form-group" id="nonFisikCategoryGroup_${currentIndex}" style="display:none;">
+                            <label>Kategori Non-Fisik <span style="color:red;">*</span></label>
+                            <select name="items[${currentIndex}][category]" class="form-control">
+                                ${nonFisikCategoryOptionsHtml}
+                            </select>
+                        </div>
                     </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Nama Barang <span style="color:red;">*</span></label>
-                        <input type="text" name="items[${currentIndex}][item_name]" class="form-control" required>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Spesifikasi</label>
+                            <input type="text" name="items[${currentIndex}][specification]" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label>Jumlah <span style="color:red;">*</span></label>
+                            <input type="number" name="items[${currentIndex}][quantity]" class="form-control" value="1" min="1" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Satuan <span style="color:red;">*</span></label>
+                            <select id="unit_select_${currentIndex}" name="items[${currentIndex}][unit]" class="form-control" onchange="handleUnitChange(${currentIndex})" required></select>
+                            <input type="text" id="unit_manual_${currentIndex}" name="items[${currentIndex}][unit]" class="form-control" style="display:none; margin-top:0.5rem;" placeholder="Tulis satuan, contoh: Rim, Dus, Botol" oninput="updatePriceLabel(${currentIndex})" disabled>
+                        </div>
+                        <div class="form-group">
+                            <label id="price_label_${currentIndex}">Est. Harga Satuan (Rp)</label>
+                            <input type="number" name="items[${currentIndex}][estimated_price_per_unit]" class="form-control" min="0">
+                        </div>
                     </div>
-                    <div class="form-group" id="assetTypeGroup_${currentIndex}">
-                        <label>Jenis Aset <span style="color:red;">*</span></label>
-                        <select name="items[${currentIndex}][asset_type_id]" class="form-control" required>
-                            ${assetTypeOptionsHtml}
-                        </select>
+
+                    <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed var(--border-color);">
+                        <p style="font-weight: 600; margin-bottom: 0.75rem; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">
+                            📌 Detail Pengajuan Item Ini
+                        </p>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Unit Pengaju <span style="color:red;">*</span></label>
+                                ${unitField}
+                            </div>
+                            <div class="form-group">
+                                <label>Prioritas <span style="color:red;">*</span></label>
+                                <select name="items[${currentIndex}][priority]" class="form-control" required>
+                                    ${priorityOptionsHtml}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Alasan Pengajuan <span style="color:red;">*</span></label>
+                                <select name="items[${currentIndex}][alasan_pengajuan]" class="form-control" required
+                                    onchange="toggleRelatedAssetForItem(${currentIndex}, this)">
+                                    ${alasanOptionsHtml}
+                                </select>
+                            </div>
+                            <div class="form-group" id="relatedAssetGroup_${currentIndex}" style="display: none;">
+                                <label>Aset yang Diganti</label>
+                                <select name="items[${currentIndex}][related_asset_id]" class="form-control">
+                                    ${relatedAssetOptionsHtml}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Alasan / Latar Belakang Item Ini <span style="color:red;">*</span></label>
+                            <textarea name="items[${currentIndex}][reason]" class="form-control" rows="2" placeholder="Jelaskan mengapa item ini diajukan..." required></textarea>
+                        </div>
                     </div>
-                    <div class="form-group" id="habisPakaiCategoryGroup_${currentIndex}" style="display:none;">
-                        <label>Kategori Habis Pakai <span style="color:red;">*</span></label>
-                        <select name="items[${currentIndex}][category]" class="form-control">
-                            ${habisPakaiCategoryOptionsHtml}
-                        </select>
-                    </div>
-                    <div class="form-group" id="nonFisikCategoryGroup_${currentIndex}" style="display:none;">
-                        <label>Kategori Non-Fisik <span style="color:red;">*</span></label>
-                        <select name="items[${currentIndex}][category]" class="form-control">
-                            ${nonFisikCategoryOptionsHtml}
-                        </select>
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Spesifikasi</label>
-                        <input type="text" name="items[${currentIndex}][specification]" class="form-control">
-                    </div>
-                    <div class="form-group">
-                        <label>Jumlah <span style="color:red;">*</span></label>
-                        <input type="number" name="items[${currentIndex}][quantity]" class="form-control" value="1" min="1" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Satuan <span style="color:red;">*</span></label>
-                        <select id="unit_select_${currentIndex}" name="items[${currentIndex}][unit]" class="form-control" onchange="handleUnitChange(${currentIndex})" required></select>
-                        <input type="text" id="unit_manual_${currentIndex}" name="items[${currentIndex}][unit]" class="form-control" style="display:none; margin-top:0.5rem;" placeholder="Tulis satuan, contoh: Rim, Dus, Botol" disabled>
-                    </div>
-                    <div class="form-group">
-                        <label>Est. Harga/Unit (Rp)</label>
-                        <input type="number" name="items[${currentIndex}][estimated_price_per_unit]" class="form-control" min="0">
-                    </div>
-                </div>
-                <button type="button" class="btn btn-danger" onclick="this.closest('.item-row').remove()">Hapus Item Ini</button>
-            `;
+
+                    <button type="button" class="btn btn-danger" style="margin-top: 1rem;" onclick="this.closest('.item-row').remove()">Hapus Item Ini</button>
+                `;
             container.appendChild(row);
-            populateSifatBarangOptions(currentIndex, 'Fisik'); // baris baru selalu mulai sebagai Fisik
+            populateSifatBarangOptions(currentIndex, 'Fisik');
             updateClassificationGroups(currentIndex);
-            populateUnitOptions(currentIndex, 'Fisik'); // baris baru selalu mulai sebagai Fisik
+            populateUnitOptions(currentIndex, 'Fisik');
             itemIndex++;
         }
 
         // ============================================================
-        //  FUNGSI TOGGLE ASET TERKAIT
-        // ============================================================
-        function toggleRelatedAsset() {
-            const alasan = document.getElementById('alasan_pengajuan').value;
-            document.getElementById('relatedAssetGroup').style.display = alasan === 'Penggantian' ? 'block' : 'none';
-        }
-
-        // ============================================================
-        //  INISIALISASI: pastikan semua opsi memiliki data-index & data-value
+        //  INISIALISASI
         // ============================================================
         document.addEventListener('DOMContentLoaded', function() {
+            // Pastikan semua opsi picker punya data-index & data-value
             document.querySelectorAll('.item-type-option').forEach(el => {
                 if (!el.hasAttribute('data-index')) {
                     const picker = el.closest('.item-type-picker');
@@ -837,7 +892,6 @@
                             if (match) {
                                 const idx = match[1];
                                 el.setAttribute('data-index', idx);
-                                // Set data-value berdasarkan apakah opsi ini aktif
                                 if (el.classList.contains('active')) {
                                     const isFisik = el.querySelector('strong')?.textContent.includes(
                                         'Aset Fisik');
@@ -846,6 +900,18 @@
                             }
                         }
                     }
+                }
+            });
+
+            // Inisialisasi label harga untuk semua baris yang sudah ada di DOM.
+            // Penting untuk kasus form di-submit → validasi gagal → old() reload,
+            // atau baris lama dengan satuan custom yang sudah diisi.
+            document.querySelectorAll('.item-row').forEach((row) => {
+                const hidden = row.querySelector('input[name$="[item_type]"]');
+                if (!hidden) return;
+                const match = hidden.name.match(/items\[(\d+)\]/);
+                if (match) {
+                    updatePriceLabel(match[1]);
                 }
             });
         });

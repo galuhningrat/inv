@@ -1,17 +1,17 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Auth\LoginController;
-use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\Api\AssetDetailController;
 use App\Http\Controllers\AssetController;
-use App\Http\Controllers\BorrowingController;
-use App\Http\Controllers\MaintenanceController;
-use App\Http\Controllers\UserController;
 use App\Http\Controllers\AssetRequestController;
+use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\BorrowingController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\IntangibleAssetController;
+use App\Http\Controllers\MaintenanceController;
 use App\Http\Controllers\QrCodeController;
 use App\Http\Controllers\ReportController;
-use App\Http\Controllers\Api\AssetDetailController;
-use App\Http\Controllers\IntangibleAssetController;
+use App\Http\Controllers\UserController;
+use Illuminate\Support\Facades\Route;
 
 // Public routes
 Route::get('/', function () {
@@ -75,6 +75,12 @@ Route::middleware(['auth'])->group(function () {
 
     // Asset Requests Management
     Route::middleware(['level:requests'])->group(function () {
+        Route::get('/requests/create-service/{category?}', [AssetRequestController::class, 'createService'])
+            ->name('requests.create-service')
+            ->whereIn('category', ['pemeliharaan', 'instalasi', 'pelatihan', 'sewa', 'konsultasi']);
+        Route::post('/requests/create-service/{category}', [AssetRequestController::class, 'storeService'])
+            ->name('requests.store-service')
+            ->whereIn('category', ['pemeliharaan', 'instalasi', 'pelatihan', 'sewa', 'konsultasi']);
         Route::resource('requests', AssetRequestController::class)
             ->parameters(['requests' => 'assetRequest'])
             ->except(['edit', 'update']);
@@ -87,6 +93,12 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/requests/{assetRequest}/disburse', [AssetRequestController::class, 'disburseFund'])->name('requests.disburse');
         Route::get('/requests/{assetRequest}/approval', [AssetRequestController::class, 'approval'])->name('requests.approval');
         Route::post('/requests/{assetRequest}/items/{item}/approve', [AssetRequestController::class, 'approveItem'])->name('requests.approve-item');
+        Route::post('/requests/{assetRequest}/service-items/{item}/approve', [AssetRequestController::class, 'approveServiceItem'])
+            ->name('requests.approve-service-item');
+        Route::get('/requests/{assetRequest}/complete-service', [AssetRequestController::class, 'showCompleteServiceForm'])
+            ->name('requests.complete-service.form');
+        Route::post('/requests/{assetRequest}/complete-service', [AssetRequestController::class, 'completeService'])
+            ->name('requests.complete-service');
     });
 
     // Reports

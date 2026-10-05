@@ -2,9 +2,9 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Casts\Attribute;
 
 class AssetRequestItem extends Model
 {
@@ -27,7 +27,18 @@ class AssetRequestItem extends Model
     // vendor & masa berlaku yang harus dipantau, beda karakter dengan jasa sekali
     // kerja seperti servis AC.
     public const SIFAT_BARANG_FISIK = ['Tidak Habis Pakai', 'Habis Pakai'];
-    public const SIFAT_BARANG_NON_FISIK = ['Tidak Habis Pakai', 'Jasa'];
+
+    // Sejak ada Portal Katalog Layanan, Jasa punya alur sendiri
+    // (menu "Pengajuan Jasa" → 5 sub-kategori). Tidak lagi tersedia
+    // sebagai pilihan di dalam form Pengajuan Aset.
+    // 'Jasa' tetap didaftarkan sebagai nilai legacy di bawah untuk
+    // keperluan pembacaan data lama.
+    public const SIFAT_BARANG_NON_FISIK = ['Tidak Habis Pakai'];
+
+    // Nilai-nilai legacy yang masih mungkin tersimpan di database dari
+    // pengajuan sebelum Portal Katalog. Dipakai di view show/approval/receive
+    // untuk tetap menampilkan/memproses data lama dengan benar.
+    public const SIFAT_BARANG_NON_FISIK_LEGACY = ['Tidak Habis Pakai', 'Jasa'];
 
     // Kategori untuk item Fisik + Habis Pakai (ATK, dsb). Dipakai bersama kolom
     // "category" yang sama dengan Kategori Non-Fisik — kolomnya cuma string biasa
@@ -44,30 +55,55 @@ class AssetRequestItem extends Model
 
     protected $fillable = [
         'asset_request_id',
-        'asset_type_id',
+        'unit_id',
+        'priority',
+        'alasan_pengajuan',
+        'reason',
+        'service_category',
         'item_name',
         'specification',
-        'category',
-        'sifat_barang',
         'quantity',
         'unit',
         'estimated_price_per_unit',
-        'image',
-        'item_type',
+        'service_data',
         'approval_status',
         'approval_notes',
         'approved_by',
         'approved_at',
         'rolled_from_item_id',
-        'received_quantity',
-        'receipt_notes',
-        'receipt_proof_file',
+        'attachment_file',
+        'completed_at',
+        'completion_notes',
+        'bast_file',
+        'executor',
+        'actual_cost',
     ];
 
     protected $casts = [
+        'service_data'             => 'array',
         'estimated_price_per_unit' => 'decimal:2',
-        'approved_at' => 'datetime',
+        'actual_cost'              => 'decimal:2',
+        'approved_at'              => 'datetime',
+        'completed_at'             => 'datetime',
     ];
+
+    /**
+     * Helper: URL BAST untuk ditampilkan di view.
+     */
+    protected function bastUrl(): \Illuminate\Database\Eloquent\Casts\Attribute
+    {
+        return \Illuminate\Database\Eloquent\Casts\Attribute::make(
+            get: fn() => $this->bast_file && \Illuminate\Support\Facades\Storage::disk('public')->exists($this->bast_file)
+                ? \Illuminate\Support\Facades\Storage::url($this->bast_file)
+                : null,
+        );
+    }
+
+    public function isCompleted(): bool
+    {
+        return ! is_null($this->completed_at);
+    }
+
 
     protected function imageUrl(): Attribute
     {
@@ -103,6 +139,10 @@ class AssetRequestItem extends Model
             || ($this->item_type === 'Non-Fisik' && $this->sifat_barang === 'Jasa');
     }
 
+    // ============================================================
+    //  RELASI
+    // ============================================================
+
     public function assetRequest()
     {
         return $this->belongsTo(AssetRequest::class);
@@ -128,6 +168,30 @@ class AssetRequestItem extends Model
         return $this->hasMany(self::class, 'rolled_from_item_id');
     }
 
+    /**
+     * Unit Pengaju untuk item ini (Fase 2). Setelah perombakan, satu dokumen
+     * pengajuan bisa berisi banyak item dengan unit berbeda-beda, sehingga
+     * relasi unit dipindah dari header ke level item.
+     */
+    public function unit()
+    {
+        return $this->belongsTo(Unit::class);
+    }
+
+    /**
+     * Aset yang akan diganti — relevan hanya bila alasan_pengajuan = "Penggantian".
+     * Dipindah dari header ke level item supaya setiap item bisa punya aset
+     * pengganti yang berbeda dalam satu dokumen.
+     */
+    public function relatedAsset()
+    {
+        return $this->belongsTo(Asset::class, 'related_asset_id');
+    }
+
+    // ============================================================
+    //  SCOPE
+    // ============================================================
+
     // Item yang boleh diproses di halaman Penerimaan Barang.
     // Item yang ditolak atau ditangguhkan Ketua belum lolos approval dan tidak boleh
     // ikut diregistrasi sebagai aset sampai statusnya berubah menjadi "approved".
@@ -135,6 +199,10 @@ class AssetRequestItem extends Model
     {
         return $query->whereNotIn('approval_status', ['rejected', 'deferred']);
     }
+
+    // ============================================================
+    //  ACCESSOR — Subtotal & Status
+    // ============================================================
 
     public function getSubtotalAttribute()
     {

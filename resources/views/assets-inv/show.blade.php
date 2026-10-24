@@ -5,191 +5,171 @@
 
 @section('content')
     @php
-        $groupParams = collect(request()->only(['group_name', 'group_type_id', 'group_brand']))->filter();
-        $hasGroupContext = $groupParams->count() === 3 && is_numeric($groupParams['group_type_id'] ?? null);
-        $backUrl = $hasGroupContext
-            ? route('assets-inv.group-detail', [
-                'name' => $groupParams['group_name'],
-                'type_id' => $groupParams['group_type_id'],
-                'brand' => $groupParams['group_brand'],
-            ])
-            : route('assets-inv.index');
+        $backUrl = route('assets-inv.group-detail', ['batch_id' => $asset->asset_batch_id]);
+        $schema = \App\Models\AssetType::getSchema($asset->batch->assetType->code ?? '');
+        $hideGeneral = $schema['hide_general'] ?? false;
+        $batchData = $asset->batch->category_data ?? [];
+        $unitData = $asset->unit_data ?? [];
     @endphp
-    <div class="data-table-container">
+
+    <div class="data-table-container" style="max-width: 1100px; margin: 0 auto;">
         <div class="table-header">
             <h3 class="table-title">Detail Informasi Aset</h3>
-            <a href="{{ $backUrl }}" class="btn btn-secondary">← Kembali</a>
+            <a href="{{ $backUrl }}" class="btn btn-secondary">← Kembali ke Grup</a>
         </div>
-        <div style="padding: 2rem;">
-            <div class="asset-detail">
-                <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 2rem; margin-bottom: 2rem;">
-                    <div class="detail-image">
-                        <img src="{{ $asset->image_url }}" alt="{{ $asset->name }}"
-                            style="width: 100%; border-radius: 12px; box-shadow: var(--shadow);">
+
+        <div style="padding: 2rem; display: flex; gap: 2rem; align-items: flex-start; flex-wrap: wrap;">
+
+            {{-- 🔥 KOLOM KIRI: FOTO & QR CODE 🔥 --}}
+            <div style="width: 280px; flex-shrink: 0; display: flex; flex-direction: column; gap: 1.5rem;">
+
+                {{-- Foto Aset --}}
+                <div
+                    style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1rem; text-align: center;">
+                    <img src="{{ $asset->image_url }}" alt="{{ $asset->batch->name ?? 'Aset' }}"
+                        style="width: 100%; height: 220px; object-fit: contain; border-radius: 8px;">
+                </div>
+
+                {{-- QR Code --}}
+                <div
+                    style="background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.5rem; text-align: center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+                    <h5 style="margin-top: 0; margin-bottom: 1rem; font-size: 0.9rem; color: #64748b;">QR CODE ASET</h5>
+                    <div id="qrCodeContainer" style="display: flex; justify-content: center;"></div>
+                    <p style="margin-top: 1rem; font-family: monospace; font-size: 0.8rem; color: #94a3b8;">
+                        {{ $asset->qr_code }}</p>
+                </div>
+
+            </div>
+
+            {{-- 🔥 KOLOM KANAN: INFORMASI 🔥 --}}
+            <div style="flex: 1; min-width: 300px;">
+
+                {{-- Header & Tombol Aksi --}}
+                <div
+                    style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+                    <div>
+                        <h2 style="margin: 0 0 0.5rem; font-size: 1.75rem; color: var(--text-primary);">
+                            {{ $asset->batch->name ?? '-' }}</h2>
+                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                            <span
+                                class="status-badge {{ $asset->status === 'Tersedia' ? 'available' : 'borrowed' }}">{{ $asset->status }}</span>
+                            <span
+                                class="status-badge {{ $asset->condition === 'Baik' ? 'available' : 'maintenance' }}">Kondisi:
+                                {{ $asset->condition }}</span>
+                        </div>
                     </div>
-                    <div class="detail-info">
-                        <h2 style="margin-bottom: 1rem; color: var(--text-primary);">{{ $asset->name }}</h2>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                            <p><strong>Label Aset Kampus:</strong> {{ $asset->asset_id }}</p>
-                            <p><strong>Jenis:</strong> {{ $asset->assetType->name ?? '-' }}</p>
-                            <p><strong>Merek:</strong> {{ $asset->brand }}</p>
-                            @if ($asset->model)
-                                <p><strong>Tipe / Model:</strong> {{ $asset->model }}</p>
-                            @endif
-                            <p><strong>Nomor Seri Pabrik (S/N):</strong> {{ $asset->serial_number }}</p>
-                            <p><strong>Lokasi:</strong>
+
+                    <div class="btn-group" style="margin: 0; flex-wrap: nowrap;">
+                        @can('update', $asset)
+                            <a href="{{ route('assets-inv.edit', $asset->id) }}" class="btn btn-primary">✏️ Edit Unit</a>
+                        @endcan
+                        <button class="btn btn-secondary" onclick="printQrCode()">🖨️ Cetak QR</button>
+                        @can('delete', $asset)
+                            <form action="{{ route('assets-inv.destroy', $asset) }}" method="POST" style="display: inline;"
+                                onsubmit="return confirm('Apakah Anda yakin ingin menghapus aset ini?')">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="btn btn-danger">🗑️ Hapus</button>
+                            </form>
+                        @endcan
+                    </div>
+                </div>
+
+                {{-- Blok Informasi Umum --}}
+                <div
+                    style="background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+                    <h4
+                        style="margin-top: 0; margin-bottom: 1.25rem; font-size: 1rem; color: #1e293b; border-bottom: 2px solid #f1f5f9; padding-bottom: 0.5rem;">
+                        📋 Informasi Umum</h4>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; font-size: 0.9rem;">
+                        <p><span style="color: #64748b;">Label Aset:</span><br><strong>{{ $asset->asset_id }}</strong></p>
+                        <p><span style="color: #64748b;">Jenis
+                                Kategori:</span><br><strong>{{ $asset->batch->assetType->name ?? '-' }}</strong></p>
+
+                        {{-- Sembunyikan Merek & S/N jika kosong (seperti Buku) --}}
+                        @if (!$hideGeneral)
+                            <p><span
+                                    style="color: #64748b;">Merek:</span><br><strong>{{ $asset->batch->brand ?? '-' }}</strong>
+                            </p>
+                            <p><span style="color: #64748b;">Nomor Seri
+                                    (S/N):</span><br><strong>{{ $asset->serial_number ?? '-' }}</strong></p>
+                        @endif
+
+                        <p><span style="color: #64748b;">Lokasi:</span><br>
+                            <strong>
                                 @if ($asset->location_id)
                                     {{ $asset->location_ref->name ?? '' }}
-                                    @if ($asset->location_detail)
-                                        - {{ $asset->location_detail }}
-                                    @endif
+                                    {{ $asset->location_detail ? '- ' . $asset->location_detail : '' }}
                                 @else
-                                    {{ $asset->location }}
+                                    {{ $asset->location ?? '-' }}
                                 @endif
-                            </p>
-                            <p><strong>Kode QR:</strong> {{ $asset->qr_code }}</p>
-                            <p><strong>Status:</strong>
-                                <span
-                                    class="status-badge {{ $asset->status === 'Tersedia' ? 'available' : ($asset->status === 'Dipinjam' ? 'borrowed' : 'maintenance') }}">
-                                    {{ $asset->status }}
-                                </span>
-                            </p>
-                            <p><strong>Kondisi:</strong>
-                                <span
-                                    class="status-badge {{ $asset->condition === 'Baik' ? 'available' : ($asset->condition === 'Rusak Ringan' ? 'borrowed' : 'maintenance') }}">
-                                    {{ $asset->condition }}
-                                </span>
-                            </p>
-                            @if ($asset->status === 'Diganti' && $asset->replacement)
-                                <p>
-                                    <strong>Diganti Oleh:</strong>
-                                    <a href="{{ route('assets-inv.show', $asset->replacement) }}"
-                                        style="color: var(--primary-color);">
-                                        {{ $asset->replacement->asset_id }} — {{ $asset->replacement->name }}
-                                    </a>
-                                </p>
-                            @endif
+                            </strong>
+                        </p>
+                        <p><span style="color: #64748b;">Tanggal
+                                Pembelian:</span><br><strong>{{ $asset->batch->purchase_date ? $asset->batch->purchase_date->format('d F Y') : '-' }}</strong>
+                        </p>
+                        <p><span style="color: #64748b;">Harga Satuan:</span><br><strong
+                                style="color: var(--primary-color);">Rp
+                                {{ number_format($asset->batch->price ?? 0, 0, ',', '.') }}</strong></p>
+                    </div>
+                </div>
 
-                            @if ($asset->replaces)
-                                <p>
-                                    <strong>Menggantikan:</strong>
-                                    <a href="{{ route('assets-inv.show', $asset->replaces) }}"
-                                        style="color: var(--primary-color);">
-                                        {{ $asset->replaces->asset_id }} — {{ $asset->replaces->name }}
-                                    </a>
-                                    <br>
-                                    <small style="color: var(--text-secondary);">(Status aset lama: <span
-                                            class="status-badge maintenance">Diganti</span>)</small>
+                {{-- 🔥 Blok Spesifikasi Dinamis (JSON) 🔥 --}}
+                @if (count($batchData) > 0 || count($unitData) > 0)
+                    <div
+                        style="background: #f0f9ff; border: 1px solid #bae6fd; border-left: 4px solid #0ea5e9; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem;">
+                        <h4 style="margin-top: 0; margin-bottom: 1.25rem; font-size: 1rem; color: #0369a1;">⚙️ Spesifikasi
+                            Khusus Kategori ({{ $asset->batch->assetType->name }})</h4>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; font-size: 0.9rem;">
+
+                            {{-- Tampilkan Data dari Induk (Batch) --}}
+                            @foreach ($batchData as $key => $value)
+                                @if (isset($schema[$key]) && !empty($value))
+                                    <p><span style="color: #0369a1;">{{ $schema[$key]['label'] ?? $key }}:</span><br>
+                                        <strong>{{ $value }}</strong>
+                                    </p>
+                                @endif
+                            @endforeach
+
+                            {{-- Tampilkan Data dari Unit --}}
+                            @foreach ($unitData as $key => $value)
+                                @if (isset($schema[$key]) && !empty($value))
+                                    <p><span style="color: #0369a1;">{{ $schema[$key]['label'] ?? $key }}:</span><br>
+                                        <strong>{{ $value }}</strong>
+                                    </p>
+                                @endif
+                            @endforeach
+
+                        </div>
+                    </div>
+                @endif
+
+                {{-- Blok Akuntansi --}}
+                @if ($asset->batch->funding_source || $asset->batch->economic_life_years || $asset->batch->residual_value)
+                    <div
+                        style="background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+                        <h4
+                            style="margin-top: 0; margin-bottom: 1.25rem; font-size: 1rem; color: #1e293b; border-bottom: 2px solid #f1f5f9; padding-bottom: 0.5rem;">
+                            💰 Data Akuntansi</h4>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; font-size: 0.9rem;">
+                            @if ($asset->batch->funding_source)
+                                <p><span style="color: #64748b;">Sumber
+                                        Dana:</span><br><strong>{{ $asset->batch->funding_source }}</strong></p>
+                            @endif
+                            @if ($asset->batch->economic_life_years)
+                                <p><span style="color: #64748b;">Umur
+                                        Ekonomis:</span><br><strong>{{ $asset->batch->economic_life_years }} tahun</strong>
                                 </p>
                             @endif
-                            <p><strong>Harga:</strong> <span class="price-display">Rp
-                                    {{ number_format($asset->price, 0, ',', '.') }}</span></p>
-                            <p><strong>Tanggal Pembelian:</strong> {{ $asset->purchase_date->format('d F Y') }}</p>
-                            {{-- Data akuntansi cuma ditampilkan kalau memang diisi — supaya aset
-                                 lama yang belum punya data ini tidak menampilkan baris kosong. --}}
-                            @if ($asset->funding_source)
-                                <p><strong>Sumber Pendanaan:</strong> {{ $asset->funding_source }}</p>
-                            @endif
-                            @if ($asset->economic_life_years)
-                                <p><strong>Umur Ekonomis:</strong> {{ $asset->economic_life_years }} tahun</p>
-                            @endif
-                            @if (!is_null($asset->residual_value))
-                                <p><strong>Nilai Residu:</strong> Rp
-                                    {{ number_format($asset->residual_value, 0, ',', '.') }}</p>
+                            @if (!is_null($asset->batch->residual_value))
+                                <p><span style="color: #64748b;">Nilai Residu:</span><br><strong>Rp
+                                        {{ number_format($asset->batch->residual_value, 0, ',', '.') }}</strong></p>
                             @endif
                         </div>
                     </div>
-                </div>
+                @endif
 
-                <div style="text-align: center; margin: 2rem 0;">
-                    <h4 style="margin-bottom: 1rem;">QR Code Aset</h4>
-                    <div id="qrCodeContainer"
-                        style="display: inline-block; padding: 15px; background: white; border-radius: 8px; box-shadow: var(--shadow);">
-                    </div>
-                    <p style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.875rem;">{{ $asset->qr_code }}
-                    </p>
-                </div>
-
-                <div class="btn-group" style="justify-content: center;">
-                    @can('update', $asset)
-                        <a href="{{ route('assets-inv.edit', array_merge(['asset' => $asset->id], $hasGroupContext ? $groupParams->toArray() : [])) }}"
-                            class="btn btn-primary">Edit Aset</a>
-                    @endcan
-                    <button class="btn btn-secondary" onclick="printQrCode()">Cetak QR Code</button>
-                    @can('delete', $asset)
-                        <form action="{{ route('assets-inv.destroy', $asset) }}" method="POST" style="display: inline;"
-                            onsubmit="return confirm('Apakah Anda yakin ingin menghapus aset ini?')">
-                            @csrf
-                            @method('DELETE')
-                            @if ($hasGroupContext)
-                                <input type="hidden" name="group_name" value="{{ $groupParams['group_name'] }}">
-                                <input type="hidden" name="group_type_id" value="{{ $groupParams['group_type_id'] }}">
-                                <input type="hidden" name="group_brand" value="{{ $groupParams['group_brand'] }}">
-                            @endif
-                            <button type="submit" class="btn btn-danger">Hapus Aset</button>
-                        </form>
-                    @endcan
-                </div>
             </div>
-
-            @if ($asset->borrowings->count() > 0)
-                <div style="margin-top: 2rem;">
-                    <h4 style="margin-bottom: 1rem;">Riwayat Peminjaman</h4>
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Peminjam</th>
-                                <th>Tanggal Pinjam</th>
-                                <th>Tanggal Kembali</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach ($asset->borrowings as $borrowing)
-                                <tr>
-                                    <td>{{ $borrowing->borrowing_id }}</td>
-                                    <td>{{ $borrowing->borrower_name }}</td>
-                                    <td>{{ $borrowing->borrow_date->format('d M Y') }}</td>
-                                    <td>{{ $borrowing->actual_return_date ? $borrowing->actual_return_date->format('d M Y') : $borrowing->return_date->format('d M Y') }}
-                                    </td>
-                                    <td><span
-                                            class="status-badge {{ $borrowing->status === 'Selesai' ? 'available' : 'borrowed' }}">{{ $borrowing->status }}</span>
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-            @endif
-
-            @if ($asset->maintenances->count() > 0)
-                <div style="margin-top: 2rem;">
-                    <h4 style="margin-bottom: 1rem;">Riwayat Pemeliharaan</h4>
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Jenis</th>
-                                <th>Tanggal</th>
-                                <th>Biaya</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach ($asset->maintenances as $maintenance)
-                                <tr>
-                                    <td>{{ $maintenance->maintenance_id }}</td>
-                                    <td>{{ $maintenance->type }}</td>
-                                    <td>{{ $maintenance->maintenance_date->format('d M Y') }}</td>
-                                    <td>Rp {{ number_format($maintenance->cost, 0, ',', '.') }}</td>
-                                    <td><span class="status-badge available">{{ $maintenance->status }}</span></td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-            @endif
         </div>
     </div>
 @endsection
@@ -209,7 +189,7 @@
 
         function printQrCode() {
             const asset = {
-                name: '{{ $asset->name }}',
+                name: '{{ $asset->batch->name ?? 'Aset' }}',
                 qrcode: '{{ $asset->qr_code }}'
             };
             const qrUrl = '{{ route('asset.detail', ['qrcode' => $asset->qr_code]) }}';

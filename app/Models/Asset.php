@@ -15,17 +15,9 @@ class Asset extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
+        'asset_batch_id',
         'asset_id',
-        'name',
-        'asset_type_id',
-        'brand',
-        'model',
         'serial_number',
-        'price',
-        'funding_source',
-        'economic_life_years',
-        'residual_value',
-        'purchase_date',
         'location',
         'condition',
         'status',
@@ -41,10 +33,7 @@ class Asset extends Model
     ];
 
     protected $casts = [
-        'purchase_date' => 'date',
-        'price' => 'decimal:2',
-        'residual_value' => 'decimal:2',
-        'economic_life_years' => 'integer',
+        'expired_at' => 'date',
     ];
 
     protected static function boot()
@@ -113,8 +102,8 @@ class Asset extends Model
 
                 // Kasus 2: gambar dari seeder, fisik di public/assets/products/
                 $filename = basename($this->image);
-                if (file_exists(public_path('assets/products/'.$filename))) {
-                    return asset('assets/products/'.$filename);
+                if (file_exists(public_path('assets/products/' . $filename))) {
+                    return asset('assets/products/' . $filename);
                 }
 
                 // Fallback terakhir kalau benar-benar tidak ditemukan
@@ -127,6 +116,11 @@ class Asset extends Model
     public function assetType()
     {
         return $this->belongsTo(AssetType::class);
+    }
+
+    public function batch()
+    {
+        return $this->belongsTo(AssetBatch::class, 'asset_batch_id');
     }
 
     public function borrowings()

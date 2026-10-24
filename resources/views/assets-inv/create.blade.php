@@ -59,12 +59,12 @@
         </div>
 
         <div style="padding: 2rem;">
-            <form action="{{ route('assets-inv.store') }}" method="POST" enctype="multipart/form-data">
+            <form action="{{ route('assets-inv.store') }}" method="POST" enctype="multipart/form-data" id="assetForm">
                 @csrf
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="name">Nama Aset <span style="color: red;">*</span></label>
+                        <label for="name">Nama Aset / Model <span style="color: red;">*</span></label>
                         <input type="text" id="name" name="name"
                             class="form-control @error('name') error @enderror" value="{{ old('name') }}" required>
                         @error('name')
@@ -74,32 +74,10 @@
                     <div class="form-group">
                         <label for="asset_type_id">Jenis Aset <span style="color: red;">*</span></label>
                         <select id="asset_type_id" name="asset_type_id"
-                            class="form-control @error('asset_type_id') error @enderror" required>
+                            class="form-control @error('asset_type_id') error @enderror" required
+                            onchange="handleCategoryChange()">
                             <option value="">Pilih Jenis</option>
-
-                            @php
-                                $orderedCodes = [
-                                    'KOM',
-                                    'JAR',
-                                    'ELK',
-                                    'LAB',
-                                    'MEB',
-                                    'ARS',
-                                    'OTO',
-                                    'TNH',
-                                    'GDG',
-                                    'PRS',
-                                    'FUR',
-                                    'ATK',
-                                    'LAN',
-                                ];
-                                $sortedAssetTypes = $assetTypes->sortBy(function ($type) use ($orderedCodes) {
-                                    $pos = array_search($type->code, $orderedCodes);
-                                    return $pos === false ? 999 : $pos;
-                                });
-                            @endphp
-
-                            @foreach ($sortedAssetTypes as $type)
+                            @foreach ($assetTypes as $type)
                                 <option value="{{ $type->id }}"
                                     {{ old('asset_type_id') == $type->id ? 'selected' : '' }}>
                                     {{ $type->name }} ({{ $type->code }})
@@ -112,68 +90,86 @@
                     </div>
                 </div>
 
+                {{-- FIELD UMUM (Merek, Model, Harga) --}}
                 <div class="form-row">
-                    <div class="form-group">
+                    <div class="form-group general-brand-group">
                         <label for="brand">Merek <span style="color: red;">*</span></label>
                         <input type="text" id="brand" name="brand"
-                            class="form-control @error('brand') error @enderror" value="{{ old('brand') }}" required>
+                            class="form-control @error('brand') error @enderror" value="{{ old('brand') }}">
                         @error('brand')
                             <div class="error-message" style="display: block;">{{ $message }}</div>
                         @enderror
                     </div>
-                    <div class="form-group">
+                    <div class="form-group general-model-group">
                         <label for="model">Tipe / Model <small style="font-weight: normal;">(opsional)</small></label>
                         <input type="text" id="model" name="model" class="form-control"
                             value="{{ old('model') }}" placeholder="mis. ExpertCenter D700">
                     </div>
                     <div class="form-group">
-                        <label for="price">Harga Pembelian <span style="color: red;">*</span></label>
+                        <label for="price">Harga Pembelian (Satuan) <span style="color: red;">*</span></label>
+                        <!-- 🔥 TAMBAHKAN onwheel & step="any" AGAR HARGA TIDAK BERUBAH SAAT DI-SCROLL -->
                         <input type="number" id="price" name="price"
                             class="form-control @error('price') error @enderror" value="{{ old('price') }}" min="0"
-                            required>
+                            step="any" onwheel="this.blur()" required>
                         @error('price')
                             <div class="error-message" style="display: block;">{{ $message }}</div>
                         @enderror
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label for="purchase_date">Tanggal Pembelian <span style="color: red;">*</span></label>
-                    <input type="date" id="purchase_date" name="purchase_date"
-                        class="form-control @error('purchase_date') error @enderror"
-                        value="{{ old('purchase_date', date('Y-m-d')) }}" required>
-                    @error('purchase_date')
-                        <div class="error-message" style="display: block;">{{ $message }}</div>
-                    @enderror
-                </div>
-
-                {{-- Data akuntansi — semua opsional, tidak ada yang diwajibkan (lihat catatan
-                di migration 2026_09_07_000000_add_accounting_fields_to_assets.php). --}}
-                <hr style="margin: 1.5rem 0;">
-                <h4 style="margin-bottom: 1rem;">Data Akuntansi <small
-                        style="font-weight: normal; color: var(--text-secondary);">(opsional)</small></h4>
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="funding_source">Sumber Pendanaan</label>
-                        <select id="funding_source" name="funding_source" class="form-control">
-                            <option value="">-- Tidak ditentukan --</option>
-                            @foreach ($fundingSources as $fs)
-                                <option value="{{ $fs }}" {{ old('funding_source') === $fs ? 'selected' : '' }}>
-                                    {{ $fs }}
-                                </option>
-                            @endforeach
-                        </select>
+                        <label for="purchase_date">Tanggal Pembelian <span style="color: red;">*</span></label>
+                        <input type="date" id="purchase_date" name="purchase_date"
+                            class="form-control @error('purchase_date') error @enderror"
+                            value="{{ old('purchase_date', date('Y-m-d')) }}" required>
+                        @error('purchase_date')
+                            <div class="error-message" style="display: block;">{{ $message }}</div>
+                        @enderror
                     </div>
-                    <div class="form-group">
-                        <label for="economic_life_years">Umur Ekonomis (Tahun)</label>
-                        <input type="number" id="economic_life_years" name="economic_life_years" class="form-control"
-                            value="{{ old('economic_life_years') }}" min="1" max="100"
-                            placeholder="mis. 5">
-                    </div>
-                    <div class="form-group">
-                        <label for="residual_value">Nilai Residu (Rp)</label>
-                        <input type="number" id="residual_value" name="residual_value" class="form-control"
-                            value="{{ old('residual_value') }}" min="0">
+                </div>
+
+                {{-- 🔥 WADAH UNTUK FIELD DINAMIS BATCH 🔥 --}}
+                <div id="dynamicBatchFields"
+                    style="background: #f8fafc; border: 1px dashed #cbd5e1; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; display: none;">
+                    <h4
+                        style="margin-top: 0; margin-bottom: 1rem; font-size: 1rem; color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.5rem;">
+                        ⚙️ Spesifikasi Khusus Kategori
+                    </h4>
+                    <div class="form-row" id="batchFieldsContainer" style="flex-wrap: wrap;"></div>
+                </div>
+
+                {{-- 🔥 BUNGKUS DENGAN ID ACCOUNTING SECTION 🔥 --}}
+                <div id="accountingSection">
+                    <hr style="margin: 1.5rem 0;">
+                    <h4 style="margin-bottom: 1rem;">Data Akuntansi <small
+                            style="font-weight: normal; color: var(--text-secondary);">(opsional)</small></h4>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="funding_source">Sumber Pendanaan</label>
+                            <select id="funding_source" name="funding_source" class="form-control">
+                                <option value="">-- Tidak ditentukan --</option>
+                                @foreach ($fundingSources as $fs)
+                                    <option value="{{ $fs }}"
+                                        {{ old('funding_source') === $fs ? 'selected' : '' }}>
+                                        {{ $fs }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="economic_life_years">Umur Ekonomis (Tahun)</label>
+                            <input type="number" id="economic_life_years" name="economic_life_years"
+                                class="form-control" value="{{ old('economic_life_years') }}" min="1"
+                                max="100" placeholder="mis. 5">
+                        </div>
+                        <div class="form-group">
+                            <label for="residual_value">Nilai Residu (Rp)</label>
+                            <!-- 🔥 TAMBAHKAN onwheel & step="any" -->
+                            <input type="number" id="residual_value" name="residual_value" class="form-control"
+                                value="{{ old('residual_value') }}" min="0" step="any"
+                                onwheel="this.blur()">
+                        </div>
                     </div>
                 </div>
 
@@ -196,51 +192,54 @@
                     </div>
                 </div>
 
-                <hr style="margin: 1.5rem 0;">
-                <h4 style="margin-bottom: 1rem;">Lokasi Penempatan</h4>
+                {{-- 🔥 BUNGKUS DENGAN ID LOCATION SECTION 🔥 --}}
+                <div id="locationSection">
+                    <hr style="margin: 1.5rem 0;">
+                    <h4 style="margin-bottom: 1rem;">Lokasi Penempatan</h4>
 
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="kategori">Kategori <span style="color: red;">*</span></label>
-                        <select id="kategori" class="form-control" required onchange="updateUnitOptions()">
-                            <option value="">Pilih Kategori</option>
-                            @foreach ($units->pluck('category')->unique() as $cat)
-                                <option value="{{ $cat }}">{{ $cat }}</option>
-                            @endforeach
-                        </select>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="kategori">Kategori <span style="color: red;">*</span></label>
+                            <select id="kategori" class="form-control" required onchange="updateUnitOptions()">
+                                <option value="">Pilih Kategori</option>
+                                @foreach ($units->pluck('category')->unique() as $cat)
+                                    <option value="{{ $cat }}">{{ $cat }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="unit_id">Unit <span style="color: red;">*</span></label>
+                            <select id="unit_id" name="unit_id" class="form-control @error('unit_id') error @enderror"
+                                required disabled onchange="updateLocationOptions()">
+                                <option value="">-- Pilih Kategori dulu --</option>
+                            </select>
+                            @error('unit_id')
+                                <div class="error-message" style="display: block;">{{ $message }}</div>
+                            @enderror
+                        </div>
                     </div>
+
                     <div class="form-group">
-                        <label for="unit_id">Unit <span style="color: red;">*</span></label>
-                        <select id="unit_id" name="unit_id" class="form-control @error('unit_id') error @enderror"
-                            required disabled onchange="updateLocationOptions()">
-                            <option value="">-- Pilih Kategori dulu --</option>
+                        <label for="location_id">Lokasi Spesifik <span style="color: red;">*</span></label>
+                        <select id="location_id" name="location_id"
+                            class="form-control @error('location_id') error @enderror" required disabled>
+                            <option value="">-- Pilih Unit dulu --</option>
                         </select>
-                        @error('unit_id')
+                        @error('location_id')
                             <div class="error-message" style="display: block;">{{ $message }}</div>
                         @enderror
                     </div>
-                </div>
 
-                <div class="form-group">
-                    <label for="location_id">Lokasi Spesifik <span style="color: red;">*</span></label>
-                    <select id="location_id" name="location_id"
-                        class="form-control @error('location_id') error @enderror" required disabled>
-                        <option value="">-- Pilih Unit dulu --</option>
-                    </select>
-                    @error('location_id')
-                        <div class="error-message" style="display: block;">{{ $message }}</div>
-                    @enderror
-                </div>
-
-                <div class="form-group">
-                    <label id="location_detail_label" for="location_detail">Detail Penempatan
-                        <small style="font-weight: normal;">(opsional, mis. "di dalam lemari")</small>
-                    </label>
-                    <input type="text" id="location_detail" name="location_detail" class="form-control"
-                        value="{{ old('location_detail') }}">
-                    @error('location_detail')
-                        <div class="error-message" style="display: block;">{{ $message }}</div>
-                    @enderror
+                    <div class="form-group">
+                        <label id="location_detail_label" for="location_detail">Detail Penempatan
+                            <small style="font-weight: normal;">(opsional, mis. "di dalam lemari")</small>
+                        </label>
+                        <input type="text" id="location_detail" name="location_detail" class="form-control"
+                            value="{{ old('location_detail') }}">
+                        @error('location_detail')
+                            <div class="error-message" style="display: block;">{{ $message }}</div>
+                        @enderror
+                    </div>
                 </div>
 
                 <hr style="margin: 1.5rem 0;">
@@ -252,16 +251,15 @@
                         min="1" max="100" onchange="renderUnitBlocks()" required>
                 </div>
 
-                {{-- Layout tabel horizontal, bukan tumpukan kotak vertikal — dulu kalau
-                kuantitas > 3 form jadi sangat panjang ke bawah. Tabel ini scroll
-                horizontal sendiri di layar sempit (lihat CSS .unit-table-wrapper). --}}
                 <div class="unit-table-wrapper">
                     <table class="unit-table" id="unitTable">
                         <thead>
-                            <tr>
+                            <tr id="tableHeaderRow">
                                 <th style="width: 4rem;">Unit Ke</th>
-                                <th>Nomor Seri Pabrik (S/N) <span style="color: red;">*</span></th>
-                                <th style="width: 10rem;">Kondisi <span style="color: red;">*</span></th>
+                                <th class="general-serial-header">Nomor Seri Pabrik (S/N) <span
+                                        style="color: red;">*</span></th>
+                                <th id="kondisiHeader" style="width: 10rem;">Kondisi <span style="color: red;">*</span>
+                                </th>
                                 <th style="width: 14rem;">Foto Unit</th>
                             </tr>
                         </thead>
@@ -269,7 +267,7 @@
                     </table>
                 </div>
 
-                <div class="btn-group">
+                <div class="btn-group" style="margin-top: 1.5rem;">
                     <a href="{{ route('assets-inv.index') }}" class="btn btn-secondary">Batal</a>
                     <button type="submit" class="btn btn-success">Simpan Aset Fisik</button>
                 </div>
@@ -278,15 +276,17 @@
     </div>
 
     <script id="unitsData" type="application/json">
-            @json($unitsForJs)
-        </script>
+        @json($unitsForJs)
+    </script>
+
+    <script>
+        window.assetSchemas = {!! json_encode($schemas) !!};
+    </script>
 @endsection
 
+{{-- BAGIAN STYLES TETAP SAMA SEPERTI SEBELUMNYA --}}
 @push('styles')
     <style>
-        /* =============================================
-                           ASSET TYPE SELECTOR (Hero Card)
-                        ============================================= */
         .asset-type-selector {
             background: var(--card-background);
             border-radius: 16px;
@@ -419,27 +419,6 @@
             white-space: nowrap;
         }
 
-        @media screen and (max-width: 640px) {
-            .asset-type-cards {
-                grid-template-columns: 1fr;
-            }
-
-            .asset-type-card {
-                padding: 1rem 1.25rem;
-            }
-
-            .asset-type-card__icon {
-                font-size: 1.8rem;
-                width: 52px;
-                height: 52px;
-            }
-        }
-
-        /* =============================================
-                   TABEL HORIZONTAL UNTUK DETAIL PER UNIT
-                   Ganti tumpukan kotak vertikal — dulu kalau kuantitas
-                   besar (>3) form jadi sangat panjang ke bawah.
-                ============================================= */
         .unit-table-wrapper {
             overflow-x: auto;
             border: 1px solid var(--border-color);
@@ -475,12 +454,30 @@
         .unit-table .form-control {
             margin: 0;
         }
+
+        @media screen and (max-width: 640px) {
+            .asset-type-cards {
+                grid-template-columns: 1fr;
+            }
+
+            .asset-type-card {
+                padding: 1rem 1.25rem;
+            }
+
+            .asset-type-card__icon {
+                font-size: 1.8rem;
+                width: 52px;
+                height: 52px;
+            }
+        }
     </style>
 @endpush
 
+{{-- BAGIAN SCRIPTS TETAP SAMA SEPERTI YANG ANDA KIRIM --}}
 @push('scripts')
     <script>
         const allUnits = JSON.parse(document.getElementById('unitsData').textContent);
+        let currentSchema = {};
 
         function updateUnitOptions() {
             const kategori = document.getElementById('kategori').value;
@@ -544,29 +541,247 @@
             }
         }
 
+        function handleCategoryChange() {
+            const typeId = document.getElementById('asset_type_id').value;
+            const dynamicBatchContainer = document.getElementById('dynamicBatchFields');
+            const generalBrand = document.querySelector('.general-brand-group');
+            const generalModel = document.querySelector('.general-model-group');
+            const generalSerialHeader = document.querySelector('.general-serial-header');
+            const qtyInput = document.getElementById('quantity');
+            const locationSection = document.getElementById('locationSection');
+            const accountingSection = document.getElementById('accountingSection');
+
+            // Reset
+            document.getElementById('batchFieldsContainer').innerHTML = '';
+            dynamicBatchContainer.style.display = 'none';
+            generalBrand.style.display = 'block';
+            generalModel.style.display = 'block';
+            generalSerialHeader.style.display = 'table-cell';
+
+            // Reset Kuantitas & Section
+            qtyInput.disabled = false;
+            qtyInput.max = 100;
+            if (locationSection) locationSection.style.display = 'block';
+            if (accountingSection) accountingSection.style.display = 'block';
+
+            if (!typeId || !window.assetSchemas[typeId]) {
+                currentSchema = {};
+                renderUnitBlocks();
+                return;
+            }
+
+            currentSchema = window.assetSchemas[typeId];
+
+            // CEK APAKAH ASET STATIS (TNH / GDG)
+            const isStaticAsset = currentSchema.is_static_asset || false;
+
+            // 1. Cek Sembunyikan Field Umum
+            if (currentSchema.hide_general) {
+                generalBrand.style.display = 'none';
+                generalModel.style.display = 'none';
+                generalSerialHeader.style.display = 'none';
+                document.getElementById('brand').removeAttribute('required');
+            } else {
+                document.getElementById('brand').setAttribute('required', 'required');
+            }
+
+            // 2. Cek Batas Kuantitas
+            if (currentSchema.max_qty) {
+                qtyInput.value = currentSchema.max_qty;
+                qtyInput.max = currentSchema.max_qty;
+                qtyInput.disabled = true;
+            }
+
+            // 3. Sembunyikan Lokasi & Akuntansi untuk Tanah/Gedung
+            if (isStaticAsset) {
+                if (locationSection) locationSection.style.display = 'none';
+                if (accountingSection) accountingSection.style.display = 'none';
+
+                // Hapus atribut required agar form bisa disubmit
+                const unitSelect = document.getElementById('unit_id');
+                const locSelect = document.getElementById('location_id');
+                if (unitSelect) unitSelect.removeAttribute('required');
+                if (locSelect) locSelect.removeAttribute('required');
+            }
+
+            // 4. Render
+            renderBatchFields();
+        }
+
+        function renderBatchFields() {
+            const container = document.getElementById('batchFieldsContainer');
+            const dynamicBatchContainer = document.getElementById('dynamicBatchFields');
+            const headerRow = document.getElementById('tableHeaderRow');
+            const kondisiHeader = document.getElementById('kondisiHeader');
+
+            container.innerHTML = '';
+            let hasBatchFields = false;
+
+            // Render Input Batch
+            for (const [key, field] of Object.entries(currentSchema)) {
+                if (field.in_batch) {
+                    hasBatchFields = true;
+                    let inputHtml = '';
+
+                    if (field.type === 'select') {
+                        let options = `<option value="">-- Pilih --</option>`;
+                        for (const [val, label] of Object.entries(field.options)) {
+                            options += `<option value="${val}">${label}</option>`;
+                        }
+                        inputHtml =
+                            `<select name="category_data[${key}]" id="batch_input_${key}" class="form-control" onchange="handleDependencies()" ${field.required ? 'required' : ''}>${options}</select>`;
+                    } else if (field.type === 'textarea') {
+                        inputHtml =
+                            `<textarea name="category_data[${key}]" id="batch_input_${key}" class="form-control" rows="2" ${field.required ? 'required' : ''}></textarea>`;
+                    } else {
+                        inputHtml =
+                            `<input type="${field.type}" name="category_data[${key}]" id="batch_input_${key}" class="form-control" ${field.required ? 'required' : ''}>`;
+                    }
+
+                    const colStyle = field.type === 'textarea' ?
+                        'flex: 1 1 100%;' :
+                        'flex: 1 1 calc(33.333% - 1rem); min-width: 250px;';
+
+                    const initialDisplay = field.show_if ? 'none' : 'block';
+
+                    container.innerHTML += `
+                        <div class="form-group conditional-field" data-field="${key}" style="padding-right: 1rem; box-sizing: border-box; display: ${initialDisplay}; ${colStyle}">
+                            <label>${field.label} ${field.required ? '<span style="color:red;">*</span>' : ''}</label>
+                            ${inputHtml}
+                        </div>
+                    `;
+                }
+            }
+
+            if (hasBatchFields) {
+                dynamicBatchContainer.style.display = 'block';
+            }
+
+            // Render Header Tabel untuk Field Unit
+            for (const [key, field] of Object.entries(currentSchema)) {
+                if (field.in_unit) {
+                    const th = document.createElement('th');
+                    th.className = `conditional-header dynamic-header`;
+                    th.dataset.field = key;
+
+                    th.style.display = field.show_if ? 'none' : 'table-cell';
+
+                    th.innerHTML = `${field.label} ${field.required ? '<span style="color:red;">*</span>' : ''}`;
+                    headerRow.insertBefore(th, kondisiHeader);
+                }
+            }
+
+            handleDependencies();
+        }
+
+        function handleDependencies() {
+            for (const [key, field] of Object.entries(currentSchema)) {
+                let isConditionMet = true;
+
+                if (field.show_if) {
+                    for (const [depKey, allowedValues] of Object.entries(field.show_if)) {
+                        const depInput = document.getElementById(`batch_input_${depKey}`);
+                        const currentValue = depInput ? depInput.value : '';
+                        if (!allowedValues.includes(currentValue)) {
+                            isConditionMet = false;
+                            break;
+                        }
+                    }
+                }
+
+                const batchField = document.querySelector(`.conditional-field[data-field="${key}"]`);
+                if (batchField) {
+                    batchField.style.display = isConditionMet ? 'block' : 'none';
+                }
+
+                const headerToToggle = document.querySelector(`.conditional-header[data-field="${key}"]`);
+                if (headerToToggle) {
+                    headerToToggle.style.display = isConditionMet ? 'table-cell' : 'none';
+                }
+
+                const inputEl = document.getElementById(`batch_input_${key}`);
+                if (inputEl) {
+                    if (isConditionMet && field.required) {
+                        inputEl.setAttribute('required', 'required');
+                    } else {
+                        inputEl.removeAttribute('required');
+                    }
+                }
+            }
+
+            renderUnitBlocks();
+        }
+
         function renderUnitBlocks() {
-            const qty = parseInt(document.getElementById('quantity').value) || 1;
+            const qtyInput = document.getElementById('quantity');
             const container = document.getElementById('unitBlocksContainer');
+            const hideGeneral = currentSchema.hide_general || false;
+
+            let qty = parseInt(qtyInput.value);
+            if (isNaN(qty) || qty < 1) qty = 1;
+
             container.innerHTML = '';
 
             for (let i = 0; i < qty; i++) {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                        <td style="font-weight: 600; text-align: center;">#${i + 1}</td>
-                        <td><input type="text" name="serial_numbers[]" class="form-control" required></td>
-                        <td>
-                            <select name="conditions[]" class="form-control" required>
-                                <option value="Baik">Baik</option>
-                                <option value="Rusak Ringan">Rusak Ringan</option>
-                                <option value="Rusak Berat">Rusak Berat</option>
-                            </select>
-                        </td>
-                        <td><input type="file" name="images[${i}]" class="form-control" accept="image/*"></td>
-                    `;
-                container.appendChild(row);
+                let rowHtml = `<td style="font-weight: 600; text-align: center;">#${i + 1}</td>`;
+
+                if (!hideGeneral) {
+                    rowHtml += `<td><input type="text" name="serial_numbers[]" class="form-control" required></td>`;
+                }
+
+                for (const [key, field] of Object.entries(currentSchema)) {
+                    if (field.in_unit) {
+                        let inputHtml = '';
+                        let displayStyle = 'table-cell';
+
+                        if (field.show_if) {
+                            let isConditionMet = true;
+                            for (const [depKey, allowedValues] of Object.entries(field.show_if)) {
+                                const depInput = document.getElementById(`batch_input_${depKey}`);
+                                const currentValue = depInput ? depInput.value : '';
+                                if (!allowedValues.includes(currentValue)) {
+                                    isConditionMet = false;
+                                    break;
+                                }
+                            }
+                            if (!isConditionMet) displayStyle = 'none';
+                        }
+
+                        if (field.type === 'select') {
+                            let options = `<option value="">-- Pilih --</option>`;
+                            for (const [val, label] of Object.entries(field.options)) {
+                                options += `<option value="${val}">${label}</option>`;
+                            }
+                            inputHtml =
+                                `<select name="unit_data[${i}][${key}]" class="form-control" ${field.required ? 'required' : ''}>${options}</select>`;
+                        } else {
+                            inputHtml =
+                                `<input type="${field.type}" name="unit_data[${i}][${key}]" class="form-control" ${field.required ? 'required' : ''}>`;
+                        }
+
+                        rowHtml += `<td style="display: ${displayStyle};">${inputHtml}</td>`;
+                    }
+                }
+
+                rowHtml += `
+                    <td>
+                        <select name="conditions[]" class="form-control" required>
+                            <option value="Baik">Baik</option>
+                            <option value="Rusak Ringan">Rusak Ringan</option>
+                            <option value="Rusak Berat">Rusak Berat</option>
+                        </select>
+                    </td>
+                    <td><input type="file" name="images[${i}]" class="form-control" accept="image/*"></td>
+                `;
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = rowHtml;
+                container.appendChild(tr);
             }
         }
 
-        document.addEventListener('DOMContentLoaded', renderUnitBlocks);
+        document.addEventListener('DOMContentLoaded', function() {
+            handleCategoryChange();
+        });
     </script>
 @endpush

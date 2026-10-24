@@ -3,16 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Models\Asset;
+use App\Models\AssetBatch;
 use App\Models\AssetType;
-use App\Models\QrCode;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
-use App\Models\Unit;
-use App\Models\Location;
 use App\Models\IntangibleAsset;
-use App\Models\AssetRequest;
+use App\Models\Location;
+use App\Models\QrCode;
+use App\Models\Unit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class AssetController extends Controller
@@ -21,8 +21,8 @@ class AssetController extends Controller
     {
         $this->authorize('viewAny', Asset::class);
 
-        $view = $request->input('view', 'semua'); // semua | fisik | non-fisik
-        $assetTypes = AssetType::all();
+        $view = $request->input('view', 'semua');
+        $assetTypes = AssetType::getOrdered();
         $units = Unit::whereNotNull('category')->orderBy('type')->orderBy('name')->get();
 
         if ($view === 'non-fisik') {
@@ -33,71 +33,53 @@ class AssetController extends Controller
             return $this->indexSemua($request, $assetTypes, $units, $view);
         }
 
-        // view === 'fisik'
-        $query = Asset::with('assetType', 'unit');
-        $user = auth()->user();
+        $query = AssetBatch::with('assetType')
+            ->withCount([
+                'assets',
+                'assets as tersedia_count' => fn ($q) => $q->where('status', 'Tersedia'),
+                'assets as dipinjam_count' => fn ($q) => $q->where('status', 'Dipinjam'),
+                'assets as maintenance_count' => fn ($q) => $q->where('status', 'Maintenance'),
+                'assets as diganti_count' => fn ($q) => $q->where('status', 'Diganti'),
+            ]);
 
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
-                $q->where('asset_id', 'ILIKE', "%{$search}%")
-                    ->orWhere('name', 'ILIKE', "%{$search}%")
+                $q->where('name', 'ILIKE', "%{$search}%")
                     ->orWhere('brand', 'ILIKE', "%{$search}%")
-                    ->orWhere('location', 'ILIKE', "%{$search}%")
-                    ->orWhere('serial_number', 'ILIKE', "%{$search}%");
+                    ->orWhere('model', 'ILIKE', "%{$search}%");
             });
         }
         if ($request->filled('type')) {
-            $query->whereHas('assetType', fn($q) => $q->where('code', $request->type));
+            $query->whereHas('assetType', fn ($q) => $q->where('code', $request->type));
         }
         if ($request->filled('unit_id')) {
-            $query->where('unit_id', $request->unit_id);
+            $query->whereHas('assets', fn ($q) => $q->where('unit_id', $request->unit_id));
         }
         if ($request->filled('status')) {
-            $query->where('status', $request->status);
+            $query->whereHas('assets', fn ($q) => $q->where('status', $request->status));
         }
 
-        $allAssets = $query->orderBy('created_at', 'desc')->get();
+        $batches = $query->orderBy('created_at', 'desc')->get();
 
-        // Jika ada filter status, tampilkan list (tidak dikelompokkan)
         if ($request->filled('status')) {
-            $assets = $allAssets;
+            $assets = Asset::with(['batch', 'unit'])->where('status', $request->status)->get();
+
             return view('assets-inv.index', [
                 'assets' => $assets,
                 'assetTypes' => $assetTypes,
                 'units' => $units,
                 'isGrouped' => false,
-                'view' => $view
+                'view' => $view,
             ]);
         }
 
-        // Group by name, type_id, brand
-        $grouped = $allAssets
-            ->groupBy(fn($a) => $a->name . '|' . $a->asset_type_id . '|' . $a->brand)
-            ->map(function ($group) {
-                $first = $group->first();
-                return (object) [
-                    'name' => $first->name,
-                    'brand' => $first->brand,
-                    'asset_type_id' => $first->asset_type_id,
-                    'assetType' => $first->assetType,
-                    'location' => $first->location,
-                    'image_url' => $first->image_url,
-                    'price' => $first->price,
-                    'total_quantity' => $group->count(),
-                    'tersedia_count' => $group->where('status', 'Tersedia')->count(),
-                    'dipinjam_count' => $group->where('status', 'Dipinjam')->count(),
-                    'maintenance_count' => $group->where('status', 'Maintenance')->count(),
-                    'diganti_count' => $group->where('status', 'Diganti')->count(),
-                ];
-            })->values();
-
         return view('assets-inv.index', [
-            'grouped' => $grouped,
+            'grouped' => $batches,
             'assetTypes' => $assetTypes,
             'units' => $units,
             'isGrouped' => true,
-            'view' => $view
+            'view' => $view,
         ]);
     }
 
@@ -108,6 +90,10 @@ class AssetController extends Controller
         $status = $request->input('status');
 
         $query = IntangibleAsset::with('unit');
+
+        if ($request->filled('type')) {
+            $query->whereRaw('1 = 0');
+        }
 
         if ($search) {
             $query->where(function ($q) use ($search) {
@@ -125,13 +111,13 @@ class AssetController extends Controller
             } elseif ($status === 'Kadaluarsa') {
                 $query->where('status', 'Kadaluarsa');
             }
-            // status lain tidak berlaku untuk non-fisik
         }
 
         $groupedNonFisik = $query->orderBy('created_at', 'desc')->get()
-            ->groupBy(fn($i) => $i->name . '|' . $i->category . '|' . $i->vendor)
+            ->groupBy(fn ($i) => $i->name.'|'.$i->category.'|'.$i->vendor)
             ->map(function ($group) {
                 $first = $group->first();
+
                 return (object) [
                     'name' => $first->name,
                     'category' => $first->category,
@@ -160,45 +146,49 @@ class AssetController extends Controller
         $unitId = $request->input('unit_id');
         $status = $request->input('status');
 
-        // ---- QUERY ASET FISIK ----
-        $physicalQuery = Asset::with('assetType', 'unit');
+        $physicalQuery = AssetBatch::with('assetType')
+            ->withCount('assets as quantity')
+            ->whereHas('assets');
+
         if ($search) {
             $physicalQuery->where(function ($q) use ($search) {
-                $q->where('asset_id', 'ILIKE', "%{$search}%")
-                    ->orWhere('name', 'ILIKE', "%{$search}%")
+                $q->where('name', 'ILIKE', "%{$search}%")
                     ->orWhere('brand', 'ILIKE', "%{$search}%")
-                    ->orWhere('location', 'ILIKE', "%{$search}%")
-                    ->orWhere('serial_number', 'ILIKE', "%{$search}%");
+                    ->orWhere('model', 'ILIKE', "%{$search}%");
             });
         }
+
+        if ($request->filled('type')) {
+            $physicalQuery->whereHas('assetType', fn ($q) => $q->where('code', $request->type));
+        }
+
         if ($unitId) {
-            $physicalQuery->where('unit_id', $unitId);
+            $physicalQuery->whereHas('assets', fn ($q) => $q->where('unit_id', $unitId));
         }
         if ($status && in_array($status, ['Tersedia', 'Dipinjam', 'Maintenance', 'Diganti'])) {
-            $physicalQuery->where('status', $status);
+            $physicalQuery->whereHas('assets', fn ($q) => $q->where('status', $status));
         }
 
-        $physicalGroups = $physicalQuery->get()
-            ->groupBy(fn($a) => $a->name . '|' . $a->asset_type_id . '|' . $a->brand)
-            ->map(function ($group) {
-                $first = $group->first();
-                return (object) [
-                    'type' => 'Fisik',
-                    'name' => $first->name,
-                    'category_label' => $first->assetType->name ?? '-',
-                    'unit_label' => $first->unit->name ?? '-',
-                    'quantity' => $group->count(),
-                    'status_label' => $group->where('status', 'Tersedia')->count() . ' Tersedia',
-                    'detail_route' => route('assets-inv.group-detail', [
-                        'name' => $first->name,
-                        'type_id' => $first->asset_type_id,
-                        'brand' => $first->brand
-                    ]),
-                ];
-            });
+        $physicalGroups = $physicalQuery->get()->map(function ($batch) {
+            $tersedia = $batch->assets->where('status', 'Tersedia')->count();
 
-        // ---- QUERY ASET NON-FISIK ----
+            return (object) [
+                'type' => 'Fisik',
+                'name' => $batch->name,
+                'category_label' => $batch->assetType->name ?? '-',
+                'unit_label' => '-',
+                'quantity' => $batch->quantity,
+                'status_label' => $tersedia.' Tersedia',
+                'detail_route' => route('assets-inv.group-detail', ['batch_id' => $batch->id]),
+            ];
+        });
+
         $intangibleQuery = IntangibleAsset::with('unit');
+
+        if ($request->filled('type')) {
+            $intangibleQuery->whereRaw('1 = 0');
+        }
+
         if ($search) {
             $intangibleQuery->where(function ($q) use ($search) {
                 $q->where('name', 'ILIKE', "%{$search}%")
@@ -209,21 +199,20 @@ class AssetController extends Controller
         if ($unitId) {
             $intangibleQuery->where('unit_id', $unitId);
         }
-        // Filter status untuk non-fisik: Tersedia -> Aktif, Kadaluarsa -> Kadaluarsa
         if ($status) {
             if ($status === 'Tersedia') {
                 $intangibleQuery->where('status', 'Aktif');
             } elseif ($status === 'Kadaluarsa') {
                 $intangibleQuery->where('status', 'Kadaluarsa');
             }
-            // status lain (Dipinjam, Maintenance, Diganti) tidak mempengaruhi non-fisik
         }
 
         $intangibleGroups = $intangibleQuery->get()
-            ->groupBy(fn($i) => $i->name . '|' . $i->category . '|' . $i->vendor)
+            ->groupBy(fn ($i) => $i->name.'|'.$i->category.'|'.$i->vendor)
             ->map(function ($group) {
                 $first = $group->first();
                 $kadaluarsa = $group->where('status', 'Kadaluarsa')->count();
+
                 return (object) [
                     'type' => 'Non-Fisik',
                     'name' => $first->name,
@@ -250,36 +239,115 @@ class AssetController extends Controller
     {
         $this->authorize('viewAny', Asset::class);
 
-        $validated = $request->validate([
-            'name' => 'required|string',
-            'type_id' => 'required|exists:asset_types,id',
-            'brand' => 'required|string',
+        $batch = AssetBatch::with(['assetType', 'assets' => function ($q) {
+            $q->orderBy('serial_number');
+        }, 'assets.location_ref', 'assets.unit'])
+            ->findOrFail($request->query('batch_id'));
+
+        abort_if($batch->assets->isEmpty(), 404);
+
+        return view('assets-inv.group-detail', compact('batch'));
+    }
+
+    public function editBatch(AssetBatch $batch)
+    {
+        if (! in_array(auth()->user()->level, ['Sarpras', 'Admin'])) {
+            abort(403, 'Hanya Sarpras yang dapat mengedit batch.');
+        }
+
+        $orderedCodes = [
+            'KOM', 'JAR', 'ELK', 'LAB', 'MEB', 'ARS', 'OTO', 'TNH', 'GDG', 'PRS', 'FUR', 'ATK', 'LAN',
+        ];
+        $assetTypes = AssetType::all()->sortBy(function ($type) use ($orderedCodes) {
+            $pos = array_search(strtoupper($type->code), $orderedCodes);
+
+            return $pos === false ? 999 : $pos;
+        });
+
+        $fundingSources = ['Dana Yayasan', 'Hibah/Bantuan Pemerintah (LLDIKTI)', 'Dana Mandiri/UKT Mahasiswa', 'Kerja Sama Industri'];
+
+        return view('assets-inv.edit-batch', compact('batch', 'assetTypes', 'fundingSources'));
+    }
+
+    public function updateBatch(Request $request, AssetBatch $batch)
+    {
+        if (! in_array(auth()->user()->level, ['Sarpras', 'Admin'])) {
+            abort(403, 'Hanya Sarpras yang dapat mengedit batch.');
+        }
+
+        // 🔥 BERSIHKAN HARGA DARI KARAKTER ANEH (Titik, Koma, Spasi)
+        if ($request->has('price')) {
+            $request->merge(['price' => preg_replace('/[^0-9]/', '', $request->input('price'))]);
+        }
+        if ($request->has('residual_value') && $request->input('residual_value') != '') {
+            $request->merge(['residual_value' => preg_replace('/[^0-9]/', '', $request->input('residual_value'))]);
+        }
+
+        $schema = AssetType::getSchema($batch->assetType->code);
+        $hideGeneral = $schema['hide_general'] ?? false;
+        $isStaticAsset = $schema['is_static_asset'] ?? false;
+
+        $rules = [
+            'name' => 'required|string|max:255',
+            'asset_type_id' => 'required|exists:asset_types,id',
+            'brand' => $hideGeneral ? 'nullable' : 'required|string|max:255',
+            'model' => 'nullable|string|max:255',
+            'price' => 'required|numeric|min:0',
+            'purchase_date' => 'required|date',
+            'funding_source' => $isStaticAsset ? 'nullable' : 'nullable|string|max:100',
+            'economic_life_years' => $isStaticAsset ? 'nullable' : 'nullable|integer|min:1|max:100',
+            'residual_value' => $isStaticAsset ? 'nullable' : 'nullable|numeric|min:0',
+        ];
+
+        foreach ($schema as $key => $field) {
+            if (isset($field['in_batch']) && $field['in_batch'] === true) {
+                $rule = $field['required'] ? 'required' : 'nullable';
+                if ($field['type'] === 'number') {
+                    $rule .= '|numeric';
+                }
+                if ($field['type'] === 'select' && isset($field['options'])) {
+                    $rule .= '|in:'.implode(',', array_keys($field['options']));
+                }
+                $rules["category_data.{$key}"] = $rule;
+            }
+        }
+
+        $validated = $request->validate($rules);
+
+        if ($isStaticAsset) {
+            $validated['funding_source'] = null;
+            $validated['economic_life_years'] = null;
+            $validated['residual_value'] = null;
+        }
+
+        $batch->update([
+            'asset_type_id' => $validated['asset_type_id'],
+            'name' => $validated['name'],
+            'brand' => $validated['brand'] ?? null,
+            'model' => $validated['model'] ?? null,
+            'price' => $validated['price'],
+            'purchase_date' => $validated['purchase_date'],
+            'funding_source' => $validated['funding_source'] ?? null,
+            'economic_life_years' => $validated['economic_life_years'] ?? null,
+            'residual_value' => $validated['residual_value'] ?? null,
+            'category_data' => $request->input('category_data', []),
         ]);
 
-        $query = Asset::with('assetType', 'location_ref', 'unit')
-            ->where('name', $validated['name'])
-            ->where('asset_type_id', $validated['type_id'])
-            ->where('brand', $validated['brand']);
-
-        $units = $query->orderBy('serial_number')->get();
-
-        abort_if($units->isEmpty(), 404);
-
-        return view('assets-inv.group-detail', [
-            'units' => $units,
-            'groupName' => $validated['name'],
-            'groupBrand' => $validated['brand'],
-        ]);
+        return redirect()->route('assets-inv.group-detail', ['batch_id' => $batch->id])
+            ->with('success', 'Data Induk (Batch) berhasil diupdate!');
     }
 
     public function create()
     {
-        $assetTypes = AssetType::all();
+        $assetTypes = AssetType::getOrdered();
         $units = Unit::with('locations')->whereNotNull('category')->orderBy('category')->orderBy('name')->get();
         $usersByLevel = \App\Models\User::orderBy('name')->get()->groupBy('level');
-        // Daftar yang sama persis dengan IntangibleAssetController, supaya Sumber
-        // Pendanaan konsisten antara aset fisik dan non-fisik.
         $fundingSources = ['Dana Yayasan', 'Hibah/Bantuan Pemerintah (LLDIKTI)', 'Dana Mandiri/UKT Mahasiswa', 'Kerja Sama Industri'];
+
+        $schemas = [];
+        foreach (AssetType::all() as $type) {
+            $schemas[$type->id] = AssetType::getSchema($type->code);
+        }
 
         $unitsForJs = $units->map(function ($u) {
             return [
@@ -292,12 +360,36 @@ class AssetController extends Controller
             ];
         })->values();
 
-        return view('assets-inv.create', compact('assetTypes', 'units', 'usersByLevel', 'unitsForJs', 'fundingSources'));
+        return view('assets-inv.create', compact('assetTypes', 'units', 'usersByLevel', 'unitsForJs', 'fundingSources', 'schemas'));
     }
 
     public function store(Request $request)
     {
         $this->authorize('create', Asset::class);
+
+        // Validasi Dasar untuk memastikan ID ada
+        $request->validate([
+            'asset_type_id' => 'required|exists:asset_types,id',
+        ]);
+
+        // 🔥 BERSIHKAN HARGA DARI KARAKTER ANEH
+        if ($request->has('price')) {
+            $request->merge(['price' => preg_replace('/[^0-9]/', '', $request->input('price'))]);
+        }
+        if ($request->has('residual_value') && $request->input('residual_value') != '') {
+            $request->merge(['residual_value' => preg_replace('/[^0-9]/', '', $request->input('residual_value'))]);
+        }
+
+        // Cari data dengan aman (tanpa findOrFail agar tidak crash jika data hilang)
+        $assetType = AssetType::find($request->input('asset_type_id'));
+
+        if (! $assetType) {
+            return back()->withInput()->with('error', 'Data Jenis Aset tidak ditemukan di database. Silakan muat ulang (refresh) halaman ini dan coba lagi.');
+        }
+
+        $schema = AssetType::getSchema($assetType->code);
+        $hideGeneral = $schema['hide_general'] ?? false;
+        $isStaticAsset = $schema['is_static_asset'] ?? false;
 
         $unit = Unit::find($request->input('unit_id'));
         $hasLocations = $unit && $unit->locations()->exists();
@@ -305,75 +397,101 @@ class AssetController extends Controller
         $rules = [
             'name' => 'required|string|max:255',
             'asset_type_id' => 'required|exists:asset_types,id',
-            'brand' => 'required|string|max:255',
-            'model' => 'nullable|string|max:255',
             'price' => 'required|numeric|min:0',
-            'funding_source' => 'nullable|string|max:100',
-            'economic_life_years' => 'nullable|integer|min:1|max:100',
-            'residual_value' => 'nullable|numeric|min:0',
             'purchase_date' => 'required|date',
-            'unit_id' => 'required|exists:units,id',
-            'location_id' => $hasLocations ? 'required|exists:locations,id' : 'nullable',
-            'location_detail' => $hasLocations ? 'nullable|string|max:255' : 'required|string|max:255',
+            'brand' => $hideGeneral ? 'nullable' : 'required|string|max:255',
+            'model' => 'nullable|string|max:255',
+            'unit_id' => $isStaticAsset ? 'nullable' : 'required|exists:units,id',
+            'location_id' => ($isStaticAsset || ! $hasLocations) ? 'nullable|exists:locations,id' : 'required|exists:locations,id',
+            'location_detail' => $isStaticAsset ? 'nullable|string|max:255' : ($hasLocations ? 'nullable|string|max:255' : 'required|string|max:255'),
+            'funding_source' => $isStaticAsset ? 'nullable' : 'nullable|string|max:100',
+            'economic_life_years' => $isStaticAsset ? 'nullable' : 'nullable|integer|min:1|max:100',
+            'residual_value' => $isStaticAsset ? 'nullable' : 'nullable|numeric|min:0',
             'quantity' => 'required|integer|min:1|max:100',
-            'serial_numbers' => 'required|array|size:' . $request->input('quantity', 1),
-            // whereNull('deleted_at') WAJIB: rule "unique" query langsung ke tabel
-            // tanpa lewat global scope SoftDeletes, jadi tanpa ini nomor seri milik
-            // aset yang SUDAH DIHAPUS tetap dianggap "sudah dipakai". Akibatnya aset
-            // pengganti dengan nomor seri fisik yang sama (mis. barang lama dihapus
-            // lalu didata ulang) ditolak dengan pesan yang membingungkan — padahal
-            // di layar aset itu sudah tidak ada. Ini keluarga bug yang sama dengan
-            // penomoran QR/asset_id yang sudah diperbaiki sebelumnya, cuma kebalikan
-            // arahnya: di sini soft-deleted harus DIKECUALIKAN, bukan disertakan.
-            'serial_numbers.*' => ['required', 'string', 'distinct', Rule::unique('assets', 'serial_number')->whereNull('deleted_at')],
             'conditions' => 'required|array',
             'conditions.*' => 'required|in:Baik,Rusak Ringan,Rusak Berat',
             'images.*' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'penanggung_jawab_id' => 'nullable|exists:users,id',
         ];
 
+        if (! $hideGeneral) {
+            $rules['serial_numbers'] = 'required|array|size:'.$request->input('quantity', 1);
+            $rules['serial_numbers.*'] = ['required', 'string', 'distinct', Rule::unique('assets', 'serial_number')->whereNull('deleted_at')];
+        }
+
+        foreach ($schema as $key => $field) {
+            if (isset($field['type']) && $field['type'] !== 'hidden') {
+                $rule = $field['required'] ? 'required' : 'nullable';
+                if ($field['type'] === 'number') {
+                    $rule .= '|numeric';
+                }
+                if ($field['type'] === 'select' && isset($field['options'])) {
+                    $rule .= '|in:'.implode(',', array_keys($field['options']));
+                }
+
+                if (isset($field['in_batch'])) {
+                    $rules["category_data.{$key}"] = $rule;
+                }
+                if (isset($field['in_unit'])) {
+                    $rules["unit_data.*.{$key}"] = $rule;
+                }
+            }
+        }
+
         $validated = $request->validate($rules);
 
-        $locationName = !empty($validated['location_id']) ? Location::find($validated['location_id'])->name : null;
+        if ($isStaticAsset) {
+            $validated['funding_source'] = null;
+            $validated['economic_life_years'] = null;
+            $validated['residual_value'] = null;
+            $validated['unit_id'] = null;
+            $validated['location_id'] = null;
+            $validated['location_detail'] = null;
+        }
+
+        $locationName = ! empty($validated['location_id']) ? Location::find($validated['location_id'])->name : null;
         $locationString = trim(collect([$locationName, $validated['location_detail'] ?? null])->filter()->implode(' - '));
-        $assetType = AssetType::find($validated['asset_type_id']);
 
         DB::beginTransaction();
         try {
+            $batch = AssetBatch::create([
+                'asset_type_id' => $validated['asset_type_id'],
+                'name' => $validated['name'],
+                'brand' => $validated['brand'] ?? null,
+                'model' => $validated['model'] ?? null,
+                'price' => $validated['price'],
+                'purchase_date' => $validated['purchase_date'],
+                'funding_source' => $validated['funding_source'] ?? null,
+                'economic_life_years' => $validated['economic_life_years'] ?? null,
+                'residual_value' => $validated['residual_value'] ?? null,
+                'category_data' => $request->input('category_data', []),
+            ]);
+
             $created = 0;
 
-            foreach ($validated['serial_numbers'] as $index => $serialNumber) {
-                $imagePath = $request->hasFile("images.$index")
-                    ? $request->file("images.$index")->store('assets', 'public')
+            for ($i = 0; $i < $validated['quantity']; $i++) {
+                $imagePath = $request->hasFile("images.$i")
+                    ? $request->file("images.$i")->store('assets', 'public')
                     : null;
 
-                // asset_id TIDAK di-set manual di sini lagi — dibiarkan kosong supaya
-                // Asset::boot()'s creating hook yang generate lewat
-                // Asset::generateAssetId(), yang sekarang sudah benar (withTrashed()).
-                // Sebelumnya di sini ada logika hitung nomor sendiri lewat raw SQL
-                // yang terpisah dari generateAssetId() dan punya bug persis yang sama
-                // (mengecualikan baris yang soft-deleted) — dua implementasi untuk hal
-                // yang sama gampang saling menyimpang; sekarang cuma ada satu.
+                $unitData = $request->input("unit_data.{$i}", []);
+
+                $newAssetId = Asset::generateAssetId($assetType->id);
+
                 $asset = Asset::create([
-                    'name' => $validated['name'],
-                    'asset_type_id' => $validated['asset_type_id'],
-                    'brand' => $validated['brand'],
-                    'model' => $validated['model'] ?? null,
-                    'serial_number' => $serialNumber,
-                    'price' => $validated['price'],
-                    'funding_source' => $validated['funding_source'] ?? null,
-                    'economic_life_years' => $validated['economic_life_years'] ?? null,
-                    'residual_value' => $validated['residual_value'] ?? null,
-                    'purchase_date' => $validated['purchase_date'],
+                    'asset_id' => $newAssetId,
+                    'asset_batch_id' => $batch->id,
+                    'serial_number' => $validated['serial_numbers'][$i] ?? null,
                     'location' => $locationString,
                     'location_id' => $validated['location_id'] ?? null,
                     'location_detail' => $validated['location_detail'] ?? null,
-                    'unit_id' => $validated['unit_id'],
-                    'condition' => $validated['conditions'][$index],
+                    'unit_id' => $validated['unit_id'] ?? null,
+                    'condition' => $validated['conditions'][$i],
                     'status' => 'Tersedia',
                     'image' => $imagePath,
                     'qr_code' => QrCode::generateCodeContent($assetType->code),
                     'penanggung_jawab_id' => $validated['penanggung_jawab_id'] ?? null,
+                    'unit_data' => $unitData,
                 ]);
 
                 QrCode::create(['asset_id' => $asset->id, 'code_content' => $asset->qr_code, 'status' => 'Aktif']);
@@ -381,17 +499,19 @@ class AssetController extends Controller
             }
 
             DB::commit();
-            return redirect()->route('assets-inv.index')->with('success', "{$created} unit aset berhasil ditambahkan!");
+
+            return redirect()->route('assets-inv.index')->with('success', "Batch aset & {$created} unit berhasil ditambahkan!");
         } catch (\Exception $e) {
             DB::rollback();
-            return redirect()->back()->withInput()->with('error', 'Gagal menambahkan aset: ' . $e->getMessage());
+
+            return redirect()->back()->withInput()->with('error', 'Gagal menambahkan aset: '.$e->getMessage());
         }
     }
 
     public function show(Asset $asset)
     {
         $asset->load([
-            'assetType',
+            'batch.assetType',
             'qrCodes',
             'borrowings' => function ($query) {
                 $query->latest()->limit(10);
@@ -410,7 +530,15 @@ class AssetController extends Controller
 
     public function edit(Asset $asset)
     {
-        $assetTypes = AssetType::all();
+        $orderedCodes = [
+            'KOM', 'JAR', 'ELK', 'LAB', 'MEB', 'ARS', 'OTO', 'TNH', 'GDG', 'PRS', 'FUR', 'ATK', 'LAN',
+        ];
+        $assetTypes = AssetType::all()->sortBy(function ($type) use ($orderedCodes) {
+            $pos = array_search(strtoupper($type->code), $orderedCodes);
+
+            return $pos === false ? 999 : $pos;
+        });
+
         $units = Unit::with('locations')->whereNotNull('category')->orderBy('category')->orderBy('name')->get();
         $usersByLevel = \App\Models\User::orderBy('name')->get()->groupBy('level');
         $fundingSources = ['Dana Yayasan', 'Hibah/Bantuan Pemerintah (LLDIKTI)', 'Dana Mandiri/UKT Mahasiswa', 'Kerja Sama Industri'];
@@ -426,96 +554,97 @@ class AssetController extends Controller
             ];
         })->values();
 
-        return view('assets-inv.edit', compact('asset', 'assetTypes', 'units', 'usersByLevel', 'unitsForJs', 'fundingSources'));
+        $schemas = [];
+        foreach (AssetType::all() as $type) {
+            $schemas[$type->id] = AssetType::getSchema($type->code);
+        }
+
+        return view('assets-inv.edit', compact('asset', 'assetTypes', 'units', 'usersByLevel', 'unitsForJs', 'fundingSources', 'schemas'));
     }
 
     public function update(Request $request, Asset $asset)
     {
         $this->authorize('update', $asset);
 
-        // Validasi dasar
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'asset_type_id' => 'required|exists:asset_types,id',
-            'brand' => 'required|string|max:255',
-            'model' => 'nullable|string|max:255',
-            'price' => 'required|numeric|min:0',
-            'funding_source' => 'nullable|string|max:100',
-            'economic_life_years' => 'nullable|integer|min:1|max:100',
-            'residual_value' => 'nullable|numeric|min:0',
-            'purchase_date' => 'required|date',
-            'unit_id' => 'required|exists:units,id',
-            'location_id' => 'nullable|exists:locations,id',
-            'location_detail' => 'nullable|string|max:255',
-            // Sama seperti di store(): kecualikan aset yang sudah soft-deleted supaya
-            // nomor seri milik aset terhapus tidak memblokir aset aktif.
-            'serial_number' => ['required', 'string', Rule::unique('assets', 'serial_number')->ignore($asset->id)->whereNull('deleted_at')],
+        $assetType = $asset->batch->assetType;
+        $schema = AssetType::getSchema($assetType->code);
+        $hideGeneral = $schema['hide_general'] ?? false;
+        $isStaticAsset = $schema['is_static_asset'] ?? false;
+
+        $rules = [
+            'unit_id' => $isStaticAsset ? 'nullable' : 'required|exists:units,id',
+            'location_id' => $isStaticAsset ? 'nullable|exists:locations,id' : 'nullable|exists:locations,id',
+            'location_detail' => $isStaticAsset ? 'nullable|string|max:255' : 'nullable|string|max:255',
+            'serial_number' => $hideGeneral ? 'nullable' : ['required', 'string', Rule::unique('assets', 'serial_number')->ignore($asset->id)->whereNull('deleted_at')],
             'condition' => 'required|in:Baik,Rusak Ringan,Rusak Berat',
             'penanggung_jawab_id' => 'nullable|exists:users,id',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-        ]);
+        ];
 
-        // Tentukan apakah unit memiliki lokasi
-        $unit = Unit::find($validated['unit_id']);
-        $hasLocations = $unit && $unit->locations()->exists();
-
-        // Jika unit punya lokasi, location_id wajib
-        if ($hasLocations && empty($validated['location_id'])) {
-            return back()->withErrors(['location_id' => 'Lokasi Spesifik wajib diisi untuk unit ini.'])->withInput();
+        $unitDataRules = [];
+        foreach ($schema as $key => $field) {
+            if (isset($field['in_unit']) && $field['in_unit'] === true) {
+                $rule = $field['required'] ? 'required' : 'nullable';
+                if ($field['type'] === 'number') {
+                    $rule .= '|numeric';
+                }
+                if ($field['type'] === 'select' && isset($field['options'])) {
+                    $rule .= '|in:'.implode(',', array_keys($field['options']));
+                }
+                $unitDataRules["unit_data.{$key}"] = $rule;
+            }
         }
 
-        // Jika unit tidak punya lokasi, location_detail wajib
-        if (!$hasLocations && empty($validated['location_detail'])) {
-            return back()->withErrors(['location_detail' => 'Detail Penempatan wajib diisi karena unit ini belum memiliki daftar lokasi spesifik.'])->withInput();
+        $validated = $request->validate($rules);
+        $validatedUnitData = $request->validate($unitDataRules);
+
+        if (! $isStaticAsset) {
+            $unit = Unit::find($validated['unit_id']);
+            $hasLocations = $unit && $unit->locations()->exists();
+
+            if ($hasLocations && empty($validated['location_id'])) {
+                return back()->withErrors(['location_id' => 'Lokasi Spesifik wajib diisi untuk unit ini.'])->withInput();
+            }
+
+            if (! $hasLocations && empty($validated['location_detail'])) {
+                return back()->withErrors(['location_detail' => 'Detail Penempatan wajib diisi karena unit ini belum memiliki daftar lokasi spesifik.'])->withInput();
+            }
         }
 
-        // Generate location string
-        $locationName = !empty($validated['location_id']) ? Location::find($validated['location_id'])->name : null;
+        $locationName = ! empty($validated['location_id']) ? Location::find($validated['location_id'])->name : null;
         $locationString = trim(collect([$locationName, $validated['location_detail'] ?? null])->filter()->implode(' - '));
 
-        // Jika location string kosong, gunakan location lama
         if (empty($locationString)) {
             $locationString = $asset->location;
         }
 
-        // Update data
-        $asset->name = $validated['name'];
-        $asset->asset_type_id = $validated['asset_type_id'];
-        $asset->brand = $validated['brand'];
-        $asset->model = $validated['model'] ?? null;
-        $asset->price = $validated['price'];
-        $asset->funding_source = $validated['funding_source'] ?? null;
-        $asset->economic_life_years = $validated['economic_life_years'] ?? null;
-        $asset->residual_value = $validated['residual_value'] ?? null;
-        $asset->purchase_date = $validated['purchase_date'];
-        $asset->unit_id = $validated['unit_id'];
+        $asset->unit_id = $validated['unit_id'] ?? null;
         $asset->location_id = $validated['location_id'] ?? null;
         $asset->location_detail = $validated['location_detail'] ?? null;
         $asset->location = $locationString;
-        $asset->serial_number = $validated['serial_number'];
+        $asset->serial_number = $validated['serial_number'] ?? null;
         $asset->condition = $validated['condition'];
         $asset->penanggung_jawab_id = $validated['penanggung_jawab_id'] ?? null;
+        $asset->unit_data = $validatedUnitData['unit_data'] ?? [];
 
-        // Handle image upload
         if ($request->hasFile('image')) {
             if ($asset->image && Storage::disk('public')->exists($asset->image)) {
                 Storage::disk('public')->delete($asset->image);
             }
-            $imagePath = $request->file('image')->store('assets', 'public');
-            $asset->image = $imagePath;
+            $asset->image = $request->file('image')->store('assets', 'public');
         }
 
         $asset->save();
 
-        return redirect($this->resolveGroupRedirect($request))
-            ->with('success', 'Aset berhasil diupdate!');
+        return redirect()->route('assets-inv.group-detail', ['batch_id' => $asset->asset_batch_id])
+            ->with('success', 'Data unit aset berhasil diupdate!');
     }
 
     public function destroy(Asset $asset)
     {
         $this->authorize('delete', $asset);
 
-        $groupSnapshot = ['name' => $asset->name, 'type_id' => $asset->asset_type_id, 'brand' => $asset->brand];
+        $batchId = $asset->asset_batch_id;
 
         try {
             if ($asset->image && Storage::disk('public')->exists($asset->image)) {
@@ -524,45 +653,19 @@ class AssetController extends Controller
             $asset->qrCodes()->delete();
             $asset->delete();
 
-            return redirect($this->resolveGroupRedirectAfterDelete(request(), $groupSnapshot))
-                ->with('success', 'Aset berhasil dihapus!');
+            $sisaUnit = Asset::where('asset_batch_id', $batchId)->count();
+            if ($sisaUnit == 0) {
+                AssetBatch::find($batchId)?->delete();
+
+                return redirect()->route('assets-inv.index')->with('success', 'Unit aset terakhir dihapus, beserta data batchnya.');
+            }
+
+            return redirect()->route('assets-inv.group-detail', ['batch_id' => $batchId])
+                ->with('success', '1 unit aset berhasil dihapus!');
         } catch (\Exception $e) {
             return redirect()->route('assets-inv.index')
-                ->with('error', 'Gagal menghapus aset: ' . $e->getMessage());
+                ->with('error', 'Gagal menghapus aset: '.$e->getMessage());
         }
-    }
-
-    private function resolveGroupRedirect(Request $request): string
-    {
-        if ($request->filled('group_name') && is_numeric($request->input('group_type_id')) && $request->filled('group_brand')) {
-            return route('assets-inv.group-detail', [
-                'name' => $request->input('group_name'),
-                'type_id' => $request->input('group_type_id'),
-                'brand' => $request->input('group_brand'),
-            ]);
-        }
-
-        return route('assets-inv.index');
-    }
-
-    private function resolveGroupRedirectAfterDelete(Request $request, array $group): string
-    {
-        if ($request->filled('group_name')) {
-            $stillExists = Asset::where('name', $group['name'])
-                ->where('asset_type_id', $group['type_id'])
-                ->where('brand', $group['brand'])
-                ->exists();
-
-            if ($stillExists) {
-                return route('assets-inv.group-detail', [
-                    'name' => $group['name'],
-                    'type_id' => $group['type_id'],
-                    'brand' => $group['brand'],
-                ]);
-            }
-        }
-
-        return route('assets-inv.index');
     }
 
     public function generateQrCode(Request $request)
@@ -577,13 +680,11 @@ class AssetController extends Controller
     {
         $type = AssetType::find($assetTypeId);
         $prefix = $type ? $type->code : 'AST';
-
         $attempts = 0;
         do {
             $timestamp = base_convert(time() + $attempts, 10, 36);
             $random = strtoupper(Str::random(6));
             $qrCode = "{$prefix}-{$timestamp}-{$random}";
-
             $exists = Asset::where('qr_code', $qrCode)->exists();
             $attempts++;
         } while ($exists && $attempts < 10);
@@ -594,13 +695,10 @@ class AssetController extends Controller
     public function bulkDelete(Request $request)
     {
         $this->authorize('delete', Asset::class);
-
         try {
             $ids = $request->ids;
             $deleted = 0;
-
             DB::beginTransaction();
-
             foreach ($ids as $id) {
                 $asset = Asset::find($id);
                 if ($asset) {
@@ -612,29 +710,25 @@ class AssetController extends Controller
                     $deleted++;
                 }
             }
-
             DB::commit();
 
-            return response()->json([
-                'success' => true,
-                'message' => "{$deleted} aset berhasil dihapus."
-            ]);
+            return response()->json(['success' => true, 'message' => "{$deleted} aset berhasil dihapus."]);
         } catch (\Exception $e) {
             DB::rollback();
 
-            return response()->json([
-                'success' => false,
-                'message' => 'Gagal menghapus aset: ' . $e->getMessage()
-            ], 500);
+            return response()->json(['success' => false, 'message' => 'Gagal menghapus aset: '.$e->getMessage()], 500);
         }
     }
 
     public function showModal(Asset $asset)
     {
-        $asset->load(['assetType', 'qrCodes', 'borrowings', 'maintenances']);
+        $asset->load(['batch.assetType', 'qrCodes', 'borrowings', 'maintenances']);
 
-        return response()->json([
-            'html' => view('assets-inv.modal-detail', compact('asset'))->render()
-        ]);
+        return response()->json(['html' => view('assets-inv.modal-detail', compact('asset'))->render()]);
+    }
+
+    public function guide()
+    {
+        return view('assets-inv.guide');
     }
 }

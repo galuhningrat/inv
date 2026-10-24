@@ -69,7 +69,7 @@
                         </div>
                     </div>
 
-                    @if($qrCode->asset)
+                    @if ($qrCode->asset)
                         <h4
                             style="margin: 2rem 0 1rem; color: var(--text-primary); border-bottom: 2px solid var(--primary-color); padding-bottom: 0.5rem;">
                             Informasi Aset Terkait
@@ -137,7 +137,7 @@
 
 @push('scripts')
     <script>
-        document.addEventListener('DOMContentLoaded', function () {
+        document.addEventListener('DOMContentLoaded', function() {
             const qrContainer = document.getElementById('qrCodeContainer');
             const qrUrl = '{{ route('asset.detail', ['qrcode' => $qrCode->code_content]) }}';
 

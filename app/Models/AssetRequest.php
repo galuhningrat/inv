@@ -276,7 +276,7 @@ class AssetRequest extends Model
     {
         $allItems = $this->items->concat($this->serviceItems);
 
-        return [php artisan view:clear
+        return [
             'pending'  => $allItems->where('approval_status', 'pending')->count(),
             'approved' => $allItems->where('approval_status', 'approved')->count(),
             'rejected' => $allItems->where('approval_status', 'rejected')->count(),

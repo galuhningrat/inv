@@ -1,13 +1,55 @@
 @extends('layouts.app')
 
 @section('title', 'Detail Grup Aset')
-@section('page-title', 'Detail Grup: ' . $groupName)
+@section('page-title', 'Detail Grup: ' . $batch->name)
 
 @section('content')
     <div class="data-table-container">
         <div class="table-header">
-            <h3 class="table-title">{{ $groupName }} ({{ $groupBrand }}) — {{ $units->count() }} Unit</h3>
-            <a href="{{ route('assets-inv.index') }}" class="btn btn-secondary">← Kembali</a>
+            <h3 class="table-title">{{ $batch->name }} ({{ $batch->brand ?? $batch->assetType->name }}) —
+                {{ $batch->assets->count() }} Unit</h3>
+            <div style="display: flex; gap: 0.5rem;">
+                @if (in_array(auth()->user()->level, ['Sarpras', 'Admin']))
+                    <a href="{{ route('assets-inv.edit-batch', $batch->id) }}" class="btn btn-primary">✏️ Edit Info Batch</a>
+                @endif
+                <a href="{{ route('assets-inv.index') }}" class="btn btn-secondary">← Kembali</a>
+            </div>
+        </div>
+
+        <div style="padding: 1rem 2rem; background: var(--light-bg); margin: 1rem 2rem; border-radius: 8px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div>
+                    {{-- 🔥 SEMBUNYIKAN MEREK/TIPE JIKA KOSONG 🔥 --}}
+                    @if ($batch->brand || $batch->model)
+                        <p><strong>Merek / Tipe:</strong> {{ $batch->brand }} {{ $batch->model }}</p>
+                    @endif
+
+                    <p><strong>Jenis Aset:</strong> {{ $batch->assetType->name ?? '-' }}</p>
+
+                    {{-- 🔥 TAMPILKAN DATA SPESIFIK KATEGORI (JSON) DI SINI 🔥 --}}
+                    @php
+                        $schema = \App\Models\AssetType::getSchema($batch->assetType->code ?? '');
+                        $batchData = $batch->category_data ?? [];
+                    @endphp
+
+                    @foreach ($batchData as $key => $value)
+                        @if (isset($schema[$key]) && !empty($value))
+                            {{-- Hanya tampilkan 2 field penting di atas agar tidak terlalu panjang --}}
+                            @if (in_array($key, ['subkategori', 'penulis', 'luas_m2', 'no_polisi', 'processor']))
+                                <p><strong>{{ $schema[$key]['label'] ?? $key }}:</strong> {{ $value }}</p>
+                            @endif
+                        @endif
+                    @endforeach
+                </div>
+                <div>
+                    <p><strong>Harga Satuan:</strong> Rp {{ number_format($batch->price, 0, ',', '.') }}</p>
+                    <p><strong>Tanggal Beli:</strong>
+                        {{ $batch->purchase_date ? $batch->purchase_date->format('d M Y') : '-' }}</p>
+                    @if ($batch->funding_source)
+                        <p><strong>Sumber Dana:</strong> {{ $batch->funding_source }}</p>
+                    @endif
+                </div>
+            </div>
         </div>
 
         <div class="table-wrapper">
@@ -16,7 +58,7 @@
                     <tr>
                         <th>ID Aset</th>
                         <th>Gambar</th>
-                        <th>Nomor Seri Pabrik</th>
+                        <th>Nomor Identitas</th>
                         <th>Lokasi</th>
                         <th>Kondisi</th>
                         <th>Status</th>
@@ -24,14 +66,23 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach ($units as $unit)
+                    @foreach ($batch->assets as $unit)
                         <tr>
                             <td><strong>{{ $unit->asset_id }}</strong></td>
                             <td>
-                                <img src="{{ $unit->image_url }}" alt="{{ $unit->name }}"
+                                <img src="{{ $unit->image_url }}" alt="{{ $batch->name }}"
                                     style="width: 40px; height: 40px; object-fit: cover; border-radius: 6px;">
                             </td>
-                            <td>{{ $unit->serial_number }}</td>
+                            <td>
+                                {{-- 🔥 TAMPILKAN S/N ATAU IDENTITAS KHUSUS (Seperti No. Aksesion) 🔥 --}}
+                                @if ($unit->serial_number)
+                                    {{ $unit->serial_number }}
+                                @elseif(isset($unit->unit_data['nomor_aksesion']))
+                                    {{ $unit->unit_data['nomor_aksesion'] }}
+                                @else
+                                    <span style="color: var(--text-secondary);">-</span>
+                                @endif
+                            </td>
                             <td>
                                 @if ($unit->location_id)
                                     {{ $unit->location_ref->name ?? '' }}
@@ -39,7 +90,7 @@
                                         - {{ $unit->location_detail }}
                                     @endif
                                 @else
-                                    {{ $unit->location }}
+                                    {{ $unit->location ?? 'Tanpa Lokasi' }}
                                 @endif
                             </td>
                             <td>
@@ -67,9 +118,8 @@
                             </td>
                             <td>
                                 <div class="action-buttons" style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
-                                    {{-- Tombol Detail --}}
-                                    <a href="{{ route('assets-inv.show', ['asset' => $unit->id, 'group_name' => $groupName, 'group_type_id' => $unit->asset_type_id, 'group_brand' => $groupBrand]) }}"
-                                        class="btn btn-secondary btn-sm" title="Lihat Detail">
+                                    <a href="{{ route('assets-inv.show', $unit->id) }}" class="btn btn-secondary btn-sm"
+                                        title="Lihat Detail">
                                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
                                             stroke="currentColor" stroke-width="2" stroke-linecap="round"
                                             stroke-linejoin="round">
@@ -79,9 +129,8 @@
                                         Detail
                                     </a>
 
-                                    {{-- Tombol Edit --}}
-                                    <a href="{{ route('assets-inv.edit', ['asset' => $unit->id, 'group_name' => $groupName, 'group_type_id' => $unit->asset_type_id, 'group_brand' => $groupBrand]) }}"
-                                        class="btn btn-primary btn-sm" title="Edit Aset">
+                                    <a href="{{ route('assets-inv.edit', $unit->id) }}" class="btn btn-primary btn-sm"
+                                        title="Edit Aset">
                                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
                                             stroke="currentColor" stroke-width="2" stroke-linecap="round"
                                             stroke-linejoin="round">
@@ -91,18 +140,12 @@
                                         Edit
                                     </a>
 
-                                    {{-- Tombol Hapus --}}
                                     @can('delete', $unit)
-                                        {{-- Konfirmasi menyebut jumlah unit yang tersisa supaya jelas bahwa yang
-                                             dihapus HANYA baris ini, bukan seluruh grup. --}}
                                         <form action="{{ route('assets-inv.destroy', $unit) }}" method="POST"
                                             style="display: inline;"
-                                            onsubmit="return confirm('Hapus 1 unit ({{ $unit->asset_id }}) dari total {{ $units->count() }} unit pada grup ini?\n\nUnit lain pada grup ini tidak akan terpengaruh.')">
+                                            onsubmit="return confirm('Hapus 1 unit ({{ $unit->asset_id }}) dari total {{ $batch->assets->count() }} unit pada grup ini?\n\nUnit lain pada grup ini tidak akan terpengaruh.')">
                                             @csrf
                                             @method('DELETE')
-                                            <input type="hidden" name="group_name" value="{{ $groupName }}">
-                                            <input type="hidden" name="group_type_id" value="{{ $unit->asset_type_id }}">
-                                            <input type="hidden" name="group_brand" value="{{ $groupBrand }}">
                                             <button type="submit" class="btn btn-danger btn-sm" title="Hapus Aset">
                                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
                                                     stroke="currentColor" stroke-width="2" stroke-linecap="round"
@@ -127,7 +170,6 @@
     </div>
 @endsection
 
-{{-- Tambahan CSS untuk btn-sm --}}
 @push('styles')
     <style>
         .btn-sm {

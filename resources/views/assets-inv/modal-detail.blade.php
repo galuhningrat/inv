@@ -2,10 +2,11 @@
     <div style="display: grid; grid-template-columns: 200px 1fr; gap: 2rem; margin-bottom: 2rem;">
         <div>
             <img src="{{ $asset->image ? Storage::url($asset->image) : asset('assets/default-asset.png') }}"
-                alt="{{ $asset->name }}" style="width: 100%; border-radius: 12px; box-shadow: var(--shadow);">
+                alt="{{ $asset->batch->name ?? 'Aset' }}"
+                style="width: 100%; border-radius: 12px; box-shadow: var(--shadow);">
         </div>
         <div>
-            <h3 style="margin-bottom: 1rem; color: var(--text-primary);">{{ $asset->name }}</h3>
+            <h3 style="margin-bottom: 1rem; color: var(--text-primary);">{{ $asset->batch->name ?? '-' }}</h3>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
                 <div>
@@ -14,11 +15,11 @@
                 </div>
                 <div>
                     <p style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Jenis</p>
-                    <p style="font-weight: 600;">{{ $asset->assetType->name ?? '-' }}</p>
+                    <p style="font-weight: 600;">{{ $asset->batch->assetType->name ?? '-' }}</p>
                 </div>
                 <div>
                     <p style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Merek</p>
-                    <p style="font-weight: 600;">{{ $asset->brand }}</p>
+                    <p style="font-weight: 600;">{{ $asset->batch->brand ?? '-' }}</p>
                 </div>
                 <div>
                     <p style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Nomor Seri
@@ -32,7 +33,7 @@
                 <div>
                     <p style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Harga</p>
                     <p style="font-weight: 600; color: var(--success-color);">Rp
-                        {{ number_format($asset->price, 0, ',', '.') }}
+                        {{ number_format($asset->batch->price ?? 0, 0, ',', '.') }}
                     </p>
                 </div>
                 <div>
@@ -56,14 +57,14 @@
     <div style="text-align: center; margin: 2rem 0; padding: 1.5rem; background: var(--light-bg); border-radius: 12px;">
         <h5 style="margin-bottom: 1rem;">QR Code</h5>
         <div id="qr-detail-{{ $asset->id }}" style="display: inline-block;"></div>
-        @if($asset->qrCodes->count() > 0)
+        @if ($asset->qrCodes->count() > 0)
             <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem; font-family: monospace;">
                 {{ $asset->qrCodes->first()->code_content }}
             </p>
         @endif
     </div>
 
-    @if($asset->borrowings->count() > 0)
+    @if ($asset->borrowings->count() > 0)
         <div style="margin-top: 1.5rem;">
             <h5 style="margin-bottom: 0.75rem;">Riwayat Peminjaman (5 Terakhir)</h5>
             <div style="max-height: 150px; overflow-y: auto;">
@@ -76,12 +77,13 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach($asset->borrowings->take(5) as $borrowing)
+                        @foreach ($asset->borrowings->take(5) as $borrowing)
                             <tr>
                                 <td style="padding: 0.5rem;">{{ $borrowing->borrower_name }}</td>
                                 <td style="padding: 0.5rem;">{{ $borrowing->borrow_date->format('d/m/Y') }}</td>
                                 <td style="padding: 0.5rem;">
-                                    <span class="status-badge {{ $borrowing->status === 'Selesai' ? 'available' : 'borrowed' }}"
+                                    <span
+                                        class="status-badge {{ $borrowing->status === 'Selesai' ? 'available' : 'borrowed' }}"
                                         style="font-size: 0.7rem; padding: 0.25rem 0.5rem;">
                                         {{ $borrowing->status }}
                                     </span>
@@ -96,8 +98,9 @@
 
     <div class="btn-group" style="margin-top: 2rem; justify-content: center;">
         <button class="btn btn-secondary" onclick="closeAssetModal()">Tutup</button>
-        @if($asset->qrCodes->count() > 0)
-            <a href="{{ route('qrcodes.print', $asset->qrCodes->first()->id) }}" class="btn btn-primary" target="_blank">
+        @if ($asset->qrCodes->count() > 0)
+            <a href="{{ route('qrcodes.print', $asset->qrCodes->first()->id) }}" class="btn btn-primary"
+                target="_blank">
                 📄 Cetak QR
             </a>
         @endif
@@ -108,8 +111,8 @@
 </div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        @if($asset->qrCodes->count() > 0)
+    document.addEventListener('DOMContentLoaded', function() {
+        @if ($asset->qrCodes->count() > 0)
             if (typeof QRCode !== 'undefined') {
                 new QRCode(document.getElementById("qr-detail-{{ $asset->id }}"), {
                     text: "{{ route('asset.detail', ['qrcode' => $asset->qrCodes->first()->code_content]) }}",
@@ -119,5 +122,5 @@
                 });
             }
         @endif
-});
+    });
 </script>

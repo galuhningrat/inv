@@ -10,7 +10,8 @@
             <div class="btn-group" style="margin: 0;">
                 <button onclick="printReport()" class="btn btn-primary">🖨️ Cetak</button>
                 <a href="{{ route('reports.export.pdf') }}?type={{ $type }}" class="btn btn-danger">📄 Export PDF</a>
-                <a href="{{ route('reports.export.excel') }}?type={{ $type }}" class="btn btn-success">📊 Export Excel</a>
+                <a href="{{ route('reports.export.excel') }}?type={{ $type }}" class="btn btn-success">📊 Export
+                    Excel</a>
                 <a href="{{ route('reports.index') }}" class="btn btn-secondary">← Kembali</a>
             </div>
         </div>
@@ -38,7 +39,7 @@
                 </p>
             </div>
 
-            @if($type === 'assets')
+            @if ($type === 'assets')
                 <!-- Assets Report -->
                 <div class="table-wrapper">
                     <table class="data-table" style="font-size: 0.8rem;">
@@ -56,13 +57,13 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach($data as $index => $asset)
+                            @foreach ($data as $index => $asset)
                                 <tr>
                                     <td>{{ $index + 1 }}</td>
                                     <td>{{ $asset->asset_id }}</td>
-                                    <td>{{ $asset->name }}</td>
-                                    <td>{{ $asset->assetType->name }}</td>
-                                    <td>{{ $asset->brand }}</td>
+                                    <td>{{ $asset->batch->name ?? '-' }}</td>
+                                    <td>{{ $asset->batch->assetType->name ?? '-' }}</td>
+                                    <td>{{ $asset->batch->brand ?? '-' }}</td>
                                     <td>{{ $asset->location }}</td>
                                     <td>
                                         <span
@@ -83,17 +84,18 @@
                         <tfoot>
                             <tr style="background: var(--light-bg); font-weight: bold;">
                                 <td colspan="8" style="text-align: right;">Total Nilai Aset:</td>
-                                <td style="text-align: right;">Rp {{ number_format($data->sum('price'), 0, ',', '.') }}</td>
+                                <td style="text-align: right;">Rp {{ number_format($data->sum('price'), 0, ',', '.') }}
+                                </td>
                             </tr>
                             <tr>
-                                <td colspan="9" style="text-align: center; font-size: 0.75rem; color: var(--text-secondary);">
+                                <td colspan="9"
+                                    style="text-align: center; font-size: 0.75rem; color: var(--text-secondary);">
                                     Total: {{ $data->count() }} aset
                                 </td>
                             </tr>
                         </tfoot>
                     </table>
                 </div>
-
             @elseif($type === 'borrowing')
                 <!-- Borrowing Report -->
                 <div class="table-wrapper">
@@ -111,7 +113,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach($data as $index => $borrowing)
+                            @foreach ($data as $index => $borrowing)
                                 <tr>
                                     <td>{{ $index + 1 }}</td>
                                     <td>{{ $borrowing->borrowing_id }}</td>
@@ -132,7 +134,8 @@
                         </tbody>
                         <tfoot>
                             <tr>
-                                <td colspan="8" style="text-align: center; font-size: 0.75rem; color: var(--text-secondary);">
+                                <td colspan="8"
+                                    style="text-align: center; font-size: 0.75rem; color: var(--text-secondary);">
                                     Total: {{ $data->count() }} peminjaman |
                                     Aktif: {{ $data->where('status', 'Aktif')->count() }} |
                                     Selesai: {{ $data->where('status', 'Selesai')->count() }}
@@ -141,7 +144,6 @@
                         </tfoot>
                     </table>
                 </div>
-
             @elseif($type === 'maintenance')
                 <!-- Maintenance Report -->
                 <div class="table-wrapper">
@@ -159,7 +161,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach($data as $index => $maintenance)
+                            @foreach ($data as $index => $maintenance)
                                 <tr>
                                     <td>{{ $index + 1 }}</td>
                                     <td>{{ $maintenance->maintenance_id }}</td>
@@ -167,7 +169,8 @@
                                     <td>{{ $maintenance->type }}</td>
                                     <td>{{ $maintenance->maintenance_date->format('d/m/Y') }}</td>
                                     <td>{{ $maintenance->technician }}</td>
-                                    <td style="text-align: right;">Rp {{ number_format($maintenance->cost, 0, ',', '.') }}</td>
+                                    <td style="text-align: right;">Rp {{ number_format($maintenance->cost, 0, ',', '.') }}
+                                    </td>
                                     <td>
                                         <span
                                             class="status-badge {{ $maintenance->status === 'Selesai' ? 'available' : 'maintenance' }}">
@@ -184,14 +187,14 @@
                                     {{ number_format($data->sum('cost'), 0, ',', '.') }}</td>
                             </tr>
                             <tr>
-                                <td colspan="8" style="text-align: center; font-size: 0.75rem; color: var(--text-secondary);">
+                                <td colspan="8"
+                                    style="text-align: center; font-size: 0.75rem; color: var(--text-secondary);">
                                     Total: {{ $data->count() }} record pemeliharaan
                                 </td>
                             </tr>
                         </tfoot>
                     </table>
                 </div>
-
             @elseif($type === 'financial')
                 <!-- Financial Report -->
                 <div

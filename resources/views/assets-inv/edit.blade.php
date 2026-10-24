@@ -1,28 +1,19 @@
 @extends('layouts.app')
 
 @section('title', 'Edit Aset')
-@section('page-title', 'Edit Aset: ' . $asset->name)
+@section('page-title', 'Edit Unit Aset: ' . $asset->asset_id)
 
 @section('content')
     @php
-        $groupParams = collect(request()->only(['group_name', 'group_type_id', 'group_brand']))->filter();
-        $hasGroupContext = $groupParams->count() === 3 && is_numeric($groupParams['group_type_id'] ?? null);
-        $backUrl = $hasGroupContext
-            ? route('assets-inv.group-detail', [
-                'name' => $groupParams['group_name'],
-                'type_id' => $groupParams['group_type_id'],
-                'brand' => $groupParams['group_brand'],
-            ])
-            : route('assets-inv.index');
+        $backUrl = route('assets-inv.group-detail', ['batch_id' => $asset->asset_batch_id]);
     @endphp
 
     <div class="data-table-container" style="margin-top: 2rem;">
         <div class="table-header">
-            <h3 class="table-title">Formulir Edit Aset Fisik</h3>
+            <h3 class="table-title">Formulir Edit Unit Aset</h3>
             <a href="{{ $backUrl }}" class="btn btn-secondary">← Kembali</a>
         </div>
 
-        {{-- Tampilkan semua error global --}}
         @if ($errors->any())
             <div
                 style="background: #fee2e2; border: 1px solid #ef4444; border-radius: 8px; padding: 1rem; margin: 1rem 2rem; color: #991b1b;">
@@ -39,114 +30,51 @@
                 @csrf
                 @method('PUT')
 
-                @if ($hasGroupContext)
-                    <input type="hidden" name="group_name" value="{{ $groupParams['group_name'] }}">
-                    <input type="hidden" name="group_type_id" value="{{ $groupParams['group_type_id'] }}">
-                    <input type="hidden" name="group_brand" value="{{ $groupParams['group_brand'] }}">
-                @endif
-
-                {{-- ============================================================ --}}
-                {{--  INFORMASI UTAMA                                            --}}
-                {{-- ============================================================ --}}
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="name">Nama Aset <span style="color: red;">*</span></label>
-                        <input type="text" id="name" name="name"
-                            class="form-control @error('name') error @enderror" value="{{ old('name', $asset->name) }}"
-                            required>
-                        @error('name')
-                            <div class="error-message" style="display: block;">{{ $message }}</div>
-                        @enderror
-                    </div>
-                    <div class="form-group">
-                        <label for="asset_type_id">Jenis Aset <span style="color: red;">*</span></label>
-                        <select id="asset_type_id" name="asset_type_id"
-                            class="form-control @error('asset_type_id') error @enderror" required>
-                            <option value="">Pilih Jenis</option>
-                            @foreach ($assetTypes as $type)
-                                <option value="{{ $type->id }}"
-                                    {{ old('asset_type_id', $asset->asset_type_id) == $type->id ? 'selected' : '' }}>
-                                    {{ $type->name }} ({{ $type->code }})
-                                </option>
-                            @endforeach
-                        </select>
-                        @error('asset_type_id')
-                            <div class="error-message" style="display: block;">{{ $message }}</div>
-                        @enderror
-                    </div>
+                {{-- INFORMASI BATCH (READ ONLY) --}}
+                <div
+                    style="background: #eff6ff; border: 1px solid #bfdbfe; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
+                    <h4 style="margin: 0 0 0.5rem; color: #1e40af;">Informasi Batch / Model Aset (Hanya Baca)</h4>
+                    <p style="margin: 0 0 0.25rem;"><strong>Nama Model:</strong> {{ $asset->batch->name }}</p>
+                    <p style="margin: 0 0 0.25rem;"><strong>Merek / Tipe:</strong> {{ $asset->batch->brand }}
+                        {{ $asset->batch->model }}</p>
+                    <p style="margin: 0 0 0.25rem;"><strong>Harga Satuan:</strong> Rp
+                        {{ number_format($asset->batch->price, 0, ',', '.') }}</p>
+                    <p style="margin: 0;"><strong>Tanggal Pembelian:</strong>
+                        {{ $asset->batch->purchase_date ? $asset->batch->purchase_date->format('d F Y') : '-' }}</p>
                 </div>
 
-                {{-- Read-only — asset_id auto-generate saat aset dibuat, tidak pernah diedit
-                     manual. Ditampilkan di sini sebagai "Label Aset Kampus" (bisa dicetak jadi
-                     stiker), untuk dibedakan dari Nomor Seri Pabrik (dari produsen) di bawah. --}}
                 <div class="form-group">
                     <label>Label Aset Kampus</label>
                     <input type="text" class="form-control" value="{{ $asset->asset_id }}" disabled
                         style="font-family: monospace; background: var(--light-bg);">
                 </div>
 
+                {{-- 🔥 WADAH UNTUK FIELD DINAMIS UNIT 🔥 --}}
                 <div class="form-row">
-                    <div class="form-group">
-                        <label for="brand">Merek <span style="color: red;">*</span></label>
-                        <input type="text" id="brand" name="brand"
-                            class="form-control @error('brand') error @enderror" value="{{ old('brand', $asset->brand) }}"
-                            required>
-                        @error('brand')
-                            <div class="error-message" style="display: block;">{{ $message }}</div>
-                        @enderror
+                    <div class="form-group" id="serialNumberGroup">
+                        <label for="serial_number">Nomor Seri Pabrik (S/N) <span style="color: red;">*</span></label>
+                        <input type="text" id="serial_number" name="serial_number" class="form-control"
+                            value="{{ old('serial_number', $asset->serial_number) }}">
                     </div>
                     <div class="form-group">
-                        <label for="model">Tipe / Model <small style="font-weight: normal;">(opsional)</small></label>
-                        <input type="text" id="model" name="model" class="form-control"
-                            value="{{ old('model', $asset->model) }}" placeholder="mis. ExpertCenter D700">
-                    </div>
-                    <div class="form-group">
-                        <label for="price">Harga Pembelian <span style="color: red;">*</span></label>
-                        <input type="number" id="price" name="price"
-                            class="form-control @error('price') error @enderror" value="{{ old('price', $asset->price) }}"
-                            min="0" required>
-                        @error('price')
-                            <div class="error-message" style="display: block;">{{ $message }}</div>
-                        @enderror
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label for="purchase_date">Tanggal Pembelian <span style="color: red;">*</span></label>
-                    <input type="date" id="purchase_date" name="purchase_date"
-                        class="form-control @error('purchase_date') error @enderror"
-                        value="{{ old('purchase_date', $asset->purchase_date->format('Y-m-d')) }}" required>
-                    @error('purchase_date')
-                        <div class="error-message" style="display: block;">{{ $message }}</div>
-                    @enderror
-                </div>
-
-                {{-- Data akuntansi — semua opsional, sama seperti di form Tambah. --}}
-                <hr style="margin: 1.5rem 0;">
-                <h4 style="margin-bottom: 1rem;">Data Akuntansi <small
-                        style="font-weight: normal; color: var(--text-secondary);">(opsional)</small></h4>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="funding_source">Sumber Pendanaan</label>
-                        <select id="funding_source" name="funding_source" class="form-control">
-                            <option value="">-- Tidak ditentukan --</option>
-                            @foreach ($fundingSources as $fs)
-                                <option value="{{ $fs }}"
-                                    {{ old('funding_source', $asset->funding_source) === $fs ? 'selected' : '' }}>
-                                    {{ $fs }}</option>
-                            @endforeach
+                        <label for="condition">Kondisi <span style="color: red;">*</span></label>
+                        <select id="condition" name="condition" class="form-control" required>
+                            <option value="Baik" {{ old('condition', $asset->condition) === 'Baik' ? 'selected' : '' }}>
+                                Baik</option>
+                            <option value="Rusak Ringan"
+                                {{ old('condition', $asset->condition) === 'Rusak Ringan' ? 'selected' : '' }}>Rusak Ringan
+                            </option>
+                            <option value="Rusak Berat"
+                                {{ old('condition', $asset->condition) === 'Rusak Berat' ? 'selected' : '' }}>Rusak Berat
+                            </option>
                         </select>
                     </div>
-                    <div class="form-group">
-                        <label for="economic_life_years">Umur Ekonomis (Tahun)</label>
-                        <input type="number" id="economic_life_years" name="economic_life_years" class="form-control"
-                            value="{{ old('economic_life_years', $asset->economic_life_years) }}" min="1" max="100">
-                    </div>
-                    <div class="form-group">
-                        <label for="residual_value">Nilai Residu (Rp)</label>
-                        <input type="number" id="residual_value" name="residual_value" class="form-control"
-                            value="{{ old('residual_value', $asset->residual_value) }}" min="0">
-                    </div>
+                </div>
+
+                <div class="form-row" id="dynamicUnitFields"
+                    style="display: none; background: #f8fafc; border: 1px dashed #cbd5e1; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
+                    <h4 style="width: 100%; margin-top: 0; margin-bottom: 1rem; font-size: 1rem; color: #1e293b;">⚙️
+                        Spesifikasi Tambahan</h4>
                 </div>
 
                 <div class="form-group">
@@ -158,8 +86,7 @@
                                 @foreach ($usersInLevel as $u)
                                     <option value="{{ $u->id }}"
                                         {{ old('penanggung_jawab_id', $asset->penanggung_jawab_id) == $u->id ? 'selected' : '' }}>
-                                        {{ $u->name }}
-                                    </option>
+                                        {{ $u->name }}</option>
                                 @endforeach
                             </optgroup>
                         @endforeach
@@ -169,9 +96,6 @@
                 <hr style="margin: 1.5rem 0;">
                 <h4 style="margin-bottom: 1rem;">Lokasi Penempatan</h4>
 
-                {{-- ============================================================ --}}
-                {{--  LOKASI PENEMPATAN                                            --}}
-                {{-- ============================================================ --}}
                 <div class="form-row">
                     <div class="form-group">
                         <label for="kategori">Kategori <span style="color: red;">*</span></label>
@@ -180,158 +104,73 @@
                             @foreach ($units->pluck('category')->unique() as $cat)
                                 <option value="{{ $cat }}"
                                     {{ $asset->unit && $asset->unit->category === $cat ? 'selected' : '' }}>
-                                    {{ $cat }}
-                                </option>
+                                    {{ $cat }}</option>
                             @endforeach
                         </select>
                     </div>
                     <div class="form-group">
                         <label for="unit_id">Unit <span style="color: red;">*</span></label>
-                        <select id="unit_id" name="unit_id" class="form-control @error('unit_id') error @enderror"
-                            required disabled onchange="updateLocationOptions()">
+                        <select id="unit_id" name="unit_id" class="form-control" required disabled
+                            onchange="updateLocationOptions()">
                             <option value="">-- Pilih Kategori dulu --</option>
                         </select>
-                        @error('unit_id')
-                            <div class="error-message" style="display: block;">{{ $message }}</div>
-                        @enderror
                     </div>
                 </div>
 
                 <div class="form-group">
                     <label for="location_id">Lokasi Spesifik</label>
-                    <select id="location_id" name="location_id"
-                        class="form-control @error('location_id') error @enderror" disabled>
+                    <select id="location_id" name="location_id" class="form-control" disabled>
                         <option value="">-- Pilih Unit dulu --</option>
                     </select>
-                    @error('location_id')
-                        <div class="error-message" style="display: block;">{{ $message }}</div>
-                    @enderror
                 </div>
 
                 <div class="form-group">
                     <label id="location_detail_label" for="location_detail">Detail Penempatan</label>
-                    <input type="text" id="location_detail" name="location_detail"
-                        class="form-control @error('location_detail') error @enderror"
+                    <input type="text" id="location_detail" name="location_detail" class="form-control"
                         value="{{ old('location_detail', $asset->location_detail) }}">
-                    @error('location_detail')
-                        <div class="error-message" style="display: block;">{{ $message }}</div>
-                    @enderror
                     <small class="form-text" id="location_detail_hint">(opsional, mis. "di dalam lemari")</small>
                 </div>
 
                 <hr style="margin: 1.5rem 0;">
-                <h4 style="margin-bottom: 1rem;">Detail Unit</h4>
-
-                {{-- ============================================================ --}}
-                {{--  DETAIL UNIT                                                 --}}
-                {{-- ============================================================ --}}
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="serial_number">Nomor Seri Pabrik (S/N) <span style="color: red;">*</span></label>
-                        <input type="text" id="serial_number" name="serial_number"
-                            class="form-control @error('serial_number') error @enderror"
-                            value="{{ old('serial_number', $asset->serial_number) }}" required>
-                        @error('serial_number')
-                            <div class="error-message" style="display: block;">{{ $message }}</div>
-                        @enderror
-                    </div>
-                    <div class="form-group">
-                        <label for="condition">Kondisi <span style="color: red;">*</span></label>
-                        <select id="condition" name="condition" class="form-control @error('condition') error @enderror"
-                            required>
-                            <option value="">Pilih Kondisi</option>
-                            <option value="Baik" {{ old('condition', $asset->condition) === 'Baik' ? 'selected' : '' }}>
-                                Baik
-                            </option>
-                            <option value="Rusak Ringan"
-                                {{ old('condition', $asset->condition) === 'Rusak Ringan' ? 'selected' : '' }}>
-                                Rusak Ringan
-                            </option>
-                            <option value="Rusak Berat"
-                                {{ old('condition', $asset->condition) === 'Rusak Berat' ? 'selected' : '' }}>
-                                Rusak Berat
-                            </option>
-                        </select>
-                        @error('condition')
-                            <div class="error-message" style="display: block;">{{ $message }}</div>
-                        @enderror
-                    </div>
-                </div>
-
-                <hr style="margin: 1.5rem 0;">
-                <h4 style="margin-bottom: 1rem;">Gambar Aset</h4>
+                <h4 style="margin-bottom: 1rem;">Gambar Fisik Unit</h4>
 
                 <div class="form-group">
                     @if ($asset->image)
                         <div style="margin-bottom: 1rem;">
-                            <img src="{{ $asset->image_url }}" alt="{{ $asset->name }}"
-                                style="max-width: 200px; border-radius: 8px; box-shadow: var(--shadow);">
-                            <p style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.5rem;">
-                                Gambar saat ini
-                            </p>
+                            <img src="{{ $asset->image_url }}" style="max-width: 200px; border-radius: 8px;">
+                            <p style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.5rem;">Gambar saat
+                                ini</p>
                         </div>
                     @endif
                     <input type="file" id="image" name="image" class="form-control" accept="image/*"
                         onchange="previewImage(this)">
                     <div class="image-preview" id="imagePreview"></div>
-                    <small class="form-text">Upload gambar baru untuk mengganti (opsional, max 2MB)</small>
-                    @error('image')
-                        <div class="error-message" style="display: block;">{{ $message }}</div>
-                    @enderror
                 </div>
 
-                <div class="btn-group">
+                <div class="btn-group" style="margin-top: 1rem;">
                     <a href="{{ $backUrl }}" class="btn btn-secondary">Batal</a>
-                    <button type="submit" class="btn btn-success">Update Aset</button>
+                    <button type="submit" class="btn btn-success">Update Data Unit</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <script id="unitsData" type="application/json">
-        @json($unitsForJs)
+    <script id="unitsData" type="application/json"> @json($unitsForJs) </script>
+    <script>
+        window.assetSchemas = {!! json_encode($schemas) !!};
+        window.currentAssetTypeId = {{ $asset->batch->asset_type_id }};
+        window.currentUnitData = {!! json_encode($asset->unit_data ?? (object) []) !!};
     </script>
 @endsection
-
-@push('styles')
-    <style>
-        @media (max-width: 768px) {
-            .data-table-container {
-                margin: 0.5rem;
-            }
-
-            .table-header {
-                flex-direction: column;
-                align-items: stretch !important;
-            }
-
-            .table-title {
-                font-size: 1.1rem;
-            }
-
-            .form-row {
-                grid-template-columns: 1fr !important;
-            }
-
-            .btn-group {
-                flex-direction: column;
-            }
-
-            .btn-group .btn {
-                width: 100%;
-            }
-        }
-    </style>
-@endpush
 
 @push('scripts')
     <script>
         const allUnits = JSON.parse(document.getElementById('unitsData').textContent);
-
         const initialUnitId = {{ $asset->unit_id ?? 'null' }};
         const initialLocationId = {{ $asset->location_id ?? 'null' }};
         const initialCategory = @json($asset->unit->category ?? '');
 
+        // --- LOGIKA LOKASI (SAMA SEPERTI SEBELUMNYA) ---
         function updateUnitOptions() {
             const kategori = document.getElementById('kategori').value;
             const unitSelect = document.getElementById('unit_id');
@@ -382,9 +221,8 @@
             const unit = allUnits.find(u => u.id === unitId);
 
             if (!unit || unit.locations.length === 0) {
-                locationSelect.innerHTML = '<option value="">-- Tidak ada lokasi spesifik untuk unit ini --</option>';
+                locationSelect.innerHTML = '<option value="">-- Tidak ada lokasi spesifik --</option>';
                 locationSelect.disabled = true;
-                locationSelect.required = false;
                 locationDetail.required = true;
                 detailLabel.innerHTML = 'Detail Penempatan <span style="color:red;">*</span>';
                 hint.textContent = '(wajib, unit ini belum punya daftar lokasi spesifik)';
@@ -416,7 +254,7 @@
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     preview.innerHTML =
-                        `<img src="${e.target.result}" alt="Preview" style="max-width: 200px; height: auto; border-radius: 8px; margin-top: 1rem;">`;
+                        `<img src="${e.target.result}" style="max-width: 200px; border-radius: 8px; margin-top: 1rem;">`;
                 };
                 reader.readAsDataURL(input.files[0]);
             } else {
@@ -424,12 +262,72 @@
             }
         }
 
+        // --- LOGIKA FIELD DINAMIS UNIT ---
+        function renderDynamicUnitFields() {
+            const schema = window.assetSchemas[window.currentAssetTypeId] || {};
+            const container = document.getElementById('dynamicUnitFields');
+            const serialGroup = document.getElementById('serialNumberGroup');
+
+            // Cek Sembunyikan S/N
+            if (schema.hide_general) {
+                serialGroup.style.display = 'none';
+                document.getElementById('serial_number').removeAttribute('required');
+            } else {
+                serialGroup.style.display = 'block';
+                document.getElementById('serial_number').setAttribute('required', 'required');
+            }
+
+            let hasUnitFields = false;
+            for (const [key, field] of Object.entries(schema)) {
+                if (field.in_unit) {
+                    hasUnitFields = true;
+                    let val = window.currentUnitData[key] || '';
+                    let inputHtml = '';
+
+                    if (field.type === 'select') {
+                        let options = `<option value="">-- Pilih --</option>`;
+                        for (const [optVal, optLabel] of Object.entries(field.options)) {
+                            options += `<option value="${optVal}" ${val == optVal ? 'selected' : ''}>${optLabel}</option>`;
+                        }
+                        inputHtml =
+                            `<select name="unit_data[${key}]" class="form-control" ${field.required ? 'required' : ''}>${options}</select>`;
+                    } else {
+                        inputHtml =
+                            `<input type="${field.type}" name="unit_data[${key}]" class="form-control" value="${val}" ${field.required ? 'required' : ''}>`;
+                    }
+
+                    // Logika show_if
+                    let display = 'block';
+                    if (field.show_if) {
+                        display = 'none';
+                        for (const [depKey, allowed] of Object.entries(field.show_if)) {
+                            const depVal = window.oldBatchData ? window.oldBatchData[depKey] : null;
+                            // Note: Di halaman edit unit, kita anggap dependensi sudah pasti terpenuhi
+                            // karena batch tidak bisa diganti di sini. Kita cek apakah field ini memang
+                            // bagian dari schema batch tersebut.
+                            // Simplifikasi: Tampilkan jika tidak ada show_if, atau jika show_if sesuai dengan data batch.
+                            // Untuk edit unit, kita tampilkan saja asalkan field tersebut ada di schema.
+                            display = 'block';
+                        }
+                    }
+
+                    container.innerHTML += `
+                    <div class="form-group conditional-field" style="width: 50%; padding-right: 1rem; box-sizing: border-box; display: ${display};">
+                        <label>${field.label} ${field.required ? '<span style="color:red;">*</span>' : ''}</label>
+                        ${inputHtml}
+                    </div>
+                `;
+                }
+            }
+
+            if (hasUnitFields) container.style.display = 'flex';
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
             const kategoriSelect = document.getElementById('kategori');
-            if (initialCategory) {
-                kategoriSelect.value = initialCategory;
-            }
+            if (initialCategory) kategoriSelect.value = initialCategory;
             updateUnitOptions();
+            renderDynamicUnitFields();
         });
     </script>
 @endpush

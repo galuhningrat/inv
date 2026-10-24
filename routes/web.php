@@ -33,9 +33,13 @@ Route::middleware(['auth'])->group(function () {
 
     // Assets Management
     Route::middleware(['level:assets-inv'])->group(function () {
+        Route::get('/assets-inv/panduan', [AssetController::class, 'guide'])->name('assets-inv.guide');
+
         Route::get('/assets-inv', [AssetController::class, 'index'])->name('assets-inv.index');
         Route::get('/assets-inv/create', [AssetController::class, 'create'])->name('assets-inv.create');
         Route::get('/assets-inv/group-detail', [AssetController::class, 'groupDetail'])->name('assets-inv.group-detail');
+        Route::get('/assets-inv/batch/{batch}/edit', [AssetController::class, 'editBatch'])->name('assets-inv.edit-batch');
+        Route::put('/assets-inv/batch/{batch}', [AssetController::class, 'updateBatch'])->name('assets-inv.update-batch');
         Route::post('/assets-inv', [AssetController::class, 'store'])->name('assets-inv.store');
         Route::get('/assets-inv/{asset}', [AssetController::class, 'show'])->name('assets-inv.show');
         Route::get('/assets-inv/{asset}/edit', [AssetController::class, 'edit'])->name('assets-inv.edit');

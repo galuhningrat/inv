@@ -183,6 +183,13 @@
                         </option>
                     @endforeach
                 </select>
+
+                {{-- 🔥 TOMBOL PANDUAN DITAMBAHKAN DI SINI 🔥 --}}
+                <a href="{{ route('assets-inv.guide') }}" class="btn btn-secondary"
+                    style="background: #f3f4f6; color: #374151; border: 1px solid #e5e7eb;">
+                    📖 Panduan
+                </a>
+
                 @can('create', App\Models\Asset::class)
                     <a href="{{ route('assets-inv.create') }}" class="btn btn-primary">+ Tambah Aset</a>
                 @endcan
@@ -277,38 +284,41 @@
                     @else
                         {{-- view === 'fisik' --}}
                         @if ($isGrouped)
-                            @forelse($grouped as $group)
+                            @forelse($grouped as $batch)
                                 <tr>
                                     <td class="col-checkbox"></td>
                                     <td><span style="color: var(--text-secondary);">—</span></td>
                                     <td>
-                                        <img src="{{ $group->image_url }}" alt="{{ $group->name }}"
-                                            class="asset-image-preview"
+                                        <img src="{{ $batch->assets->first()->image_url ?? asset('assets/logo-stti.png') }}"
+                                            alt="{{ $batch->name }}" class="asset-image-preview"
                                             style="width: 50px; height: 50px; object-fit: cover; border-radius: 8px;">
                                     </td>
-                                    <td>{{ $group->name }}</td>
-                                    <td>{{ $group->assetType->name ?? '-' }}</td>
-                                    <td>{{ $group->brand }}</td>
-                                    <td>{{ $group->location }}</td>
-                                    <td><span class="status-badge available">{{ $group->total_quantity }} unit</span></td>
+                                    <td>
+                                        <strong>{{ $batch->name }}</strong><br>
+                                        <small style="color: var(--text-secondary);">{{ $batch->model }}</small>
+                                    </td>
+                                    <td>{{ $batch->assetType->name ?? '-' }}</td>
+                                    <td>{{ $batch->brand }}</td>
+                                    <td><span style="color: var(--text-secondary);">Multi-Unit</span></td>
+                                    <td><span class="status-badge available">{{ $batch->assets_count }} unit</span></td>
                                     <td style="font-size: 0.8rem; line-height: 1.6;">
-                                        {{ $group->tersedia_count }} Tersedia
-                                        @if ($group->dipinjam_count > 0)
-                                            <br>{{ $group->dipinjam_count }} Dipinjam
+                                        {{ $batch->tersedia_count }} Tersedia
+                                        @if ($batch->dipinjam_count > 0)
+                                            <br>{{ $batch->dipinjam_count }} Dipinjam
                                         @endif
-                                        @if ($group->maintenance_count > 0)
-                                            <br>{{ $group->maintenance_count }} Maintenance
+                                        @if ($batch->maintenance_count > 0)
+                                            <br>{{ $batch->maintenance_count }} Maintenance
                                         @endif
-                                        @if ($group->diganti_count > 0)
-                                            <br><span style="color: #dc2626;">{{ $group->diganti_count }} Diganti</span>
+                                        @if ($batch->diganti_count > 0)
+                                            <br><span style="color: #dc2626;">{{ $batch->diganti_count }} Diganti</span>
                                         @endif
                                     </td>
                                     <td><span class="price-display">Rp
-                                            {{ number_format($group->price, 0, ',', '.') }}</span></td>
+                                            {{ number_format($batch->price, 0, ',', '.') }}</span></td>
                                     <td>
                                         <div class="action-buttons">
-                                            <a href="{{ route('assets-inv.group-detail', ['name' => $group->name, 'type_id' => $group->asset_type_id, 'brand' => $group->brand]) }}"
-                                                class="btn btn-secondary">Detail ({{ $group->total_quantity }})</a>
+                                            <a href="{{ route('assets-inv.group-detail', ['batch_id' => $batch->id]) }}"
+                                                class="btn btn-secondary">Detail ({{ $batch->assets_count }})</a>
                                         </div>
                                     </td>
                                 </tr>
@@ -335,13 +345,13 @@
                                     </td>
                                     <td><strong>{{ $asset->asset_id }}</strong></td>
                                     <td>
-                                        <img src="{{ $asset->image_url }}" alt="{{ $asset->name }}"
+                                        <img src="{{ $asset->image_url }}" alt="{{ $asset->batch->name ?? 'Aset' }}"
                                             class="asset-image-preview"
                                             style="width: 50px; height: 50px; object-fit: cover; border-radius: 8px;">
                                     </td>
-                                    <td>{{ $asset->name }}</td>
-                                    <td>{{ $asset->assetType->name ?? '-' }}</td>
-                                    <td>{{ $asset->brand }}</td>
+                                    <td>{{ $asset->batch->name ?? '-' }}</td>
+                                    <td>{{ $asset->batch->assetType->name ?? '-' }}</td>
+                                    <td>{{ $asset->batch->brand ?? '-' }}</td>
                                     <td>
                                         @if ($asset->location_id)
                                             {{ $asset->location_ref->name ?? '' }}
@@ -380,7 +390,7 @@
                                         </span>
                                     </td>
                                     <td><span class="price-display">Rp
-                                            {{ number_format($asset->price, 0, ',', '.') }}</span></td>
+                                            {{ number_format($asset->batch->price ?? 0, 0, ',', '.') }}</span></td>
                                     <td>
                                         <div class="action-buttons">
                                             <button onclick="showAssetDetail({{ $asset->id }})"
@@ -430,7 +440,7 @@
                 @else
                     {{-- view fisik --}}
                     @if ($isGrouped)
-                        Total: <strong>{{ $grouped->sum('total_quantity') }}</strong> unit aset ({{ $grouped->count() }}
+                        Total: <strong>{{ $grouped->sum('assets_count') }}</strong> unit aset ({{ $grouped->count() }}
                         jenis barang)
                     @else
                         Total: <strong>{{ $assets->count() }}</strong> aset

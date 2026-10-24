@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Asset;
+use App\Models\AssetBatch;
 use App\Models\AssetRequest;
 use App\Models\AssetRequestItem;
 use App\Models\AssetType;
@@ -35,10 +36,6 @@ class AssetRequestController extends Controller
         return view('requests.index', compact('requests'));
     }
 
-    /**
-     * Fase 3: render form jasa sesuai kategori yang dipilih dari modal katalog.
-     * Satu view utama (create-service) + partial per kategori untuk field spesifik.
-     */
     public function createService(Request $request, ?string $category = null)
     {
         $this->authorize('create', AssetRequest::class);
@@ -65,7 +62,6 @@ class AssetRequestController extends Controller
 
         $priorities = ['Normal', 'Mendesak', 'Sangat Mendesak'];
 
-        // Data khusus kategori pemeliharaan: dropdown "Aset yang Ingin Diperbaiki"
         $assets = $category === 'pemeliharaan'
             ? Asset::orderBy('name')->get()
             : collect();
@@ -82,16 +78,6 @@ class AssetRequestController extends Controller
         ));
     }
 
-    /**
-     * Fase 3: simpan pengajuan jasa ke asset_requests (header) + service_request_items (detail).
-     * Field spesifik per kategori disimpan sebagai JSON di kolom `service_data`.
-     *
-     * Catatan: field "Alasan Pengajuan" & "Aset yang Diganti" TIDAK dipakai di
-     * form jasa — konsepnya spesifik untuk pengadaan aset (Pengadaan Baru /
-     * Penggantian / Pengisian Kembali), tidak ada di formulir resmi
-     * "Rencana Pemeliharaan" dan tidak relevan untuk jasa. Kolomnya nullable
-     * di database, jadi di-set null di sini.
-     */
     public function storeService(Request $request, string $category)
     {
         $this->authorize('create', AssetRequest::class);
@@ -104,7 +90,6 @@ class AssetRequestController extends Controller
         $user = Auth::user();
         $canChooseUnit = in_array($user->level, ['Sarpras', 'Admin']);
 
-        // ===== Base rules (field umum semua item jasa) =====
         $rules = [
             'items' => 'required|array|min:1',
             'items.*.item_name' => 'required|string|max:255',
@@ -117,7 +102,6 @@ class AssetRequestController extends Controller
             'items.*.reason' => 'required|string',
         ];
 
-        // ===== Dynamic rules dari schema kategori =====
         $schema = ServiceRequestItem::SERVICE_DATA_SCHEMA[$category] ?? [];
         foreach ($schema as $field => $fieldRules) {
             $type = $fieldRules['type'] ?? 'string';
@@ -140,14 +124,12 @@ class AssetRequestController extends Controller
             $rules["items.*.service_data.$field"] = $rule;
         }
 
-        // Khusus pemeliharaan: validasi asset_id exists
         if ($category === 'pemeliharaan') {
             $rules['items.*.service_data.asset_id'] = 'required|exists:assets,id';
         }
 
         $validated = $request->validate($rules);
 
-        // ===== Cross validation per item =====
         foreach ($validated['items'] as $idx => $item) {
             if (! $canChooseUnit && $item['unit_id'] != $user->unit_id) {
                 return back()->withInput()->withErrors([
@@ -167,7 +149,7 @@ class AssetRequestController extends Controller
                 'period_year' => now()->year,
                 'request_type' => 'jasa',
                 'service_category' => $category,
-                'alasan_pengajuan' => null,       // jasa tidak butuh alasan ini
+                'alasan_pengajuan' => null,
                 'related_asset_id' => null,
                 'priority' => $firstItem['priority'],
                 'reason' => $firstItem['reason'],
@@ -185,7 +167,7 @@ class AssetRequestController extends Controller
                 $assetRequest->serviceItems()->create([
                     'unit_id' => $item['unit_id'],
                     'priority' => $item['priority'],
-                    'alasan_pengajuan' => null,   // jasa tidak butuh alasan ini
+                    'alasan_pengajuan' => null,
                     'reason' => $item['reason'],
                     'service_category' => $category,
                     'item_name' => $item['item_name'],
@@ -545,6 +527,7 @@ class AssetRequestController extends Controller
                 $rules["receipt_proof_files.{$item->id}"] = 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120';
             } elseif ($item->item_type === 'Fisik') {
                 $rules["brand.{$item->id}"] = 'required|string|max:255';
+                $rules["model.{$item->id}"] = 'nullable|string|max:255'; // TAMBAHAN: Model
                 $rules["prices.{$item->id}"] = 'required|numeric|min:0';
                 for ($i = 0; $i < $item->quantity; $i++) {
                     $rules["images.{$item->id}.{$i}"] = 'required|image|mimes:jpg,jpeg,png,webp|max:2048';
@@ -592,19 +575,24 @@ class AssetRequestController extends Controller
                         'receipt_proof_file' => $proofPath,
                     ]);
                 } elseif ($item->item_type === 'Fisik') {
+
+                    // 1. SIMPAN BATCH
+                    $batch = AssetBatch::create([
+                        'asset_type_id' => $item->asset_type_id,
+                        'name' => $item->item_name,
+                        'brand' => $validated['brand'][$item->id],
+                        'model' => $validated['model'][$item->id] ?? $item->specification,
+                        'price' => $validated['prices'][$item->id],
+                        'purchase_date' => $validated['purchase_date'],
+                    ]);
+
                     for ($i = 0; $i < $item->quantity; $i++) {
                         $unitImagePath = $request->file("images.{$item->id}.{$i}")->store('assets', 'public');
 
+                        // 2. SIMPAN UNIT
                         $asset = new Asset;
-                        $asset->name = ! empty($validated['unit_names'][$item->id][$i] ?? null)
-                            ? $validated['unit_names'][$item->id][$i]
-                            : $item->item_name;
-                        $asset->asset_type_id = $item->asset_type_id;
-                        $asset->brand = $validated['brand'][$item->id];
+                        $asset->asset_batch_id = $batch->id;
                         $asset->serial_number = $validated['serial_numbers'][$item->id][$i];
-                        $asset->price = $validated['prices'][$item->id];
-                        $asset->purchase_date = $validated['purchase_date'];
-                        $asset->expired_at = $validated['expired_dates'][$item->id][$i] ?? null;
                         $asset->location = $locationString;
                         $asset->location_id = $validated['location_id'] ?? null;
                         $asset->location_detail = $validated['location_detail'] ?? null;
@@ -669,9 +657,9 @@ class AssetRequestController extends Controller
 
                         session()->flash('replacement_notification', [
                             'old_asset_id' => $oldAsset->asset_id,
-                            'old_asset_name' => $oldAsset->name,
+                            'old_asset_name' => $oldAsset->batch->name ?? 'Aset',
                             'new_asset_id' => $newAsset->asset_id,
-                            'new_asset_name' => $newAsset->name,
+                            'new_asset_name' => $newAsset->batch->name ?? 'Aset',
                         ]);
                     }
                 }
@@ -689,10 +677,6 @@ class AssetRequestController extends Controller
         }
     }
 
-    /**
-     * Fase 4: form penyelesaian jasa — hanya untuk Sarpras/Admin,
-     * status harus "Dana Cair" dan dokumen bertipe jasa.
-     */
     public function showCompleteServiceForm(AssetRequest $assetRequest)
     {
         if (! in_array(Auth::user()->level, ['Sarpras', 'Admin'])) {
@@ -710,10 +694,6 @@ class AssetRequestController extends Controller
         return view('requests.complete-service', compact('assetRequest'));
     }
 
-    /**
-     * Fase 4: simpan penyelesaian jasa — upload BAST, catat vendor & biaya real.
-     * Kalau semua item sudah selesai, ubah status header → "Selesai".
-     */
     public function completeService(Request $request, AssetRequest $assetRequest)
     {
         if (! in_array(Auth::user()->level, ['Sarpras', 'Admin'])) {
@@ -728,7 +708,6 @@ class AssetRequestController extends Controller
 
         $assetRequest->load('serviceItems');
 
-        // Validasi per item: setiap item wajib diisi executor & minimal 1 BAST per dokumen
         $rules = [
             'completion_date' => 'required|date',
             'items' => 'required|array',
@@ -745,9 +724,8 @@ class AssetRequestController extends Controller
         DB::beginTransaction();
         try {
             foreach ($assetRequest->serviceItems as $item) {
-                $bastPath = $item->bast_file; // default: simpan file lama
+                $bastPath = $item->bast_file;
                 if ($request->hasFile("items.{$item->id}.bast_file")) {
-                    // Hapus file lama kalau ada
                     if ($item->bast_file && \Illuminate\Support\Facades\Storage::disk('public')->exists($item->bast_file)) {
                         \Illuminate\Support\Facades\Storage::disk('public')->delete($item->bast_file);
                     }
@@ -763,7 +741,6 @@ class AssetRequestController extends Controller
                 ]);
             }
 
-            // Semua item sudah diupdate → status header menjadi "Selesai"
             $assetRequest->update(['status' => 'Selesai']);
 
             DB::commit();
@@ -781,9 +758,7 @@ class AssetRequestController extends Controller
     public function destroy(AssetRequest $assetRequest)
     {
         $this->authorize('delete', $assetRequest);
-
         $assetRequest->delete();
-
         return redirect()->route('requests.index')->with('success', 'Pengajuan berhasil dihapus!');
     }
 
@@ -904,11 +879,8 @@ class AssetRequestController extends Controller
 
     private function updateRequestStatus(AssetRequest $assetRequest)
     {
-        // Load kedua relasi — karena satu dokumen bisa berisi aset, jasa, atau campuran
-        // (secara ideal tidak campuran, tapi aman untuk handle keduanya).
         $assetRequest->load('items', 'serviceItems');
 
-        // Gabung item aset + jasa untuk dihitung
         $allItems = $assetRequest->items->concat($assetRequest->serviceItems);
 
         $pending = $allItems->where('approval_status', 'pending')->count();
@@ -934,7 +906,6 @@ class AssetRequestController extends Controller
             ]);
         }
 
-        // Rollover deferred — pisahkan aset vs jasa
         $deferredAssetItems = $assetRequest->items->where('approval_status', 'deferred');
         if ($deferredAssetItems->count() > 0) {
             $this->rolloverDeferredItems($assetRequest, $deferredAssetItems);
@@ -1011,23 +982,12 @@ class AssetRequestController extends Controller
         ]);
     }
 
-    /**
-     * Fase 3.5: rollover item jasa yang ditangguhkan Rektor ke draft bulan depan.
-     * Paralel dengan rolloverDeferredItems() — bedanya item disimpan di tabel
-     * service_request_items, bukan asset_request_items.
-     *
-     * Catatan: RolloverLog sengaja tidak dicatat di sini karena skema tabelnya
-     * spesifik untuk item aset (FK ke asset_request_items). Jejak rollover jasa
-     * tetap terlacak lewat kolom `rolled_from_item_id` di service_request_items.
-     */
     private function rolloverDeferredServiceItems(AssetRequest $assetRequest, $deferredItems)
     {
         $nextMonth = now()->addMonth();
         $targetMonth = $nextMonth->month;
         $targetYear = $nextMonth->year;
 
-        // Cari atau buat draft pengajuan bulan depan — sama tipe request (jasa)
-        // dan sama service_category
         $existingDraft = AssetRequest::where('unit_id', $assetRequest->unit_id)
             ->where('period_month', $targetMonth)
             ->where('period_year', $targetYear)
@@ -1063,7 +1023,7 @@ class AssetRequestController extends Controller
                 'quantity' => $item->quantity,
                 'unit' => $item->unit,
                 'estimated_price_per_unit' => $item->estimated_price_per_unit,
-                'service_data' => $item->service_data,   // copy JSON
+                'service_data' => $item->service_data,
                 'approval_status' => 'pending',
                 'rolled_from_item_id' => $item->id,
             ]);

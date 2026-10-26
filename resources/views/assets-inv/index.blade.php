@@ -184,8 +184,8 @@
                     @endforeach
                 </select>
 
-                {{-- 🔥 TOMBOL PANDUAN DITAMBAHKAN DI SINI 🔥 --}}
-                <a href="{{ route('assets-inv.guide') }}" class="btn btn-secondary"
+                {{-- 🔥 TOMBOL PANDUAN (Terpadu) 🔥 --}}
+                <a href="{{ route('guides.index') }}" class="btn btn-secondary"
                     style="background: #f3f4f6; color: #374151; border: 1px solid #e5e7eb;">
                     📖 Panduan
                 </a>

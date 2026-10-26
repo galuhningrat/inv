@@ -7,7 +7,14 @@
     <div class="data-table-container">
         <div class="table-header">
             <h3 class="table-title">Daftar Aset Non-Fisik</h3>
-            <a href="{{ route('intangible-assets.create') }}" class="btn btn-primary">+ Tambah Aset Non-Fisik</a>
+            <div style="display: flex; gap: 0.75rem; align-items: center;">
+                {{-- 🔥 TOMBOL PANDUAN DITAMBAHKAN 🔥 --}}
+                <a href="{{ route('guides.index') }}" class="btn btn-secondary"
+                    style="background: #f3f4f6; color: #374151; border: 1px solid #e5e7eb;">
+                    📖 Panduan
+                </a>
+                <a href="{{ route('intangible-assets.create') }}" class="btn btn-primary">+ Tambah Aset Non-Fisik</a>
+            </div>
         </div>
 
         {{-- 🔥 POIN 15: FORM PENCARIAN & FILTER 🔥 --}}
@@ -46,7 +53,8 @@
                                 Aktif</option>
                             <option value="Ditangguhkan" {{ request('status') === 'Ditangguhkan' ? 'selected' : '' }}>
                                 Ditangguhkan</option>
-                            <option value="Dihentikan" {{ request('status') === 'Dihentikan' ? 'selected' : '' }}>Dihentikan
+                            <option value="Dihentikan" {{ request('status') === 'Dihentikan' ? 'selected' : '' }}>
+                                Dihentikan
                             </option>
                             <option value="Kadaluarsa" {{ request('status') === 'Kadaluarsa' ? 'selected' : '' }}>
                                 Kadaluarsa</option>

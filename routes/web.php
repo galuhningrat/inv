@@ -31,9 +31,17 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/api/stats', [DashboardController::class, 'getStats'])->name('api.stats');
 
+    // 🔥 POIN BARU: Panduan Terpadu (Fisik & Non-Fisik)
+    Route::get('/guides', function () {
+        return view('guides.index');
+    })->name('guides.index');
+
     // Assets Management
     Route::middleware(['level:assets-inv'])->group(function () {
-        Route::get('/assets-inv/panduan', [AssetController::class, 'guide'])->name('assets-inv.guide');
+        // Redirect URL lama ke halaman panduan terpadu yang baru
+        Route::get('/assets-inv/panduan', function () {
+            return redirect()->route('guides.index');
+        })->name('assets-inv.guide');
 
         Route::get('/assets-inv', [AssetController::class, 'index'])->name('assets-inv.index');
         Route::get('/assets-inv/create', [AssetController::class, 'create'])->name('assets-inv.create');

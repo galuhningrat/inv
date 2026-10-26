@@ -147,7 +147,7 @@ class AssetType extends Model
                 'max_qty' => 1,
                 'is_static_asset' => true,
                 'hide_condition' => true,
-                'hide_image' => true, // 🔥 TAMBAHKAN BARIS INI
+                'hide_image' => true,
                 'subkategori' => ['label' => 'Status Kepemilikan', 'type' => 'select', 'options' => [
                     'HM' => 'Hak Milik', 'HGB' => 'Hak Guna Bangunan', 'HGU' => 'Hak Guna Usaha', 'lainnya' => 'Lainnya',
                 ], 'required' => true, 'in_batch' => true],
@@ -172,7 +172,7 @@ class AssetType extends Model
                 'max_qty' => 1,
                 'is_static_asset' => true,
                 'hide_condition' => true,
-                'hide_image' => true, // 🔥 TAMBAHKAN BARIS INI
+                'hide_image' => true,
                 'subkategori' => ['label' => 'Jenis Bangunan', 'type' => 'select', 'options' => [
                     'perkantoran' => 'Perkantoran', 'laboratorium' => 'Laboratorium', 'kelas' => 'Ruang Kelas', 'lainnya' => 'Lainnya',
                 ], 'required' => true, 'in_batch' => true],
@@ -182,6 +182,14 @@ class AssetType extends Model
                 'no_izin_bangunan' => ['label' => 'No. IMB / PBG', 'type' => 'text', 'required' => false, 'in_batch' => true],
                 'status_kepemilikan' => ['label' => 'Status Kepemilikan', 'type' => 'text', 'required' => false, 'in_batch' => true],
                 'file_imb' => ['label' => 'Upload IMB/PBG (PDF/Gambar)', 'type' => 'file', 'required' => false, 'in_batch' => true],
+                // 🔥 TAMBAHAN FIELD FOTO GEDUNG 🔥
+                'foto_gedung' => [
+                    'label' => 'Upload Foto Gedung/Bangunan (Bisa lebih dari 1)',
+                    'type' => 'file',
+                    'required' => false,
+                    'in_batch' => true,
+                    'multiple' => true,
+                ],
             ],
 
             'PRS' => [

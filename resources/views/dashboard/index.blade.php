@@ -6,7 +6,6 @@
 @section('content')
     <div id="dashboardContent" class="page-content">
         <!-- Stats Grid -->
-        {{-- Di section content, perbaiki grid layout --}}
         <div class="stats-grid">
             @foreach ($stats as $key => $value)
                 <div class="stat-card">
@@ -43,6 +42,60 @@
                 </div>
             @endforeach
         </div>
+
+        {{-- 🔥 POIN 12: WIDGET PENGINGAT MASA BERLAKU ASET NON-FISIK 🔥 --}}
+        @if (isset($expiringIntangibleAssets) && $expiringIntangibleAssets->count() > 0)
+            <div class="data-table-container" style="margin-bottom: 2rem; border-left: 4px solid #f59e0b;">
+                <div class="table-header">
+                    <h3 class="table-title">⏰ Pengingat Masa Berlaku Aset Non-Fisik</h3>
+                    <span
+                        style="background: #fef3c7; color: #92400e; padding: 0.25rem 0.75rem; border-radius: 999px; font-size: 0.85rem; font-weight: 600;">
+                        {{ $expiringIntangibleAssets->count() }} Aset Perlu Perhatian
+                    </span>
+                </div>
+                <div class="table-wrapper" style="padding: 0 1rem 1rem;">
+                    <table class="data-table" style="width: 100%;">
+                        <thead>
+                            <tr>
+                                <th>Kode Aset</th>
+                                <th>Nama Aset</th>
+                                <th>Kategori</th>
+                                <th>Tanggal Kedaluwarsa</th>
+                                <th>Sisa Waktu</th>
+                                <th>Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($expiringIntangibleAssets as $asset)
+                                <tr>
+                                    <td><strong>{{ $asset->asset_code }}</strong></td>
+                                    <td>{{ $asset->name }}</td>
+                                    <td>{{ \App\Models\IntangibleAsset::CATEGORIES[$asset->category] ?? $asset->category }}
+                                    </td>
+                                    <td>{{ $asset->expiry_date->format('d M Y') }}</td>
+                                    <td>
+                                        @php $days = $asset->days_until_expiry; @endphp
+                                        @if ($days < 0)
+                                            <span style="color: #ef4444; font-weight: 600;">Kedaluwarsa</span>
+                                        @elseif($days <= 7)
+                                            <span style="color: #ef4444; font-weight: 600;">{{ $days }} hari
+                                                lagi</span>
+                                        @else
+                                            <span style="color: #f59e0b; font-weight: 600;">{{ $days }} hari
+                                                lagi</span>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        <a href="{{ route('intangible-assets.show', $asset) }}" class="btn btn-secondary"
+                                            style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">Detail</a>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        @endif
 
         <!-- Chart -->
         <div class="chart-container">
@@ -136,7 +189,7 @@
                                     const value = context.parsed;
                                     const total = context.dataset.data.reduce((a, b) => a + b, 0);
                                     const percentage = total > 0 ? Math.round((value / total) * 100) :
-                                    0;
+                                        0;
                                     return `${context.label}: ${value} aset (${percentage}%)`;
                                 }
                             }

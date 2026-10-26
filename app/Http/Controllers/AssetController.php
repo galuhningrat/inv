@@ -105,11 +105,15 @@ class AssetController extends Controller
         if ($unitId) {
             $query->where('unit_id', $unitId);
         }
+
+        // 🔥 POIN 13: Handle Filter Status Baru
         if ($status) {
             if ($status === 'Tersedia') {
                 $query->where('status', 'Aktif');
             } elseif ($status === 'Kadaluarsa') {
                 $query->where('status', 'Kadaluarsa');
+            } elseif (in_array($status, ['Belum Aktif', 'Ditangguhkan', 'Dihentikan'])) {
+                $query->where('status', $status);
             }
         }
 
@@ -199,11 +203,15 @@ class AssetController extends Controller
         if ($unitId) {
             $intangibleQuery->where('unit_id', $unitId);
         }
+
+        // 🔥 POIN 13: Handle Filter Status Baru
         if ($status) {
             if ($status === 'Tersedia') {
                 $intangibleQuery->where('status', 'Aktif');
             } elseif ($status === 'Kadaluarsa') {
                 $intangibleQuery->where('status', 'Kadaluarsa');
+            } elseif (in_array($status, ['Belum Aktif', 'Ditangguhkan', 'Dihentikan'])) {
+                $intangibleQuery->where('status', $status);
             }
         }
 
@@ -213,13 +221,26 @@ class AssetController extends Controller
                 $first = $group->first();
                 $kadaluarsa = $group->where('status', 'Kadaluarsa')->count();
 
+                // 🔥 POIN 13: Tampilkan status non-fisik secara dinamis di halaman gabungan
+                if ($kadaluarsa > 0) {
+                    $statusLabel = "{$kadaluarsa} Kadaluarsa";
+                } elseif ($group->where('status', 'Dihentikan')->count() > 0) {
+                    $statusLabel = 'Dihentikan';
+                } elseif ($group->where('status', 'Ditangguhkan')->count() > 0) {
+                    $statusLabel = 'Ditangguhkan';
+                } elseif ($group->where('status', 'Belum Aktif')->count() > 0) {
+                    $statusLabel = 'Belum Aktif';
+                } else {
+                    $statusLabel = 'Aktif';
+                }
+
                 return (object) [
                     'type' => 'Non-Fisik',
                     'name' => $first->name,
                     'category_label' => $first->category,
                     'unit_label' => $first->unit->name ?? '-',
                     'quantity' => $group->count(),
-                    'status_label' => $kadaluarsa > 0 ? "{$kadaluarsa} Kadaluarsa" : 'Aktif',
+                    'status_label' => $statusLabel,
                     'detail_route' => route('intangible-assets.show', $first->sample_id ?? $first->id),
                 ];
             });
@@ -326,7 +347,7 @@ class AssetController extends Controller
         foreach ($schema as $key => $field) {
             if (isset($field['in_batch'])) {
                 if (($field['type'] ?? '') === 'file') {
-                    // 🔥 Handling multiple file di update
+                    // Handling multiple file di update
                     if (! empty($field['multiple'])) {
                         if ($request->hasFile("category_data.{$key}")) {
                             $existingPaths = $categoryData[$key] ?? [];
@@ -465,7 +486,7 @@ class AssetController extends Controller
                 } elseif ($field['type'] === 'select' && isset($field['options'])) {
                     $rule .= '|in:'.implode(',', array_keys($field['options']));
                 } elseif ($field['type'] === 'file') {
-                    // 🔥 Handling multiple file
+                    // Handling multiple file
                     if (! empty($field['multiple'])) {
                         $rules["category_data.{$key}"] = $rule.'|array';
                         $rules["category_data.{$key}.*"] = 'file|mimes:pdf,jpg,jpeg,png|max:5120';
@@ -504,7 +525,7 @@ class AssetController extends Controller
             $categoryData = $request->input('category_data', []);
             if ($request->hasFile('category_data')) {
                 foreach ($request->file('category_data') as $key => $fileOrFiles) {
-                    // 🔥 Jika berupa array (multiple file)
+                    // Jika berupa array (multiple file)
                     if (is_array($fileOrFiles)) {
                         $paths = [];
                         foreach ($fileOrFiles as $file) {

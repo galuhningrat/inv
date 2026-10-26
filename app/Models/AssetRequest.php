@@ -15,9 +15,6 @@ class AssetRequest extends Model
      * Tipe dokumen:
      *  - 'aset' → dokumen hasil submit form Pengajuan Aset (dynamic repeater)
      *  - 'jasa' → dokumen hasil submit form Pengajuan Jasa (salah satu sub-kategori)
-     *
-     * Nilai ini disimpan di header supaya halaman riwayat (index) bisa
-     * memfilter/menampilkan tab "Aset" vs "Jasa" tanpa harus join ke tabel item.
      */
     public const TYPE_ASET = 'aset';
 
@@ -84,15 +81,6 @@ class AssetRequest extends Model
     public static function generateRequestId()
     {
         return DB::transaction(function () {
-            // withTrashed() WAJIB: AssetRequest pakai SoftDeletes, dan
-            // AssetRequestPolicy::delete() mengizinkan Sarpras/Admin menghapus
-            // pengajuan berstatus Pending — soft-delete, bukan hilang permanen. Tanpa
-            // withTrashed() di sini, REQ-XXX dengan nomor tertinggi yang kebetulan
-            // terhapus akan terlewat dari pencarian "nomor terakhir", dan nomor yang
-            // sama bisa dicoba dipakai lagi — bug yang persis sama yang baru saja
-            // bikin "qr_codes_qr_code_id_unique" collide di modul Aset Fisik, cuma
-            // di sini belum sempat terjadi karena belum ada yang menghapus request
-            // dengan nomor tertinggi.
             $last = self::withTrashed()
                 ->where('request_id', 'LIKE', 'REQ-%')
                 ->lockForUpdate()
@@ -154,7 +142,6 @@ class AssetRequest extends Model
 
     /**
      * Item aset (fisik / non-fisik) yang diajukan pada dokumen ini.
-     * Setelah Fase 2, masing-masing item punya unit_id & priority sendiri.
      */
     public function items()
     {
@@ -163,7 +150,6 @@ class AssetRequest extends Model
 
     /**
      * Item jasa yang diajukan pada dokumen ini (Fase 3).
-     * Field variabel per sub-kategori tersimpan di kolom JSON service_data.
      */
     public function serviceItems()
     {
@@ -171,46 +157,34 @@ class AssetRequest extends Model
     }
 
     /**
-     * Total untuk pengajuan jasa (pakai serviceItems).
-     * Override getter lama supaya view jasa tetap jalan tanpa refactor.
+     * 🔥 POIN 16: Relasi ke aset non-fisik yang DITAUTKAN ke pengajuan ini.
+     * Digunakan untuk mencegah duplikasi registrasi (1 item non-fisik
+     * seharusnya hanya menghasilkan 1 record di intangible_assets).
      */
-    public function getServiceTotalAttribute()
+    public function intangibleAssets()
     {
-        return $this->serviceItems->sum(fn($item) => $item->subtotal);
+        return $this->hasMany(IntangibleAsset::class, 'asset_request_id');
     }
 
     // ============================================================
     //  ACCESSOR — View Helpers
     // ============================================================
 
-    /**
-     * Gabungan item aset + jasa. Berguna untuk halaman reviewer/show
-     * yang perlu menampilkan semuanya dalam satu tabel.
-     *
-     * @return \Illuminate\Support\Collection
-     */
+    public function getServiceTotalAttribute()
+    {
+        return $this->serviceItems->sum(fn ($item) => $item->subtotal);
+    }
+
     public function getAllItemsAttribute()
     {
         return $this->items->concat($this->serviceItems);
     }
 
-    /**
-     * Group item aset berdasarkan Unit Pengaju — dipakai di halaman reviewer
-     * (approval / show) supaya Ketua STTI bisa melihat "Header Lab Komputer"
-     * dengan tabel item di bawahnya, terpisah dari "Header Lab Elektro".
-     *
-     * @return \Illuminate\Support\Collection<int, \Illuminate\Support\Collection>
-     */
     public function getAssetItemsGroupedByUnitAttribute()
     {
         return $this->items->groupBy('unit_id');
     }
 
-    /**
-     * Versi gabungan (aset + jasa) di-group by unit — untuk halaman ringkasan
-     * yang menampilkan campuran item (jarang terjadi di satu request, tapi
-     * berguna saat rollover membuat dokumen dengan tipe item beragam).
-     */
     public function getAllItemsGroupedByUnitAttribute()
     {
         return $this->all_items->groupBy('unit_id');
@@ -234,7 +208,6 @@ class AssetRequest extends Model
     //  AGREGAT — Total & Summary
     // ============================================================
 
-    // Cek apakah sudah ada pengajuan di bulan ini untuk unit tertentu
     public static function hasRequestThisMonth($unitId)
     {
         return self::query()
@@ -244,40 +217,36 @@ class AssetRequest extends Model
             ->exists();
     }
 
-    // Total estimasi harga (hanya item yang disetujui) — aset + jasa
     public function getApprovedTotalAttribute()
     {
         $assetApproved = $this->items
             ->where('approval_status', 'approved')
-            ->sum(fn($item) => $item->subtotal);
+            ->sum(fn ($item) => $item->subtotal);
 
         $serviceApproved = $this->serviceItems
             ->where('approval_status', 'approved')
-            ->sum(fn($item) => $item->subtotal);
+            ->sum(fn ($item) => $item->subtotal);
 
         return $assetApproved + $serviceApproved;
     }
 
-    // Total estimasi harga (semua item) — aset + jasa
     public function getTotalEstimatedPriceAttribute()
     {
-        return $this->items->sum(fn($item) => $item->subtotal)
-            + $this->serviceItems->sum(fn($item) => $item->subtotal);
+        return $this->items->sum(fn ($item) => $item->subtotal)
+            + $this->serviceItems->sum(fn ($item) => $item->subtotal);
     }
 
-    // Total quantity — aset + jasa
     public function getTotalQuantityAttribute()
     {
         return $this->items->sum('quantity') + $this->serviceItems->sum('quantity');
     }
 
-    // Approval summary — aset + jasa
     public function getApprovalSummaryAttribute()
     {
         $allItems = $this->items->concat($this->serviceItems);
 
         return [
-            'pending'  => $allItems->where('approval_status', 'pending')->count(),
+            'pending' => $allItems->where('approval_status', 'pending')->count(),
             'approved' => $allItems->where('approval_status', 'approved')->count(),
             'rejected' => $allItems->where('approval_status', 'rejected')->count(),
             'deferred' => $allItems->where('approval_status', 'deferred')->count(),
@@ -288,7 +257,7 @@ class AssetRequest extends Model
     {
         if (
             $this->status === 'Pending' &&
-            $this->items->contains(fn($item) => ! is_null($item->rolled_from_item_id))
+            $this->items->contains(fn ($item) => ! is_null($item->rolled_from_item_id))
         ) {
             return 'Menunggu Verifikasi PJ Pengadaan untuk Pengadaan Bulan Berikutnya';
         }

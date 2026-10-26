@@ -3,11 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Asset;
-use App\Models\Borrowing;
-use App\Models\Maintenance;
-use App\Models\AssetRequest;
 use App\Models\User;
-use Illuminate\Http\Request;
 
 class DashboardController extends Controller
 {
@@ -30,12 +26,15 @@ class DashboardController extends Controller
             'data' => [
                 $stats['available_assets'],
                 $stats['borrowed_assets'],
-                $stats['maintenance_assets']
+                $stats['maintenance_assets'],
             ],
-            'colors' => ['#10b981', '#f59e0b', '#ef4444']
+            'colors' => ['#10b981', '#f59e0b', '#ef4444'],
         ];
 
-        return view('dashboard.index', compact('stats', 'recentAssets', 'chartData'));
+        // 🔥 POIN 12: Ambil aset non-fisik yang mendekati kedaluwarsa
+        $expiringIntangibleAssets = \App\Models\IntangibleAsset::getExpiringSoonAssets();
+
+        return view('dashboard.index', compact('stats', 'recentAssets', 'chartData', 'expiringIntangibleAssets'));
     }
 
     public function getStats()

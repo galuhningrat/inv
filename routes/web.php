@@ -51,6 +51,14 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/intangible-assets', [IntangibleAssetController::class, 'store'])->name('intangible-assets.store');
         Route::get('/intangible-assets/{intangibleAsset}', [IntangibleAssetController::class, 'show'])->name('intangible-assets.show');
 
+        Route::get('/intangible-assets/{intangibleAsset}/edit', [IntangibleAssetController::class, 'edit'])->name('intangible-assets.edit');
+        Route::put('/intangible-assets/{intangibleAsset}', [IntangibleAssetController::class, 'update'])->name('intangible-assets.update');
+
+        Route::delete('/intangible-assets/{intangibleAsset}', [IntangibleAssetController::class, 'destroy'])->name('intangible-assets.destroy');
+
+        // Rute download file privat
+        Route::get('/intangible-assets/{intangibleAsset}/download-certificate', [IntangibleAssetController::class, 'downloadCertificate'])->name('intangible-assets.download-certificate');
+
         // API for modal
         Route::get('/api/assets/{asset}/detail', [AssetController::class, 'showModal'])->name('api.assets.detail');
 

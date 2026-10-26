@@ -33,7 +33,7 @@
                     class="asset-type-card {{ request()->routeIs('intangible-assets.create') ? 'active' : '' }}">
                     <div class="asset-type-card__icon">💾</div>
                     <div class="asset-type-card__body">
-                        <h5>Aset Non-Fisik <span class="badge-prototype">Prototipe</span></h5>
+                        <h5>Aset Non-Fisik</h5>
                         <p>Lisensi software, HAKI, jurnal ilmiah, domain/hosting</p>
                     </div>
                     @if (request()->routeIs('intangible-assets.create'))
@@ -240,29 +240,34 @@
                     </div>
                 </div>
 
-                <hr style="margin: 1.5rem 0;">
-                <h4 style="margin-bottom: 1rem;">Kuantitas &amp; Detail Per Unit</h4>
+                {{-- 🔥 UNIT DETAILS SECTION (SELALU TAMPIL) 🔥 --}}
+                <div id="unitDetailsSection">
+                    <hr style="margin: 1.5rem 0;">
+                    <h4 style="margin-bottom: 1rem;">Kuantitas &amp; Detail Per Unit</h4>
 
-                <div class="form-group">
-                    <label for="quantity">Kuantitas <span style="color: red;">*</span></label>
-                    <input type="number" id="quantity" name="quantity" class="form-control" value="1"
-                        min="1" max="100" onchange="renderUnitBlocks()" required>
-                </div>
+                    <div class="form-group">
+                        <label for="quantity">Kuantitas <span style="color: red;">*</span></label>
+                        <input type="number" id="quantity" name="quantity" class="form-control" value="1"
+                            min="1" max="100" onchange="renderUnitBlocks()" required>
+                    </div>
 
-                <div class="unit-table-wrapper">
-                    <table class="unit-table" id="unitTable">
-                        <thead>
-                            <tr id="tableHeaderRow">
-                                <th style="width: 4rem;">Unit Ke</th>
-                                <th class="general-serial-header">Nomor Seri Pabrik (S/N) <span
-                                        style="color: red;">*</span></th>
-                                <th id="kondisiHeader" style="width: 10rem;">Kondisi <span style="color: red;">*</span>
-                                </th>
-                                <th id="fotoHeader" style="width: 14rem;">Foto Unit</th>
-                            </tr>
-                        </thead>
-                        <tbody id="unitBlocksContainer"></tbody>
-                    </table>
+                    {{-- 🔥 TAMBAHKAN CLASS unit-table-wrapper UNTUK DISEMBUNYIKAN 🔥 --}}
+                    <div class="unit-table-wrapper">
+                        <table class="unit-table" id="unitTable">
+                            <thead>
+                                <tr id="tableHeaderRow">
+                                    <th style="width: 4rem;">Unit Ke</th>
+                                    <th class="general-serial-header">Nomor Seri Pabrik (S/N) <span
+                                            style="color: red;">*</span></th>
+                                    <th id="kondisiHeader" style="width: 10rem;">Kondisi <span
+                                            style="color: red;">*</span>
+                                    </th>
+                                    <th id="fotoHeader" style="width: 14rem;">Foto Unit</th>
+                                </tr>
+                            </thead>
+                            <tbody id="unitBlocksContainer"></tbody>
+                        </table>
+                    </div>
                 </div>
 
                 <div class="btn-group" style="margin-top: 1.5rem;">
@@ -546,20 +551,25 @@
             const qtyInput = document.getElementById('quantity');
             const locationSection = document.getElementById('locationSection');
             const accountingSection = document.getElementById('accountingSection');
+            const unitTableWrapper = document.querySelector('.unit-table-wrapper'); // 🔥 Target Tabelnya Saja
 
-            // Reset
+            // Reset Container
             document.getElementById('batchFieldsContainer').innerHTML = '';
             dynamicBatchContainer.style.display = 'none';
-            generalBrand.style.display = 'block';
-            generalModel.style.display = 'block';
-            generalSerialHeader.style.display = 'table-cell';
+
+            // Reset Form Umum
+            if (generalBrand) generalBrand.style.display = 'block';
+            if (generalModel) generalModel.style.display = 'block';
+            if (generalSerialHeader) generalSerialHeader.style.display = 'table-cell';
 
             // Reset Kuantitas & Section
-            qtyInput.disabled = false;
+            qtyInput.readOnly = false; // 🔥 Gunakan readOnly agar value tetap tersubmit
             qtyInput.max = 100;
             if (locationSection) locationSection.style.display = 'block';
             if (accountingSection) accountingSection.style.display = 'block';
+            if (unitTableWrapper) unitTableWrapper.style.display = 'block'; // 🔥 Tampilkan tabel secara default
 
+            // Jika tidak ada tipe yang dipilih, hentikan proses
             if (!typeId || !window.assetSchemas[typeId]) {
                 currentSchema = {};
                 renderUnitBlocks();
@@ -567,13 +577,12 @@
             }
 
             currentSchema = window.assetSchemas[typeId];
-
             const isStaticAsset = currentSchema.is_static_asset || false;
 
             if (currentSchema.hide_general) {
-                generalBrand.style.display = 'none';
-                generalModel.style.display = 'none';
-                generalSerialHeader.style.display = 'none';
+                if (generalBrand) generalBrand.style.display = 'none';
+                if (generalModel) generalModel.style.display = 'none';
+                if (generalSerialHeader) generalSerialHeader.style.display = 'none';
                 document.getElementById('brand').removeAttribute('required');
             } else {
                 document.getElementById('brand').setAttribute('required', 'required');
@@ -582,12 +591,16 @@
             if (currentSchema.max_qty) {
                 qtyInput.value = currentSchema.max_qty;
                 qtyInput.max = currentSchema.max_qty;
-                qtyInput.disabled = true;
+                qtyInput.readOnly = true; // 🔥 Kunci di angka 1
             }
 
             if (isStaticAsset) {
                 if (locationSection) locationSection.style.display = 'none';
                 if (accountingSection) accountingSection.style.display = 'none';
+
+                // 🔥 SEMBUNYIKAN HANYA TABELNYA, BUKAN INPUT KUANTITASNYA 🔥
+                if (unitTableWrapper) unitTableWrapper.style.display = 'none';
+
                 const unitSelect = document.getElementById('unit_id');
                 const locSelect = document.getElementById('location_id');
                 if (unitSelect) unitSelect.removeAttribute('required');
@@ -604,7 +617,6 @@
             const kondisiHeader = document.getElementById('kondisiHeader');
             const fotoHeader = document.getElementById('fotoHeader');
 
-            // 🔥 Sembunyikan header Kondisi & Foto jika flag aktif
             if (kondisiHeader) {
                 kondisiHeader.style.display = currentSchema.hide_condition ? 'none' : 'table-cell';
             }
@@ -614,6 +626,11 @@
 
             container.innerHTML = '';
             let hasBatchFields = false;
+
+            if (headerRow) {
+                const existingDynamicHeaders = headerRow.querySelectorAll('.dynamic-header');
+                existingDynamicHeaders.forEach(header => header.remove());
+            }
 
             for (const [key, field] of Object.entries(currentSchema)) {
                 if (field.in_batch) {
@@ -657,14 +674,16 @@
                 dynamicBatchContainer.style.display = 'block';
             }
 
-            for (const [key, field] of Object.entries(currentSchema)) {
-                if (field.in_unit) {
-                    const th = document.createElement('th');
-                    th.className = `conditional-header dynamic-header`;
-                    th.dataset.field = key;
-                    th.style.display = field.show_if ? 'none' : 'table-cell';
-                    th.innerHTML = `${field.label} ${field.required ? '<span style="color:red;">*</span>' : ''}`;
-                    headerRow.insertBefore(th, kondisiHeader);
+            if (headerRow && kondisiHeader) {
+                for (const [key, field] of Object.entries(currentSchema)) {
+                    if (field.in_unit) {
+                        const th = document.createElement('th');
+                        th.className = `conditional-header dynamic-header`;
+                        th.dataset.field = key;
+                        th.style.display = field.show_if ? 'none' : 'table-cell';
+                        th.innerHTML = `${field.label} ${field.required ? '<span style="color:red;">*</span>' : ''}`;
+                        headerRow.insertBefore(th, kondisiHeader);
+                    }
                 }
             }
 
@@ -714,7 +733,7 @@
             const container = document.getElementById('unitBlocksContainer');
             const hideGeneral = currentSchema.hide_general || false;
             const hideCondition = currentSchema.hide_condition || false;
-            const hideImage = currentSchema.hide_image || false; // 🔥 Definisikan hideImage
+            const hideImage = currentSchema.hide_image || false;
 
             let qty = parseInt(qtyInput.value);
             if (isNaN(qty) || qty < 1) qty = 1;
@@ -765,7 +784,6 @@
                     }
                 }
 
-                // 🔥 LOGIKA KONDISI
                 let conditionHtml = '';
                 if (hideCondition) {
                     conditionHtml = `<input type="hidden" name="conditions[]" value="Baik">`;
@@ -779,7 +797,6 @@
                     `;
                 }
 
-                // 🔥 RENDER BARIS DENGAN PENGECEKAN
                 rowHtml += `
                     <td style="display: ${hideCondition ? 'none' : 'table-cell'};">
                         ${conditionHtml}

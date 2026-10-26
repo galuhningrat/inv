@@ -7,6 +7,7 @@ use App\Models\Unit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -493,10 +494,24 @@ class IntangibleAssetController extends Controller
     {
         abort_unless(in_array(Auth::user()->level, ['Sarpras', 'Admin']), 403);
 
-        if (! $intangibleAsset->certificate_file || ! Storage::disk('local')->exists($intangibleAsset->certificate_file)) {
+        if (! $intangibleAsset->certificate_file) {
             abort(404, 'File tidak ditemukan.');
         }
 
-        return Storage::disk('local')->download($intangibleAsset->certificate_file);
+        $path = $intangibleAsset->certificate_file;
+
+        // Utamakan disk 'local' (lokasi baru)
+        if (Storage::disk('local')->exists($path)) {
+            return Storage::disk('local')->download($path);
+        }
+
+        // Fallback ke disk 'public' untuk data lama yang belum dimigrasi
+        if (Storage::disk('public')->exists($path)) {
+            Log::warning("Legacy certificate accessed: {$path}. Please run 'intangible:migrate-certificates'.");
+
+            return Storage::disk('public')->download($path);
+        }
+
+        abort(404, 'File tidak ditemukan di server.');
     }
 }

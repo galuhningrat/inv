@@ -19,13 +19,15 @@ class AssetBatch extends Model
         'purchase_date',
         'funding_source',
         'economic_life_years',
-        'residual_value'
+        'residual_value',
+        'category_data',
     ];
 
     protected $casts = [
         'purchase_date' => 'date',
         'price' => 'decimal:2',
         'residual_value' => 'decimal:2',
+        'category_data' => 'array',
     ];
 
     public function assetType()

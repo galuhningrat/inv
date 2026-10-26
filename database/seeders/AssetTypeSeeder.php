@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
 use App\Models\AssetType;
+use Illuminate\Database\Seeder;
 
 class AssetTypeSeeder extends Seeder
 {
@@ -19,7 +19,8 @@ class AssetTypeSeeder extends Seeder
         ];
 
         foreach ($types as $type) {
-            AssetType::create($type);
+            // 🔥 Ubah menjadi updateOrCreate
+            AssetType::updateOrCreate(['code' => $type['code']], $type);
         }
     }
 }

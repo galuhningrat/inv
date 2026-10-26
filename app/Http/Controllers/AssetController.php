@@ -275,7 +275,6 @@ class AssetController extends Controller
             abort(403, 'Hanya Sarpras yang dapat mengedit batch.');
         }
 
-        // 🔥 BERSIHKAN HARGA DARI KARAKTER ANEH (Titik, Koma, Spasi)
         if ($request->has('price')) {
             $request->merge(['price' => preg_replace('/[^0-9]/', '', $request->input('price'))]);
         }
@@ -304,9 +303,10 @@ class AssetController extends Controller
                 $rule = $field['required'] ? 'required' : 'nullable';
                 if ($field['type'] === 'number') {
                     $rule .= '|numeric';
-                }
-                if ($field['type'] === 'select' && isset($field['options'])) {
+                } elseif ($field['type'] === 'select' && isset($field['options'])) {
                     $rule .= '|in:'.implode(',', array_keys($field['options']));
+                } elseif ($field['type'] === 'file') {
+                    $rule .= '|file|mimes:pdf,jpg,jpeg,png|max:5120';
                 }
                 $rules["category_data.{$key}"] = $rule;
             }
@@ -320,6 +320,47 @@ class AssetController extends Controller
             $validated['residual_value'] = null;
         }
 
+        $categoryData = $batch->category_data ?? [];
+        $inputCategoryData = $request->input('category_data', []);
+
+        foreach ($schema as $key => $field) {
+            if (isset($field['in_batch'])) {
+                if (($field['type'] ?? '') === 'file') {
+                    // 🔥 Handling multiple file di update
+                    if (! empty($field['multiple'])) {
+                        if ($request->hasFile("category_data.{$key}")) {
+                            $existingPaths = $categoryData[$key] ?? [];
+                            if (! is_array($existingPaths)) {
+                                $existingPaths = $existingPaths ? [$existingPaths] : [];
+                            }
+
+                            foreach ($request->file("category_data.{$key}") as $file) {
+                                if ($file->isValid()) {
+                                    $existingPaths[] = $file->store('legal-documents/batch', 'public');
+                                }
+                            }
+                            $categoryData[$key] = $existingPaths;
+                        }
+                    } else {
+                        // Single file logic (sama seperti sebelumnya)
+                        if ($request->hasFile("category_data.{$key}")) {
+                            $file = $request->file("category_data.{$key}");
+                            if ($file->isValid()) {
+                                if (isset($categoryData[$key]) && Storage::disk('public')->exists($categoryData[$key])) {
+                                    Storage::disk('public')->delete($categoryData[$key]);
+                                }
+                                $categoryData[$key] = $file->store('legal-documents/batch', 'public');
+                            }
+                        }
+                    }
+                } else {
+                    if (isset($inputCategoryData[$key])) {
+                        $categoryData[$key] = $inputCategoryData[$key];
+                    }
+                }
+            }
+        }
+
         $batch->update([
             'asset_type_id' => $validated['asset_type_id'],
             'name' => $validated['name'],
@@ -330,7 +371,7 @@ class AssetController extends Controller
             'funding_source' => $validated['funding_source'] ?? null,
             'economic_life_years' => $validated['economic_life_years'] ?? null,
             'residual_value' => $validated['residual_value'] ?? null,
-            'category_data' => $request->input('category_data', []),
+            'category_data' => $categoryData,
         ]);
 
         return redirect()->route('assets-inv.group-detail', ['batch_id' => $batch->id])
@@ -367,12 +408,10 @@ class AssetController extends Controller
     {
         $this->authorize('create', Asset::class);
 
-        // Validasi Dasar untuk memastikan ID ada
         $request->validate([
             'asset_type_id' => 'required|exists:asset_types,id',
         ]);
 
-        // 🔥 BERSIHKAN HARGA DARI KARAKTER ANEH
         if ($request->has('price')) {
             $request->merge(['price' => preg_replace('/[^0-9]/', '', $request->input('price'))]);
         }
@@ -380,7 +419,6 @@ class AssetController extends Controller
             $request->merge(['residual_value' => preg_replace('/[^0-9]/', '', $request->input('residual_value'))]);
         }
 
-        // Cari data dengan aman (tanpa findOrFail agar tidak crash jika data hilang)
         $assetType = AssetType::find($request->input('asset_type_id'));
 
         if (! $assetType) {
@@ -424,9 +462,18 @@ class AssetController extends Controller
                 $rule = $field['required'] ? 'required' : 'nullable';
                 if ($field['type'] === 'number') {
                     $rule .= '|numeric';
-                }
-                if ($field['type'] === 'select' && isset($field['options'])) {
+                } elseif ($field['type'] === 'select' && isset($field['options'])) {
                     $rule .= '|in:'.implode(',', array_keys($field['options']));
+                } elseif ($field['type'] === 'file') {
+                    // 🔥 Handling multiple file
+                    if (! empty($field['multiple'])) {
+                        $rules["category_data.{$key}"] = $rule.'|array';
+                        $rules["category_data.{$key}.*"] = 'file|mimes:pdf,jpg,jpeg,png|max:5120';
+
+                        continue;
+                    } else {
+                        $rule .= '|file|mimes:pdf,jpg,jpeg,png|max:5120';
+                    }
                 }
 
                 if (isset($field['in_batch'])) {
@@ -454,6 +501,26 @@ class AssetController extends Controller
 
         DB::beginTransaction();
         try {
+            $categoryData = $request->input('category_data', []);
+            if ($request->hasFile('category_data')) {
+                foreach ($request->file('category_data') as $key => $fileOrFiles) {
+                    // 🔥 Jika berupa array (multiple file)
+                    if (is_array($fileOrFiles)) {
+                        $paths = [];
+                        foreach ($fileOrFiles as $file) {
+                            if ($file->isValid()) {
+                                $paths[] = $file->store('legal-documents/batch', 'public');
+                            }
+                        }
+                        $categoryData[$key] = $paths;
+                    }
+                    // Single file biasa
+                    elseif ($fileOrFiles->isValid()) {
+                        $categoryData[$key] = $fileOrFiles->store('legal-documents/batch', 'public');
+                    }
+                }
+            }
+
             $batch = AssetBatch::create([
                 'asset_type_id' => $validated['asset_type_id'],
                 'name' => $validated['name'],
@@ -464,7 +531,7 @@ class AssetController extends Controller
                 'funding_source' => $validated['funding_source'] ?? null,
                 'economic_life_years' => $validated['economic_life_years'] ?? null,
                 'residual_value' => $validated['residual_value'] ?? null,
-                'category_data' => $request->input('category_data', []),
+                'category_data' => $categoryData,
             ]);
 
             $created = 0;
@@ -475,6 +542,13 @@ class AssetController extends Controller
                     : null;
 
                 $unitData = $request->input("unit_data.{$i}", []);
+                if ($request->hasFile("unit_data.{$i}")) {
+                    foreach ($request->file("unit_data.{$i}") as $key => $file) {
+                        if (is_object($file) && $file->isValid()) {
+                            $unitData[$key] = $file->store('legal-documents/unit', 'public');
+                        }
+                    }
+                }
 
                 $newAssetId = Asset::generateAssetId($assetType->id);
 
@@ -494,7 +568,13 @@ class AssetController extends Controller
                     'unit_data' => $unitData,
                 ]);
 
-                QrCode::create(['asset_id' => $asset->id, 'code_content' => $asset->qr_code, 'status' => 'Aktif']);
+                QrCode::create([
+                    'qr_code_id' => 'QCD-'.str_pad($asset->id, 3, '0', STR_PAD_LEFT),
+                    'asset_id' => $asset->id,
+                    'code_content' => $asset->qr_code,
+                    'status' => 'Aktif',
+                ]);
+
                 $created++;
             }
 
@@ -587,16 +667,17 @@ class AssetController extends Controller
                 $rule = $field['required'] ? 'required' : 'nullable';
                 if ($field['type'] === 'number') {
                     $rule .= '|numeric';
-                }
-                if ($field['type'] === 'select' && isset($field['options'])) {
+                } elseif ($field['type'] === 'select' && isset($field['options'])) {
                     $rule .= '|in:'.implode(',', array_keys($field['options']));
+                } elseif ($field['type'] === 'file') {
+                    $rule .= '|file|mimes:pdf,jpg,jpeg,png|max:5120';
                 }
                 $unitDataRules["unit_data.{$key}"] = $rule;
             }
         }
 
         $validated = $request->validate($rules);
-        $validatedUnitData = $request->validate($unitDataRules);
+        $request->validate($unitDataRules);
 
         if (! $isStaticAsset) {
             $unit = Unit::find($validated['unit_id']);
@@ -618,6 +699,29 @@ class AssetController extends Controller
             $locationString = $asset->location;
         }
 
+        $unitData = $asset->unit_data ?? [];
+        $inputUnitData = $request->input('unit_data', []);
+
+        foreach ($schema as $key => $field) {
+            if (isset($field['in_unit'])) {
+                if (($field['type'] ?? '') === 'file') {
+                    if ($request->hasFile("unit_data.{$key}")) {
+                        $file = $request->file("unit_data.{$key}");
+                        if ($file->isValid()) {
+                            if (isset($unitData[$key]) && Storage::disk('public')->exists($unitData[$key])) {
+                                Storage::disk('public')->delete($unitData[$key]);
+                            }
+                            $unitData[$key] = $file->store('legal-documents/unit', 'public');
+                        }
+                    }
+                } else {
+                    if (isset($inputUnitData[$key])) {
+                        $unitData[$key] = $inputUnitData[$key];
+                    }
+                }
+            }
+        }
+
         $asset->unit_id = $validated['unit_id'] ?? null;
         $asset->location_id = $validated['location_id'] ?? null;
         $asset->location_detail = $validated['location_detail'] ?? null;
@@ -625,7 +729,7 @@ class AssetController extends Controller
         $asset->serial_number = $validated['serial_number'] ?? null;
         $asset->condition = $validated['condition'];
         $asset->penanggung_jawab_id = $validated['penanggung_jawab_id'] ?? null;
-        $asset->unit_data = $validatedUnitData['unit_data'] ?? [];
+        $asset->unit_data = $unitData;
 
         if ($request->hasFile('image')) {
             if ($asset->image && Storage::disk('public')->exists($asset->image)) {

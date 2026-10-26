@@ -107,7 +107,6 @@
                     </div>
                     <div class="form-group">
                         <label for="price">Harga Pembelian (Satuan) <span style="color: red;">*</span></label>
-                        <!-- 🔥 TAMBAHKAN onwheel & step="any" AGAR HARGA TIDAK BERUBAH SAAT DI-SCROLL -->
                         <input type="number" id="price" name="price"
                             class="form-control @error('price') error @enderror" value="{{ old('price') }}" min="0"
                             step="any" onwheel="this.blur()" required>
@@ -165,7 +164,6 @@
                         </div>
                         <div class="form-group">
                             <label for="residual_value">Nilai Residu (Rp)</label>
-                            <!-- 🔥 TAMBAHKAN onwheel & step="any" -->
                             <input type="number" id="residual_value" name="residual_value" class="form-control"
                                 value="{{ old('residual_value') }}" min="0" step="any"
                                 onwheel="this.blur()">
@@ -260,7 +258,7 @@
                                         style="color: red;">*</span></th>
                                 <th id="kondisiHeader" style="width: 10rem;">Kondisi <span style="color: red;">*</span>
                                 </th>
-                                <th style="width: 14rem;">Foto Unit</th>
+                                <th id="fotoHeader" style="width: 14rem;">Foto Unit</th>
                             </tr>
                         </thead>
                         <tbody id="unitBlocksContainer"></tbody>
@@ -284,7 +282,6 @@
     </script>
 @endsection
 
-{{-- BAGIAN STYLES TETAP SAMA SEPERTI SEBELUMNYA --}}
 @push('styles')
     <style>
         .asset-type-selector {
@@ -473,7 +470,6 @@
     </style>
 @endpush
 
-{{-- BAGIAN SCRIPTS TETAP SAMA SEPERTI YANG ANDA KIRIM --}}
 @push('scripts')
     <script>
         const allUnits = JSON.parse(document.getElementById('unitsData').textContent);
@@ -572,10 +568,8 @@
 
             currentSchema = window.assetSchemas[typeId];
 
-            // CEK APAKAH ASET STATIS (TNH / GDG)
             const isStaticAsset = currentSchema.is_static_asset || false;
 
-            // 1. Cek Sembunyikan Field Umum
             if (currentSchema.hide_general) {
                 generalBrand.style.display = 'none';
                 generalModel.style.display = 'none';
@@ -585,26 +579,21 @@
                 document.getElementById('brand').setAttribute('required', 'required');
             }
 
-            // 2. Cek Batas Kuantitas
             if (currentSchema.max_qty) {
                 qtyInput.value = currentSchema.max_qty;
                 qtyInput.max = currentSchema.max_qty;
                 qtyInput.disabled = true;
             }
 
-            // 3. Sembunyikan Lokasi & Akuntansi untuk Tanah/Gedung
             if (isStaticAsset) {
                 if (locationSection) locationSection.style.display = 'none';
                 if (accountingSection) accountingSection.style.display = 'none';
-
-                // Hapus atribut required agar form bisa disubmit
                 const unitSelect = document.getElementById('unit_id');
                 const locSelect = document.getElementById('location_id');
                 if (unitSelect) unitSelect.removeAttribute('required');
                 if (locSelect) locSelect.removeAttribute('required');
             }
 
-            // 4. Render
             renderBatchFields();
         }
 
@@ -613,11 +602,19 @@
             const dynamicBatchContainer = document.getElementById('dynamicBatchFields');
             const headerRow = document.getElementById('tableHeaderRow');
             const kondisiHeader = document.getElementById('kondisiHeader');
+            const fotoHeader = document.getElementById('fotoHeader');
+
+            // 🔥 Sembunyikan header Kondisi & Foto jika flag aktif
+            if (kondisiHeader) {
+                kondisiHeader.style.display = currentSchema.hide_condition ? 'none' : 'table-cell';
+            }
+            if (fotoHeader) {
+                fotoHeader.style.display = currentSchema.hide_image ? 'none' : 'table-cell';
+            }
 
             container.innerHTML = '';
             let hasBatchFields = false;
 
-            // Render Input Batch
             for (const [key, field] of Object.entries(currentSchema)) {
                 if (field.in_batch) {
                     hasBatchFields = true;
@@ -633,15 +630,18 @@
                     } else if (field.type === 'textarea') {
                         inputHtml =
                             `<textarea name="category_data[${key}]" id="batch_input_${key}" class="form-control" rows="2" ${field.required ? 'required' : ''}></textarea>`;
+                    } else if (field.type === 'file') {
+                        const isMultiple = field.multiple ? 'multiple' : '';
+                        const nameAttr = field.multiple ? `category_data[${key}][]` : `category_data[${key}]`;
+                        inputHtml =
+                            `<input type="file" name="${nameAttr}" class="form-control" accept=".pdf,.jpg,.jpeg,.png" ${isMultiple} ${field.required ? 'required' : ''}>`;
                     } else {
                         inputHtml =
                             `<input type="${field.type}" name="category_data[${key}]" id="batch_input_${key}" class="form-control" ${field.required ? 'required' : ''}>`;
                     }
 
-                    const colStyle = field.type === 'textarea' ?
-                        'flex: 1 1 100%;' :
+                    const colStyle = field.type === 'textarea' ? 'flex: 1 1 100%;' :
                         'flex: 1 1 calc(33.333% - 1rem); min-width: 250px;';
-
                     const initialDisplay = field.show_if ? 'none' : 'block';
 
                     container.innerHTML += `
@@ -657,15 +657,12 @@
                 dynamicBatchContainer.style.display = 'block';
             }
 
-            // Render Header Tabel untuk Field Unit
             for (const [key, field] of Object.entries(currentSchema)) {
                 if (field.in_unit) {
                     const th = document.createElement('th');
                     th.className = `conditional-header dynamic-header`;
                     th.dataset.field = key;
-
                     th.style.display = field.show_if ? 'none' : 'table-cell';
-
                     th.innerHTML = `${field.label} ${field.required ? '<span style="color:red;">*</span>' : ''}`;
                     headerRow.insertBefore(th, kondisiHeader);
                 }
@@ -716,6 +713,8 @@
             const qtyInput = document.getElementById('quantity');
             const container = document.getElementById('unitBlocksContainer');
             const hideGeneral = currentSchema.hide_general || false;
+            const hideCondition = currentSchema.hide_condition || false;
+            const hideImage = currentSchema.hide_image || false; // 🔥 Definisikan hideImage
 
             let qty = parseInt(qtyInput.value);
             if (isNaN(qty) || qty < 1) qty = 1;
@@ -754,6 +753,9 @@
                             }
                             inputHtml =
                                 `<select name="unit_data[${i}][${key}]" class="form-control" ${field.required ? 'required' : ''}>${options}</select>`;
+                        } else if (field.type === 'file') {
+                            inputHtml =
+                                `<input type="file" name="unit_data[${i}][${key}]" class="form-control" accept=".pdf,.jpg,.jpeg,.png" ${field.required ? 'required' : ''}>`;
                         } else {
                             inputHtml =
                                 `<input type="${field.type}" name="unit_data[${i}][${key}]" class="form-control" ${field.required ? 'required' : ''}>`;
@@ -763,15 +765,28 @@
                     }
                 }
 
-                rowHtml += `
-                    <td>
+                // 🔥 LOGIKA KONDISI
+                let conditionHtml = '';
+                if (hideCondition) {
+                    conditionHtml = `<input type="hidden" name="conditions[]" value="Baik">`;
+                } else {
+                    conditionHtml = `
                         <select name="conditions[]" class="form-control" required>
                             <option value="Baik">Baik</option>
                             <option value="Rusak Ringan">Rusak Ringan</option>
                             <option value="Rusak Berat">Rusak Berat</option>
                         </select>
+                    `;
+                }
+
+                // 🔥 RENDER BARIS DENGAN PENGECEKAN
+                rowHtml += `
+                    <td style="display: ${hideCondition ? 'none' : 'table-cell'};">
+                        ${conditionHtml}
                     </td>
-                    <td><input type="file" name="images[${i}]" class="form-control" accept="image/*"></td>
+                    <td style="display: ${hideImage ? 'none' : 'table-cell'};">
+                        <input type="file" name="images[${i}]" class="form-control" accept="image/*">
+                    </td>
                 `;
 
                 const tr = document.createElement('tr');

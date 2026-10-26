@@ -30,10 +30,12 @@ class Asset extends Model
         'location_detail',
         'expired_at',
         'replaces_asset_id',
+        'unit_data', // 🔥 TAMBAHKAN INI
     ];
 
     protected $casts = [
         'expired_at' => 'date',
+        'unit_data' => 'array', // 🔥 TAMBAHKAN INI
     ];
 
     protected static function boot()
@@ -42,7 +44,12 @@ class Asset extends Model
 
         static::creating(function ($asset) {
             if (empty($asset->asset_id)) {
-                $asset->asset_id = self::generateAssetId($asset->asset_type_id);
+                // Fallback jika asset_type_id tidak ada, kita coba ambil dari batch
+                $assetTypeId = $asset->asset_type_id ?? $asset->batch?->asset_type_id;
+
+                if ($assetTypeId) {
+                    $asset->asset_id = self::generateAssetId($assetTypeId);
+                }
             }
         });
     }
@@ -54,12 +61,6 @@ class Asset extends Model
             $year = date('Y');
             $month = date('m');
 
-            // withTrashed() WAJIB: Asset pakai SoftDeletes, dan menghapus aset
-            // (AssetController::destroy()) cuma soft-delete. Tanpa ini, asset_id
-            // dengan nomor tertinggi yang sudah soft-deleted akan terlewat dari
-            // pencarian "nomor terakhir", lalu nomor yang sama dicoba dipakai lagi
-            // untuk aset baru — persis bug yang sama yang barusan bikin
-            // "qr_codes_qr_code_id_unique" collide, cuma di kolom asset_id.
             $lastAsset = self::withTrashed()
                 ->where('asset_id', 'LIKE', "$year/$month/{$type->code}-%")
                 ->lockForUpdate()
@@ -67,7 +68,6 @@ class Asset extends Model
                 ->first();
 
             if ($lastAsset) {
-                // Extract number dengan pattern yang lebih safe
                 $parts = explode('-', $lastAsset->asset_id);
                 $lastNumber = (int) end($parts);
                 $newNumber = $lastNumber + 1;
@@ -75,7 +75,6 @@ class Asset extends Model
                 $newNumber = 1;
             }
 
-            // Format dengan padding 4 digit
             $newNumberFormatted = str_pad($newNumber, 4, '0', STR_PAD_LEFT);
 
             return "$year/$month/{$type->code}-$newNumberFormatted";
@@ -90,23 +89,19 @@ class Asset extends Model
                     return asset('assets/logo-stti.png');
                 }
 
-                // Kasus data lama dari seeder yang masih pakai URL eksternal
                 if (Str::startsWith($this->image, ['http://', 'https://'])) {
                     return $this->image;
                 }
 
-                // Kasus 1: gambar hasil upload form, tersimpan di storage disk 'public'
                 if (Storage::disk('public')->exists($this->image)) {
                     return Storage::url($this->image);
                 }
 
-                // Kasus 2: gambar dari seeder, fisik di public/assets/products/
                 $filename = basename($this->image);
-                if (file_exists(public_path('assets/products/' . $filename))) {
-                    return asset('assets/products/' . $filename);
+                if (file_exists(public_path('assets/products/'.$filename))) {
+                    return asset('assets/products/'.$filename);
                 }
 
-                // Fallback terakhir kalau benar-benar tidak ditemukan
                 return asset('assets/logo-stti.png');
             },
         );

@@ -2,9 +2,9 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
-use App\Models\Unit;
 use App\Models\Location;
+use App\Models\Unit;
+use Illuminate\Database\Seeder;
 
 class LocationSeeder extends Seeder
 {
@@ -29,8 +29,9 @@ class LocationSeeder extends Seeder
 
         foreach ($map as $unitName => $locations) {
             $unit = Unit::where('name', $unitName)->first();
-            if (!$unit)
+            if (! $unit) {
                 continue;
+            }
             foreach ($locations as $loc) {
                 Location::firstOrCreate(['unit_id' => $unit->id, 'name' => $loc]);
             }

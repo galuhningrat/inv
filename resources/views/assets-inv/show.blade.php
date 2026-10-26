@@ -126,7 +126,22 @@
                             @foreach ($batchData as $key => $value)
                                 @if (isset($schema[$key]) && !empty($value))
                                     <p><span style="color: #0369a1;">{{ $schema[$key]['label'] ?? $key }}:</span><br>
-                                        <strong>{{ $value }}</strong>
+                                        @if (($schema[$key]['type'] ?? '') === 'file')
+                                            @if (is_array($value))
+                                                {{-- 🔥 Render multiple file links --}}
+                                                @foreach ($value as $filePath)
+                                                    <a href="{{ Storage::url($filePath) }}" target="_blank"
+                                                        style="display: inline-block; margin: 2px 4px 2px 0; padding: 0.25rem 0.5rem; background: #0ea5e9; color: white; border-radius: 4px; font-size: 0.75rem; text-decoration: none;">📄
+                                                        File {{ $loop->iteration }}</a>
+                                                @endforeach
+                                            @else
+                                                <a href="{{ Storage::url($value) }}" target="_blank"
+                                                    style="display: inline-block; margin-top: 0.25rem; padding: 0.25rem 0.5rem; background: #0ea5e9; color: white; border-radius: 4px; font-size: 0.75rem; text-decoration: none;">📄
+                                                    Lihat Dokumen</a>
+                                            @endif
+                                        @else
+                                            <strong>{{ $value }}</strong>
+                                        @endif
                                     </p>
                                 @endif
                             @endforeach
@@ -135,7 +150,13 @@
                             @foreach ($unitData as $key => $value)
                                 @if (isset($schema[$key]) && !empty($value))
                                     <p><span style="color: #0369a1;">{{ $schema[$key]['label'] ?? $key }}:</span><br>
-                                        <strong>{{ $value }}</strong>
+                                        @if (($schema[$key]['type'] ?? '') === 'file')
+                                            <a href="{{ Storage::url($value) }}" target="_blank"
+                                                style="display: inline-block; margin-top: 0.25rem; padding: 0.25rem 0.5rem; background: #0ea5e9; color: white; border-radius: 4px; font-size: 0.75rem; text-decoration: none;">📄
+                                                Lihat Dokumen</a>
+                                        @else
+                                            <strong>{{ $value }}</strong>
+                                        @endif
                                     </p>
                                 @endif
                             @endforeach

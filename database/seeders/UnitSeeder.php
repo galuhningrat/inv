@@ -2,25 +2,33 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
 use App\Models\Unit;
+use Illuminate\Database\Seeder;
 
 class UnitSeeder extends Seeder
 {
     public function run(): void
     {
         $units = [
-            ['name' => 'Teknik Mesin', 'type' => 'Prodi'],
-            ['name' => 'Teknik Elektro', 'type' => 'Prodi'],
-            ['name' => 'Teknik Informatika', 'type' => 'Prodi'],
-            ['name' => 'Laboratorium Komputer', 'type' => 'Lab'],
-            ['name' => 'Laboratorium Elektro', 'type' => 'Lab'],
-            ['name' => 'Laboratorium Mesin', 'type' => 'Lab'],
-            ['name' => 'Umum', 'type' => 'Umum'],
+            // Prodi
+            ['name' => 'Teknik Mesin', 'type' => 'Prodi', 'category' => 'Akademik'],
+            ['name' => 'Teknik Elektro', 'type' => 'Prodi', 'category' => 'Akademik'],
+            ['name' => 'Teknik Informatika', 'type' => 'Prodi', 'category' => 'Akademik'],
+
+            // Laboratorium
+            ['name' => 'Laboratorium Komputer', 'type' => 'Lab', 'category' => 'Laboratorium'],
+            ['name' => 'Laboratorium Elektro', 'type' => 'Lab', 'category' => 'Laboratorium'],
+            ['name' => 'Laboratorium Mesin', 'type' => 'Lab', 'category' => 'Laboratorium'],
+
+            // Unit Umum/Pusat
+            ['name' => 'Umum', 'type' => 'Umum', 'category' => 'Administrasi'],
         ];
 
         foreach ($units as $unit) {
-            Unit::create($unit);
+            Unit::updateOrCreate(
+                ['name' => $unit['name']],
+                ['type' => $unit['type'], 'category' => $unit['category']]
+            );
         }
     }
 }

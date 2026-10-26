@@ -2,20 +2,18 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
 use App\Models\Asset;
+use App\Models\AssetBatch;
 use App\Models\AssetType;
 use App\Models\QrCode;
+use Illuminate\Database\Seeder;
 
 class AssetSeeder extends Seeder
 {
     public function run(): void
     {
-        // Ambil ID tipe aset untuk mapping
         $types = AssetType::pluck('id', 'code')->toArray();
-        // Hasil: ['KOM' => 1, 'ELK' => 2, dst...]
 
-        // Data dari script.js yang sudah dikonversi
         $assets = [
             ['id' => '2024/01/KOM-0001', 'name' => 'Laptop HP ProBook', 'type' => 'KOM', 'brand' => 'HP', 'serial' => 'HP123456', 'location' => 'Ruang IT', 'condition' => 'Baik', 'status' => 'Tersedia', 'price' => 8000000, 'purchaseDate' => '2024-01-15', 'image' => 'assets/Laptop-HP-ProBook.jpeg', 'qrcode' => 'HP123456789'],
             ['id' => '2024/01/KOM-0002', 'name' => 'Proyektor Epson', 'type' => 'KOM', 'brand' => 'Epson', 'serial' => 'EP789012', 'location' => 'Aula', 'condition' => 'Baik', 'status' => 'Dipinjam', 'price' => 5000000, 'purchaseDate' => '2024-01-12', 'image' => 'assets/proyektor-epson.jpeg', 'qrcode' => 'EP789012345'],
@@ -39,29 +37,38 @@ class AssetSeeder extends Seeder
         ];
 
         foreach ($assets as $data) {
-            // 1. Simpan Aset
-            $asset = Asset::create([
-                'asset_id' => $data['id'],
-                'name' => $data['name'],
-                'asset_type_id' => $types[$data['type']], // Mapping string 'KOM' ke ID integer
-                'brand' => $data['brand'] ?: 'No Brand',
-                'serial_number' => $data['serial'],
-                'price' => $data['price'],
-                'purchase_date' => $data['purchaseDate'], // INI YANG SEBELUMNYA ERROR
-                'location' => $data['location'] ?: 'Gudang',
-                'condition' => $data['condition'],
-                'status' => $data['status'],
-                'image' => $data['image'],
-                'qr_code' => $data['qrcode'],
-            ]);
+            // Gunakan firstOrCreate agar tidak duplikat saat dijalankan ulang
+            $batch = AssetBatch::firstOrCreate(
+                ['name' => $data['name'], 'brand' => $data['brand'] ?: 'No Brand'],
+                [
+                    'asset_type_id' => $types[$data['type']],
+                    'price' => $data['price'],
+                    'purchase_date' => $data['purchaseDate'],
+                    'category_data' => [],
+                ]
+            );
 
-            // 2. Buat data di tabel QR Codes (sesuai script.js Anda yang memisahkan tabel qr)
-            QrCode::create([
-                'qr_code_id' => 'QCD-' . str_pad($asset->id, 3, '0', STR_PAD_LEFT),
-                'asset_id' => $asset->id,
-                'code_content' => $data['qrcode'],
-                'status' => 'Aktif',
-            ]);
+            $asset = Asset::updateOrCreate(
+                ['asset_id' => $data['id']],
+                [
+                    'asset_batch_id' => $batch->id,
+                    'serial_number' => $data['serial'],
+                    'location' => $data['location'] ?: 'Gudang',
+                    'condition' => $data['condition'],
+                    'status' => $data['status'],
+                    'image' => $data['image'],
+                    'qr_code' => $data['qrcode'],
+                ]
+            );
+
+            QrCode::updateOrCreate(
+                ['code_content' => $data['qrcode']],
+                [
+                    'qr_code_id' => 'QCD-'.str_pad($asset->id, 3, '0', STR_PAD_LEFT),
+                    'asset_id' => $asset->id,
+                    'status' => 'Aktif',
+                ]
+            );
         }
     }
 }

@@ -7,7 +7,6 @@
     <div class="data-table-container">
         <div class="table-header">
             <h3 class="table-title">Edit Pengguna: {{ $user->name }}</h3>
-            <a href="{{ route('users.edit', $user->id) }}" class="btn btn-secondary">Edit</a>
             <a href="{{ route('users.index') }}" class="btn btn-secondary">← Kembali</a>
         </div>
         <div style="padding: 2rem;">
@@ -18,8 +17,9 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label for="name">Nama Lengkap <span style="color: red;">*</span></label>
-                        <input type="text" id="name" name="name" class="form-control @error('name') error @enderror"
-                            value="{{ old('name', $user->name) }}" required>
+                        <input type="text" id="name" name="name"
+                            class="form-control @error('name') error @enderror" value="{{ old('name', $user->name) }}"
+                            required>
                         @error('name')
                             <div class="error-message" style="display: block;">{{ $message }}</div>
                         @enderror
@@ -38,22 +38,45 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label for="email">Email <span style="color: red;">*</span></label>
-                        <input type="email" id="email" name="email" class="form-control @error('email') error @enderror"
-                            value="{{ old('email', $user->email) }}" required>
+                        <input type="email" id="email" name="email"
+                            class="form-control @error('email') error @enderror" value="{{ old('email', $user->email) }}"
+                            required>
                         @error('email')
                             <div class="error-message" style="display: block;">{{ $message }}</div>
                         @enderror
                     </div>
                     <div class="form-group">
-                        <label for="level">Level <span style="color: red;">*</span></label>
+                        <label for="level">Jabatan / Level <span style="color: red;">*</span></label>
                         <select id="level" name="level" class="form-control @error('level') error @enderror" required>
                             <option value="">Pilih Level</option>
-                            @foreach($levels as $lvl)
-                                <option value="{{ $lvl }}" {{ old('level', $user->level) === $lvl ? 'selected' : '' }}>{{ $lvl }}
+                            @foreach ($levels as $lvl)
+                                <option value="{{ $lvl }}"
+                                    {{ old('level', $user->level) === $lvl ? 'selected' : '' }}>{{ $lvl }}
                                 </option>
                             @endforeach
                         </select>
                         @error('level')
+                            <div class="error-message" style="display: block;">{{ $message }}</div>
+                        @enderror
+                    </div>
+                </div>
+
+                {{-- 🔥 TAMBAHKAN FIELD UNIT DI SINI 🔥 --}}
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="unit_id">Unit Kerja / Homebase</label>
+                        <select id="unit_id" name="unit_id" class="form-control @error('unit_id') error @enderror">
+                            <option value="">-- Tidak ditentukan (Global) --</option>
+                            @foreach ($units as $unit)
+                                <option value="{{ $unit->id }}"
+                                    {{ old('unit_id', $user->unit_id) == $unit->id ? 'selected' : '' }}>
+                                    {{ $unit->category }}: {{ $unit->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                        <small class="form-text" style="color: #64748b; font-size: 0.8rem;">Pilih unit tempat pengguna ini
+                            bernaung.</small>
+                        @error('unit_id')
                             <div class="error-message" style="display: block;">{{ $message }}</div>
                         @enderror
                     </div>
@@ -78,8 +101,10 @@
                 <div class="form-group">
                     <label for="status">Status <span style="color: red;">*</span></label>
                     <select id="status" name="status" class="form-control @error('status') error @enderror" required>
-                        <option value="Aktif" {{ old('status', $user->status) === 'Aktif' ? 'selected' : '' }}>Aktif</option>
-                        <option value="Nonaktif" {{ old('status', $user->status) === 'Nonaktif' ? 'selected' : '' }}>Nonaktif
+                        <option value="Aktif" {{ old('status', $user->status) === 'Aktif' ? 'selected' : '' }}>Aktif
+                        </option>
+                        <option value="Nonaktif" {{ old('status', $user->status) === 'Nonaktif' ? 'selected' : '' }}>
+                            Nonaktif
                         </option>
                     </select>
                     @error('status')
@@ -89,7 +114,7 @@
 
                 <div class="form-group">
                     <label for="avatar">Foto Profil</label>
-                    @if($user->avatar)
+                    @if ($user->avatar)
                         <div style="margin-bottom: 1rem;">
                             <img src="{{ Storage::url($user->avatar) }}" alt="{{ $user->name }}"
                                 style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover;">
@@ -120,8 +145,9 @@
             const preview = document.getElementById('avatarPreview');
             if (input.files && input.files[0]) {
                 const reader = new FileReader();
-                reader.onload = function (e) {
-                    preview.innerHTML = `<img src="${e.target.result}" alt="Preview" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; margin-top: 1rem;">`;
+                reader.onload = function(e) {
+                    preview.innerHTML =
+                        `<img src="${e.target.result}" alt="Preview" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; margin-top: 1rem;">`;
                 }
                 reader.readAsDataURL(input.files[0]);
             } else {

@@ -9,14 +9,14 @@
         <div class="table-header">
             <h3 class="table-title">Manajemen Pengguna</h3>
             <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
-                {{-- FILTER UNIT — BARU! --}}
+                {{-- FILTER UNIT --}}
                 <select
                     onchange="window.location.href='{{ route('users.index') }}?unit_id='+this.value+'&per_page={{ request('per_page', 10) }}'"
-                    class="form-control" style="width: auto; min-width: 160px;">
+                    class="form-control" style="width: auto; min-width: 320px;"> {{-- 🔥 Lebarkan sedikit agar teks tidak terpotong --}}
                     <option value="">Semua Unit</option>
                     @foreach ($units as $unit)
                         <option value="{{ $unit->id }}" {{ request('unit_id') == $unit->id ? 'selected' : '' }}>
-                            {{ $unit->name }}
+                            {{ $unit->category }}: {{ $unit->name }} {{-- 🔥 Ubah format di sini --}}
                         </option>
                     @endforeach
                 </select>
@@ -46,7 +46,7 @@
                         <th>Nama</th>
                         <th>Username</th>
                         <th>Level</th>
-                        <th>Unit</th> {{-- BARU! --}}
+                        <th>Unit</th>
                         <th>Status</th>
                         <th>Aksi</th>
                     </tr>
@@ -56,14 +56,15 @@
                         <tr>
                             <td><strong>{{ $user->id }}</strong></td>
                             <td>
-                                <img src="{{ $user->avatar ? Storage::url($user->avatar) : asset('storage/app/public/default-avatar.jpg') }}"
+                                {{-- 🔥 Perbaikan URL Gambar Avatar --}}
+                                <img src="{{ $user->avatar ? Storage::url($user->avatar) : asset('assets/admin.png') }}"
                                     alt="{{ $user->name }}"
                                     style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
                             </td>
                             <td>{{ $user->name }}</td>
                             <td>{{ $user->username }}</td>
                             <td><span class="status-badge available">{{ $user->level }}</span></td>
-                            <td>{{ $user->unit->name ?? '-' }}</td> {{-- BARU! --}}
+                            <td>{{ $user->unit->name ?? '-' }}</td>
                             <td>
                                 <span class="status-badge {{ $user->status === 'Aktif' ? 'available' : 'maintenance' }}">
                                     {{ $user->status }}
@@ -87,7 +88,10 @@
                     @empty
                         <tr>
                             <td colspan="8" style="text-align: center; padding: 2rem;">
-                                Tidak ada data pengguna.
+                                <div style="color: var(--text-secondary);">
+                                    <p style="font-size: 2rem; margin-bottom: 0.5rem;">👤</p>
+                                    <p>Tidak ada data pengguna.</p>
+                                </div>
                             </td>
                         </tr>
                     @endforelse
@@ -95,9 +99,66 @@
             </table>
         </div>
 
-        {{-- ===== PAGINATION LINK ===== --}}
-        <div style="padding: 1rem 2rem;">
-            {{ $users->links() }}
-        </div>
+        {{-- ===== 🔥 CUSTOM PAGINATION & INFO 🔥 ===== --}}
+        @if ($users->total() > 0)
+            <div
+                style="padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; border-top: 1px solid var(--border-color);">
+
+                {{-- Info Teks --}}
+                <div style="color: var(--text-secondary); font-size: 0.875rem;">
+                    Menampilkan <strong>{{ $users->firstItem() }}</strong> - <strong>{{ $users->lastItem() }}</strong>
+                    dari <strong>{{ $users->total() }}</strong> pengguna
+                </div>
+
+                {{-- Tombol Navigasi --}}
+                @if ($users->hasPages())
+                    <div style="display: flex; gap: 0.25rem; align-items: center;">
+
+                        {{-- Previous --}}
+                        @if ($users->onFirstPage())
+                            <span
+                                style="padding: 0.4rem 0.8rem; border: 1px solid var(--border-color); border-radius: 6px; background: var(--light-bg); color: #94a3b8; cursor: not-allowed; font-size: 0.85rem;">
+                                &laquo; Prev
+                            </span>
+                        @else
+                            <a href="{{ $users->previousPageUrl() }}"
+                                style="padding: 0.4rem 0.8rem; border: 1px solid var(--border-color); border-radius: 6px; background: white; color: var(--text-primary); text-decoration: none; font-size: 0.85rem; transition: all 0.2s;">
+                                &laquo; Prev
+                            </a>
+                        @endif
+
+                        {{-- Page Numbers --}}
+                        @foreach ($users->getUrlRange(max(1, $users->currentPage() - 2), min($users->lastPage(), $users->currentPage() + 2)) as $page => $url)
+                            @if ($page == $users->currentPage())
+                                <span
+                                    style="padding: 0.4rem 0.8rem; border: 1px solid var(--primary-color); border-radius: 6px; background: var(--primary-color); color: white; font-weight: 600; font-size: 0.85rem;">
+                                    {{ $page }}
+                                </span>
+                            @else
+                                <a href="{{ $url }}"
+                                    style="padding: 0.4rem 0.8rem; border: 1px solid var(--border-color); border-radius: 6px; background: white; color: var(--text-primary); text-decoration: none; font-size: 0.85rem; transition: all 0.2s;">
+                                    {{ $page }}
+                                </a>
+                            @endif
+                        @endforeach
+
+                        {{-- Next --}}
+                        @if ($users->hasMorePages())
+                            <a href="{{ $users->nextPageUrl() }}"
+                                style="padding: 0.4rem 0.8rem; border: 1px solid var(--border-color); border-radius: 6px; background: white; color: var(--text-primary); text-decoration: none; font-size: 0.85rem; transition: all 0.2s;">
+                                Next &raquo;
+                            </a>
+                        @else
+                            <span
+                                style="padding: 0.4rem 0.8rem; border: 1px solid var(--border-color); border-radius: 6px; background: var(--light-bg); color: #94a3b8; cursor: not-allowed; font-size: 0.85rem;">
+                                Next &raquo;
+                            </span>
+                        @endif
+
+                    </div>
+                @endif
+            </div>
+        @endif
+
     </div>
 @endsection

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Unit;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -14,7 +15,8 @@ class UserController extends Controller
         $perPage = in_array($request->input('per_page'), [10, 15, 25, 50, 100]) ? $request->input('per_page') : 10;
 
         $users = User::with('unit')
-            ->orderByRaw("CASE WHEN level = 'Admin' THEN 1 WHEN level = 'Sarpras' THEN 2 ELSE 3 END");
+            ->orderByRaw("CASE WHEN level = 'Admin' THEN 1 WHEN level IN ('Ketua', 'Sarana dan Prasarana') THEN 2 ELSE 3 END")
+            ->orderBy('id', 'asc');
 
         if ($request->filled('unit_id')) {
             $users->where('unit_id', $request->unit_id);
@@ -22,15 +24,33 @@ class UserController extends Controller
 
         $users = $users->paginate($perPage)->appends($request->query());
 
-        $units = \App\Models\Unit::all();
+        // 🔥 PERBAIKAN: Urutkan unit berdasarkan kategori lalu nama agar rapi
+        $units = Unit::orderBy('category')->orderBy('name')->get();
 
         return view('users.index', compact('users', 'units'));
     }
 
     public function create()
     {
-        $levels = ['Admin', 'Sarpras', 'Keuangan', 'Kaprodi', 'Rektor', 'PJ Pengadaan', 'Kalab', 'Aslab', 'Tim Pemeliharaan', 'Administrasi', 'Karyawan', 'Dosen', 'Mahasiswa'];
-        return view('users.create', compact('levels'));
+        $levels = [
+            'Ketua',
+            'Sarana dan Prasarana',
+            'Penanggung Jawab Pengadaan',
+            'Tim Pemeliharaan',
+            'Kepala Laboratorium',
+            'Kepala Program Studi',
+            'Keuangan',
+            'Administrasi',
+            'Asisten Laboratorium',
+            'Admin',
+            'Dosen',
+            'Mahasiswa',
+            'Karyawan',
+        ];
+
+        $units = Unit::orderBy('category')->orderBy('name')->get();
+
+        return view('users.create', compact('levels', 'units'));
     }
 
     public function store(Request $request)
@@ -40,7 +60,8 @@ class UserController extends Controller
             'username' => 'required|string|unique:users,username',
             'email' => 'required|email|unique:users,email',
             'password' => 'required|string|min:6|confirmed',
-            'level' => 'required|in:Admin,Sarpras,Keuangan,Kaprodi,Rektor,PJ Pengadaan,Kalab,Aslab,Tim Pemeliharaan,Administrasi,Karyawan,Dosen,Mahasiswa',
+            'level' => 'required|in:Ketua,Sarana dan Prasarana,Penanggung Jawab Pengadaan,Tim Pemeliharaan,Kepala Laboratorium,Kepala Program Studi,Keuangan,Administrasi,Asisten Laboratorium,Admin,Dosen,Mahasiswa,Karyawan',
+            'unit_id' => 'nullable|exists:units,id', // 🔥 Validasi Unit
             'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
@@ -65,18 +86,36 @@ class UserController extends Controller
 
     public function edit(User $user)
     {
-        $levels = ['Admin', 'Sarpras', 'Keuangan', 'Kaprodi', 'Rektor', 'PJ Pengadaan', 'Kalab', 'Aslab', 'Tim Pemeliharaan', 'Administrasi', 'Karyawan', 'Dosen', 'Mahasiswa'];
-        return view('users.edit', compact('user', 'levels'));
+        $levels = [
+            'Ketua',
+            'Sarana dan Prasarana',
+            'Penanggung Jawab Pengadaan',
+            'Tim Pemeliharaan',
+            'Kepala Laboratorium',
+            'Kepala Program Studi',
+            'Keuangan',
+            'Administrasi',
+            'Asisten Laboratorium',
+            'Admin',
+            'Dosen',
+            'Mahasiswa',
+            'Karyawan',
+        ];
+
+        $units = Unit::orderBy('category')->orderBy('name')->get();
+
+        return view('users.edit', compact('user', 'levels', 'units'));
     }
 
     public function update(Request $request, User $user)
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'username' => 'required|string|unique:users,username,' . $user->id,
-            'email' => 'required|email|unique:users,email,' . $user->id,
+            'username' => 'required|string|unique:users,username,'.$user->id,
+            'email' => 'required|email|unique:users,email,'.$user->id,
             'password' => 'nullable|string|min:6|confirmed',
-            'level' => 'required|in:Admin,Sarpras,Keuangan,Kaprodi,Rektor,PJ Pengadaan,Kalab,Aslab,Tim Pemeliharaan,Administrasi,Karyawan,Dosen,Mahasiswa',
+            'level' => 'required|in:Ketua,Sarana dan Prasarana,Penanggung Jawab Pengadaan,Tim Pemeliharaan,Kepala Laboratorium,Kepala Program Studi,Keuangan,Administrasi,Asisten Laboratorium,Admin,Dosen,Mahasiswa,Karyawan',
+            'unit_id' => 'nullable|exists:units,id', // 🔥 Validasi Unit
             'status' => 'required|in:Aktif,Nonaktif',
             'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);

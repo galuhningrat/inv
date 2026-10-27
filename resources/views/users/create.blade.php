@@ -16,8 +16,8 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label for="name">Nama Lengkap <span style="color: red;">*</span></label>
-                        <input type="text" id="name" name="name" class="form-control @error('name') error @enderror"
-                            value="{{ old('name') }}" required>
+                        <input type="text" id="name" name="name"
+                            class="form-control @error('name') error @enderror" value="{{ old('name') }}" required>
                         @error('name')
                             <div class="error-message" style="display: block;">{{ $message }}</div>
                         @enderror
@@ -35,21 +35,42 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label for="email">Email <span style="color: red;">*</span></label>
-                        <input type="email" id="email" name="email" class="form-control @error('email') error @enderror"
-                            value="{{ old('email') }}" required>
+                        <input type="email" id="email" name="email"
+                            class="form-control @error('email') error @enderror" value="{{ old('email') }}" required>
                         @error('email')
                             <div class="error-message" style="display: block;">{{ $message }}</div>
                         @enderror
                     </div>
                     <div class="form-group">
-                        <label for="level">Level <span style="color: red;">*</span></label>
+                        <label for="level">Jabatan / Level <span style="color: red;">*</span></label>
                         <select id="level" name="level" class="form-control @error('level') error @enderror" required>
-                            <option value="">Pilih Level</option>
-                            @foreach($levels as $lvl)
-                                <option value="{{ $lvl }}" {{ old('level') === $lvl ? 'selected' : '' }}>{{ $lvl }}</option>
+                            <option value="">Pilih Jabatan</option>
+                            @foreach ($levels as $lvl)
+                                <option value="{{ $lvl }}" {{ old('level') === $lvl ? 'selected' : '' }}>
+                                    {{ $lvl }}</option>
                             @endforeach
                         </select>
                         @error('level')
+                            <div class="error-message" style="display: block;">{{ $message }}</div>
+                        @enderror
+                    </div>
+                </div>
+
+                {{-- 🔥 BARIS BARU UNTUK UNIT KERJA 🔥 --}}
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="unit_id">Unit Kerja / Homebase</label>
+                        <select id="unit_id" name="unit_id" class="form-control @error('unit_id') error @enderror">
+                            <option value="">-- Tidak ditentukan (Global) --</option>
+                            @foreach ($units as $unit)
+                                <option value="{{ $unit->id }}" {{ old('unit_id') == $unit->id ? 'selected' : '' }}>
+                                    {{ $unit->category }}: {{ $unit->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                        <small class="form-text" style="color: #64748b; font-size: 0.8rem;">Pilih unit tempat pengguna ini
+                            bernaung (misal: Rektorat, Fasilitas Umum, Teknik Informatika).</small>
+                        @error('unit_id')
                             <div class="error-message" style="display: block;">{{ $message }}</div>
                         @enderror
                     </div>
@@ -97,8 +118,9 @@
             const preview = document.getElementById('avatarPreview');
             if (input.files && input.files[0]) {
                 const reader = new FileReader();
-                reader.onload = function (e) {
-                    preview.innerHTML = `<img src="${e.target.result}" alt="Preview" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; margin-top: 1rem;">`;
+                reader.onload = function(e) {
+                    preview.innerHTML =
+                        `<img src="${e.target.result}" alt="Preview" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; margin-top: 1rem;">`;
                 }
                 reader.readAsDataURL(input.files[0]);
             } else {

@@ -38,13 +38,16 @@ class AssetType extends Model
                     'monitor' => 'Monitor', 'printer' => 'Printer', 'keyboard' => 'Keyboard', 'mouse' => 'Mouse', 'lainnya' => 'Periferal Lainnya',
                 ], 'required' => true, 'in_batch' => true],
 
-                'processor' => ['label' => 'Prosesor / Chipset', 'type' => 'text', 'required' => false, 'in_batch' => true, 'show_if' => ['subkategori' => ['laptop', 'desktop', 'server']]],
-                'ram' => ['label' => 'Kapasitas RAM (GB)', 'type' => 'number', 'required' => false, 'in_batch' => true, 'show_if' => ['subkategori' => ['laptop', 'desktop', 'server']]],
-                'storage' => ['label' => 'Penyimpanan (SSD/HDD)', 'type' => 'text', 'required' => false, 'in_batch' => true, 'show_if' => ['subkategori' => ['laptop', 'desktop', 'server']]],
-                'gpu' => ['label' => 'GPU / Grafis', 'type' => 'text', 'required' => false, 'in_batch' => true, 'show_if' => ['subkategori' => ['laptop', 'desktop', 'server']]],
-                'os' => ['label' => 'Sistem Operasi & Versi', 'type' => 'text', 'required' => false, 'in_batch' => true, 'show_if' => ['subkategori' => ['laptop', 'desktop', 'server']]],
-                'ukuran_layar' => ['label' => 'Ukuran Layar (Inch)', 'type' => 'number', 'required' => false, 'in_batch' => true, 'show_if' => ['subkategori' => ['laptop', 'monitor']]],
-                'resolusi_layar' => ['label' => 'Resolusi Layar', 'type' => 'text', 'required' => false, 'in_batch' => true, 'show_if' => ['subkategori' => ['laptop', 'monitor']]],
+                // 🔥 SPESIFIKASI TEKNIS DIPINDAH KE IN_UNIT 🔥
+                'processor' => ['label' => 'Prosesor / Chipset', 'type' => 'text', 'required' => false, 'in_unit' => true, 'show_if' => ['subkategori' => ['laptop', 'desktop', 'server']]],
+                'ram' => ['label' => 'Kapasitas RAM (GB)', 'type' => 'number', 'required' => false, 'in_unit' => true, 'show_if' => ['subkategori' => ['laptop', 'desktop', 'server']]],
+                'storage' => ['label' => 'Penyimpanan (SSD/HDD)', 'type' => 'text', 'required' => false, 'in_unit' => true, 'show_if' => ['subkategori' => ['laptop', 'desktop', 'server']]],
+                'gpu' => ['label' => 'GPU / Grafis', 'type' => 'text', 'required' => false, 'in_unit' => true, 'show_if' => ['subkategori' => ['laptop', 'desktop', 'server']]],
+                'os' => ['label' => 'Sistem Operasi & Versi', 'type' => 'text', 'required' => false, 'in_unit' => true, 'show_if' => ['subkategori' => ['laptop', 'desktop', 'server']]],
+                'ukuran_layar' => ['label' => 'Ukuran Layar (Inch)', 'type' => 'number', 'required' => false, 'in_unit' => true, 'show_if' => ['subkategori' => ['laptop', 'monitor']]],
+                'resolusi_layar' => ['label' => 'Resolusi Layar', 'type' => 'text', 'required' => false, 'in_unit' => true, 'show_if' => ['subkategori' => ['laptop', 'monitor']]],
+
+                // Garansi tetap di batch (biasanya 1 batch garansinya sama)
                 'garansi_berakhir' => ['label' => 'Masa Garansi Berakhir', 'type' => 'date', 'required' => false, 'in_batch' => true],
 
                 'hostname' => ['label' => 'Hostname / Nama Komputer', 'type' => 'text', 'required' => false, 'in_unit' => true, 'show_if' => ['subkategori' => ['laptop', 'desktop', 'server']]],
@@ -55,11 +58,16 @@ class AssetType extends Model
                 'hide_general' => false,
                 'subkategori' => ['label' => 'Jenis Perangkat Jaringan', 'type' => 'select', 'options' => [
                     'router' => 'Router', 'switch' => 'Switch', 'ap' => 'Access Point', 'modem' => 'Modem / ONT', 'firewall' => 'Firewall',
+                    'kabel' => 'Kabel / Fiber Optic', 'lainnya' => 'Lainnya',
                 ], 'required' => true, 'in_batch' => true],
-                'jumlah_port' => ['label' => 'Jumlah Port', 'type' => 'number', 'required' => false, 'in_batch' => true],
-                'kecepatan' => ['label' => 'Kecepatan Port (Mbps/Gbps)', 'type' => 'text', 'required' => false, 'in_batch' => true],
-                'dukungan_poe' => ['label' => 'Dukungan PoE', 'type' => 'select', 'options' => ['Ya' => 'Ya', 'Tidak' => 'Tidak'], 'required' => false, 'in_batch' => true],
-                'versi_firmware' => ['label' => 'Versi Firmware', 'type' => 'text', 'required' => false, 'in_batch' => true],
+
+                // 🔥 SPESIFIKASI TEKNIS DIPINDAH KE IN_UNIT 🔥
+                'jumlah_port' => ['label' => 'Jumlah Port', 'type' => 'number', 'required' => false, 'in_unit' => true],
+                'kecepatan' => ['label' => 'Kecepatan Port (Mbps/Gbps)', 'type' => 'text', 'required' => false, 'in_unit' => true],
+                'dukungan_poe' => ['label' => 'Dukungan PoE', 'type' => 'select', 'options' => ['Ya' => 'Ya', 'Tidak' => 'Tidak'], 'required' => false, 'in_unit' => true],
+                'versi_firmware' => ['label' => 'Versi Firmware', 'type' => 'text', 'required' => false, 'in_unit' => true],
+
+                // Field unit lainnya
                 'lokasi_rak' => ['label' => 'Nomor Rak / Identitas', 'type' => 'text', 'required' => false, 'in_unit' => true],
                 'mac_address' => ['label' => 'MAC Address', 'type' => 'text', 'required' => false, 'in_unit' => true],
                 'ip_address' => ['label' => 'IP Address', 'type' => 'text', 'required' => false, 'in_unit' => true],
@@ -70,10 +78,12 @@ class AssetType extends Model
                 'subkategori' => ['label' => 'Jenis Elektronik', 'type' => 'select', 'options' => [
                     'proyektor' => 'Proyektor', 'tv' => 'TV / Layar', 'kamera' => 'Kamera', 'audio' => 'Audio', 'ac' => 'AC', 'lainnya' => 'Lainnya',
                 ], 'required' => true, 'in_batch' => true],
-                'daya_listrik' => ['label' => 'Daya Listrik (Watt)', 'type' => 'number', 'required' => false, 'in_batch' => true],
-                'tegangan' => ['label' => 'Tegangan (Volt)', 'type' => 'number', 'required' => false, 'in_batch' => true],
-                'kapasitas_pendingin' => ['label' => 'Kapasitas Pendingin (PK)', 'type' => 'text', 'required' => false, 'in_batch' => true, 'show_if' => ['subkategori' => ['ac']]],
-                'tahun_pembuatan' => ['label' => 'Tahun Pembuatan', 'type' => 'number', 'required' => false, 'in_batch' => true],
+
+                // 🔥 SPESIFIKASI TEKNIS DIPINDAH KE IN_UNIT 🔥
+                'daya_listrik' => ['label' => 'Daya Listrik (Watt)', 'type' => 'number', 'required' => false, 'in_unit' => true],
+                'tegangan' => ['label' => 'Tegangan (Volt)', 'type' => 'number', 'required' => false, 'in_unit' => true],
+                'kapasitas_pendingin' => ['label' => 'Kapasitas Pendingin (PK)', 'type' => 'text', 'required' => false, 'in_unit' => true, 'show_if' => ['subkategori' => ['ac']]],
+                'tahun_pembuatan' => ['label' => 'Tahun Pembuatan', 'type' => 'number', 'required' => false, 'in_unit' => true],
             ],
 
             'LAB' => [
@@ -81,12 +91,18 @@ class AssetType extends Model
                 'subkategori' => ['label' => 'Jenis Instrumen', 'type' => 'select', 'options' => [
                     'ukur' => 'Alat Ukur', 'eksperimen' => 'Peralatan Eksperimen', 'mikroskop' => 'Mikroskop / Optik', 'lainnya' => 'Lainnya',
                 ], 'required' => true, 'in_batch' => true],
-                'fungsi_alat' => ['label' => 'Fungsi Instrumen', 'type' => 'text', 'required' => true, 'in_batch' => true],
-                'rentang_ukur' => ['label' => 'Rentang Pengukuran', 'type' => 'text', 'required' => false, 'in_batch' => true],
-                'akurasi' => ['label' => 'Akurasi / Ketelitian', 'type' => 'text', 'required' => false, 'in_batch' => true],
-                'satuan_ukur' => ['label' => 'Satuan Pengukuran', 'type' => 'text', 'required' => false, 'in_batch' => true],
+
+                // 🔥 SPESIFIKASI TEKNIS DIPINDAH KE IN_UNIT 🔥
+                'fungsi_alat' => ['label' => 'Fungsi Instrumen', 'type' => 'text', 'required' => false, 'in_unit' => true],
+                'rentang_ukur' => ['label' => 'Rentang Pengukuran', 'type' => 'text', 'required' => false, 'in_unit' => true],
+                'akurasi' => ['label' => 'Akurasi / Ketelitian', 'type' => 'text', 'required' => false, 'in_unit' => true],
+                'satuan_ukur' => ['label' => 'Satuan Pengukuran', 'type' => 'text', 'required' => false, 'in_unit' => true],
+
+                // Kalibrasi tetap di batch sebagai penentu utama
                 'butuh_kalibrasi' => ['label' => 'Memerlukan Kalibrasi?', 'type' => 'select', 'options' => ['Ya' => 'Ya', 'Tidak' => 'Tidak'], 'required' => true, 'in_batch' => true],
                 'interval_kalibrasi' => ['label' => 'Interval (Bulan)', 'type' => 'number', 'required' => false, 'in_batch' => true, 'show_if' => ['butuh_kalibrasi' => ['Ya']]],
+
+                // Hasil kalibrasi per unit
                 'tgl_kalibrasi_terakhir' => ['label' => 'Tgl Kalibrasi Terakhir', 'type' => 'date', 'required' => false, 'in_unit' => true, 'show_if' => ['butuh_kalibrasi' => ['Ya']]],
                 'no_sertifikat_kalibrasi' => ['label' => 'No. Sertifikat Kalibrasi', 'type' => 'text', 'required' => false, 'in_unit' => true, 'show_if' => ['butuh_kalibrasi' => ['Ya']]],
             ],
@@ -182,7 +198,6 @@ class AssetType extends Model
                 'no_izin_bangunan' => ['label' => 'No. IMB / PBG', 'type' => 'text', 'required' => false, 'in_batch' => true],
                 'status_kepemilikan' => ['label' => 'Status Kepemilikan', 'type' => 'text', 'required' => false, 'in_batch' => true],
                 'file_imb' => ['label' => 'Upload IMB/PBG (PDF/Gambar)', 'type' => 'file', 'required' => false, 'in_batch' => true],
-                // 🔥 TAMBAHAN FIELD FOTO GEDUNG 🔥
                 'foto_gedung' => [
                     'label' => 'Upload Foto Gedung/Bangunan (Bisa lebih dari 1)',
                     'type' => 'file',

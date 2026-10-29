@@ -14,10 +14,63 @@
 
     <!-- Styles -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+
+    <!-- 🔥 CSS UNTUK HORIZONTAL SCROLL HINT 🔥 -->
+    <style>
+        /* 🔥 CSS SCROLL HINT FINAL (ANTI KEPOTONG) 🔥 */
+        .scroll-hint {
+            position: fixed;
+            bottom: 40px;
+            /* Jarak dari bawah */
+            left: 50%;
+            transform: translateX(-50%);
+            /* Posisi tengah */
+            background: #1e293b;
+            /* Warna gelap */
+            color: #f8fafc;
+            padding: 10px 20px;
+            border-radius: 50px;
+            font-size: 13px;
+            font-weight: 500;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+            z-index: 99999;
+            /* Pastikan paling atas */
+
+            /* 🔥 KUNCI ANTI KEPOTONG 🔥 */
+            width: max-content;
+            max-width: 95vw;
+            white-space: nowrap;
+            display: block;
+            /* Bukan flex, agar teks tidak terlipat */
+
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            pointer-events: none;
+            /* Agar tidak menghalangi klik */
+        }
+
+        .scroll-hint.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateX(-50%) translateY(-10px);
+            /* Efek naik dikit */
+        }
+
+        /* Styling kotak tombol keyboard */
+        .scroll-hint .kbd {
+            background: #334155;
+            color: #e2e8f0;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            font-weight: bold;
+            border-bottom: 2px solid #0f172a;
+        }
+    </style>
     @stack('styles')
 </head>
-
-<script src="{{ asset('js/horizontal-scroll.js') }}"></script>
 
 <body class="@if (session('dark_mode')) dark-mode @endif">
     <div id="app" class="dashboard">
@@ -291,7 +344,7 @@
 
     <!-- Scroll Hint -->
     <div class="scroll-hint" id="scrollHint">
-        💡 <strong>Tip:</strong> Gunakan <strong>Shift + Scroll</strong> untuk melihat konten tabel secara horizontal
+        ↔️ Tekan <span class="kbd">Shift</span> + <span class="kbd">Scroll</span> untuk menggeser tabel
     </div>
 
     <!-- Loading Overlay -->
@@ -316,7 +369,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             initializeSidebar();
             initializeFlashMessages();
-            initializeScrollHint();
+            initializeScrollHint(); // 🔥 Panggil fungsi scroll hint
             updateServerTime();
             setInterval(updateServerTime, 1000);
         });
@@ -447,22 +500,39 @@
             }
         }
 
+        // 🔥 FUNGSI BARU UNTUK HORIZONTAL SCROLL HINT 🔥
         function initializeScrollHint() {
-            const tables = document.querySelectorAll('.table-wrapper, .data-table-container');
-            let hintShown = localStorage.getItem('scrollHintShown');
+            // Jangan tampilkan di HP (karena HP pakai swipe)
+            if (window.innerWidth <= 768) return;
 
-            tables.forEach(table => {
-                if (table.scrollWidth > table.clientWidth && !hintShown) {
-                    const hint = document.getElementById('scrollHint');
-                    if (hint) {
-                        hint.classList.add('show');
-                        setTimeout(() => {
-                            hint.classList.remove('show');
-                            localStorage.setItem('scrollHintShown', 'true');
-                        }, 5000);
-                    }
+            const scrollableElements = document.querySelectorAll('.table-wrapper, .data-table-container, .content-area');
+            let hasHorizontalScroll = false;
+
+            scrollableElements.forEach(element => {
+                if (element && element.scrollWidth > element.clientWidth) {
+                    hasHorizontalScroll = true;
                 }
             });
+
+            if (hasHorizontalScroll) {
+                const hint = document.getElementById('scrollHint');
+                if (hint) {
+                    // Cek kapan terakhir kali ditampilkan (cooldown 30 detik agar tidak spam)
+                    const lastShown = sessionStorage.getItem('scrollHintLastShown');
+                    if (lastShown && (Date.now() - lastShown < 30000)) return;
+
+                    // Delay sedikit agar render tabel selesai
+                    setTimeout(() => {
+                        hint.classList.add('show');
+                        sessionStorage.setItem('scrollHintLastShown', Date.now());
+
+                        // Hilangkan setelah 5 detik
+                        setTimeout(() => {
+                            hint.classList.remove('show');
+                        }, 5000);
+                    }, 500);
+                }
+            }
         }
 
         function showLoading() {
@@ -506,304 +576,3 @@
 </body>
 
 </html>
-
-@push('styles')
-    <style>
-        .asset-gate-container {
-            background: var(--card-background);
-            border-radius: 16px;
-            box-shadow: var(--shadow);
-            padding: 1.5rem 2rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .asset-gate-header h4 {
-            margin: 0 0 0.25rem;
-            font-size: 1rem;
-            color: var(--text-primary);
-        }
-
-        .asset-gate-header p {
-            margin: 0 0 1.25rem;
-            font-size: 0.8rem;
-            color: var(--text-secondary);
-        }
-
-        .asset-gate-cards {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1rem;
-        }
-
-        .asset-gate-card {
-            position: relative;
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            padding: 1.25rem;
-            border: 2px solid var(--border-color);
-            border-radius: 12px;
-            text-decoration: none;
-            color: inherit;
-            background: var(--light-bg);
-            transition: all 0.2s ease;
-        }
-
-        .asset-gate-card:hover {
-            border-color: var(--primary-color);
-            transform: translateY(-3px);
-            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
-        }
-
-        .asset-gate-card.active {
-            border-color: var(--primary-color);
-            background: color-mix(in srgb, var(--primary-color) 8%, var(--card-background));
-            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
-        }
-
-        .asset-gate-icon {
-            font-size: 1.75rem;
-            flex-shrink: 0;
-            width: 56px;
-            height: 56px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: var(--card-background);
-            border-radius: 12px;
-            box-shadow: inset 0 0 0 1px var(--border-color);
-        }
-
-        .asset-gate-info {
-            min-width: 0;
-        }
-
-        .asset-gate-info h5 {
-            margin: 0 0 0.25rem;
-            font-size: 0.95rem;
-            color: var(--text-primary);
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            flex-wrap: wrap;
-        }
-
-        .asset-gate-info p {
-            margin: 0;
-            font-size: 0.78rem;
-            color: var(--text-secondary);
-            line-height: 1.4;
-        }
-
-        .asset-gate-check {
-            position: absolute;
-            top: 0.75rem;
-            right: 0.75rem;
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            background: var(--primary-color);
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.75rem;
-            font-weight: bold;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
-        }
-
-        .badge-prototype {
-            font-size: 0.65rem;
-            font-weight: 600;
-            background: #fff3cd;
-            color: #856404;
-            padding: 0.15rem 0.55rem;
-            border-radius: 999px;
-            border: 1px solid #ffc107;
-            white-space: nowrap;
-        }
-
-        @media screen and (max-width: 640px) {
-            .asset-gate-cards {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        .asset-type-tab:hover {
-            background: var(--card-background);
-            color: var(--text-primary);
-        }
-
-        .asset-type-tab.active {
-            background: var(--primary-color);
-            color: white;
-            border-color: var(--primary-color);
-        }
-
-        .asset-type-tab small {
-            font-weight: normal;
-            opacity: 0.85;
-        }
-
-        .item-type-picker {
-            display: flex;
-            gap: 0.75rem;
-            flex-wrap: wrap;
-        }
-
-        .item-type-option {
-            display: flex;
-            align-items: center;
-            gap: 0.6rem;
-            padding: 0.6rem 1rem;
-            border: 2px solid var(--border-color);
-            border-radius: 10px;
-            cursor: pointer;
-            font-size: 0.8rem;
-            color: var(--text-secondary);
-            transition: all 0.15s ease;
-            flex: 1;
-            min-width: 220px;
-            background: var(--light-bg);
-        }
-
-        .item-type-option:hover {
-            border-color: var(--primary-color);
-        }
-
-        .item-type-option.active {
-            border-color: var(--primary-color);
-            background: color-mix(in srgb, var(--primary-color) 8%, var(--card-background));
-            color: var(--text-primary);
-        }
-
-        .item-type-option strong {
-            display: block;
-            font-size: 0.85rem;
-            font-weight: 600;
-        }
-
-        .item-type-option small {
-            display: block;
-            font-weight: normal;
-            font-size: 0.75rem;
-            color: var(--text-secondary);
-            margin-top: 0.1rem;
-        }
-
-        .item-type-icon {
-            font-size: 1.4rem;
-            flex-shrink: 0;
-        }
-
-        .view-toggle-wrapper {
-            padding: 0 2rem;
-            margin-bottom: 0.75rem;
-            margin-top: 0.5rem;
-        }
-
-        .view-toggle {
-            display: inline-flex;
-            background: #f3f4f6;
-            border-radius: 12px;
-            padding: 4px;
-            gap: 4px;
-            border: 1px solid #e5e7eb;
-            flex-wrap: wrap;
-        }
-
-        .view-toggle-btn {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.6rem 1.2rem;
-            border-radius: 10px;
-            text-decoration: none;
-            font-size: 0.85rem;
-            font-weight: 500;
-            color: #6b7280;
-            background: transparent;
-            transition: all 0.2s ease;
-            border: none;
-            cursor: pointer;
-            white-space: nowrap;
-        }
-
-        .view-toggle-btn .view-toggle-icon {
-            font-size: 1.2rem;
-            line-height: 1;
-        }
-
-        .view-toggle-btn .view-toggle-label {
-            font-weight: 500;
-        }
-
-        .view-toggle-btn:hover {
-            color: #111827;
-            background: rgba(0, 0, 0, 0.04);
-        }
-
-        .view-toggle-btn.active {
-            background: #ffffff;
-            color: #2563eb;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
-            font-weight: 600;
-        }
-
-        .view-toggle-btn.active .view-toggle-label {
-            color: #2563eb;
-        }
-
-        /* Dark mode */
-        body.dark-mode .view-toggle {
-            background: #1f2937;
-            border-color: #374151;
-        }
-
-        body.dark-mode .view-toggle-btn:hover {
-            background: rgba(255, 255, 255, 0.06);
-        }
-
-        body.dark-mode .view-toggle-btn.active {
-            background: #111827;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-        }
-
-        /* Responsive */
-        @media screen and (max-width: 640px) {
-            .view-toggle-wrapper {
-                padding: 0 1rem;
-            }
-
-            .view-toggle {
-                width: 100%;
-                justify-content: stretch;
-            }
-
-            .view-toggle-btn {
-                flex: 1;
-                justify-content: center;
-                padding: 0.5rem 0.8rem;
-                font-size: 0.78rem;
-            }
-
-            .view-toggle-btn .view-toggle-label {
-                display: none;
-            }
-
-            .view-toggle-btn .view-toggle-icon {
-                font-size: 1.4rem;
-            }
-        }
-
-        @media screen and (max-width: 480px) {
-            .view-toggle-btn {
-                padding: 0.4rem 0.6rem;
-            }
-
-            .view-toggle-btn .view-toggle-icon {
-                font-size: 1.2rem;
-            }
-        }
-    </style>
-@endpush

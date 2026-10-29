@@ -33,7 +33,7 @@ class AssetController extends Controller
             return $this->indexSemua($request, $assetTypes, $units, $view);
         }
 
-        $query = AssetBatch::with('assetType')
+        $query = AssetBatch::with(['assetType', 'assets.unit'])
             ->withCount([
                 'assets',
                 'assets as tersedia_count' => fn ($q) => $q->where('status', 'Tersedia'),
@@ -150,7 +150,7 @@ class AssetController extends Controller
         $unitId = $request->input('unit_id');
         $status = $request->input('status');
 
-        $physicalQuery = AssetBatch::with('assetType')
+        $physicalQuery = AssetBatch::with(['assetType', 'assets.unit'])
             ->withCount('assets as quantity')
             ->whereHas('assets');
 
@@ -176,11 +176,15 @@ class AssetController extends Controller
         $physicalGroups = $physicalQuery->get()->map(function ($batch) {
             $tersedia = $batch->assets->where('status', 'Tersedia')->count();
 
+            // Ambil nama unit dari aset pertama di batch tersebut
+            $firstAsset = $batch->assets->first();
+            $unitName = $firstAsset && $firstAsset->unit ? $firstAsset->unit->name : '-';
+
             return (object) [
                 'type' => 'Fisik',
                 'name' => $batch->name,
                 'category_label' => $batch->assetType->name ?? '-',
-                'unit_label' => '-',
+                'unit_label' => $unitName, // 🔥 SUDAH DIPERBAIKI
                 'quantity' => $batch->quantity,
                 'status_label' => $tersedia.' Tersedia',
                 'detail_route' => route('assets-inv.group-detail', ['batch_id' => $batch->id]),

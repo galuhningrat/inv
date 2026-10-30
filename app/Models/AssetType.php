@@ -38,7 +38,6 @@ class AssetType extends Model
                     'monitor' => 'Monitor', 'printer' => 'Printer', 'keyboard' => 'Keyboard', 'mouse' => 'Mouse', 'lainnya' => 'Periferal Lainnya',
                 ], 'required' => true, 'in_batch' => true],
 
-                // 🔥 SPESIFIKASI TEKNIS DIPINDAH KE IN_UNIT 🔥
                 'processor' => ['label' => 'Prosesor / Chipset', 'type' => 'text', 'required' => false, 'in_unit' => true, 'show_if' => ['subkategori' => ['laptop', 'desktop', 'server']]],
                 'ram' => ['label' => 'Kapasitas RAM (GB)', 'type' => 'number', 'required' => false, 'in_unit' => true, 'show_if' => ['subkategori' => ['laptop', 'desktop', 'server']]],
                 'storage' => ['label' => 'Penyimpanan (SSD/HDD)', 'type' => 'text', 'required' => false, 'in_unit' => true, 'show_if' => ['subkategori' => ['laptop', 'desktop', 'server']]],
@@ -47,11 +46,18 @@ class AssetType extends Model
                 'ukuran_layar' => ['label' => 'Ukuran Layar (Inch)', 'type' => 'number', 'required' => false, 'in_unit' => true, 'show_if' => ['subkategori' => ['laptop', 'monitor']]],
                 'resolusi_layar' => ['label' => 'Resolusi Layar', 'type' => 'text', 'required' => false, 'in_unit' => true, 'show_if' => ['subkategori' => ['laptop', 'monitor']]],
 
-                // Garansi tetap di batch (biasanya 1 batch garansinya sama)
                 'garansi_berakhir' => ['label' => 'Masa Garansi Berakhir', 'type' => 'date', 'required' => false, 'in_batch' => true],
 
                 'hostname' => ['label' => 'Hostname / Nama Komputer', 'type' => 'text', 'required' => false, 'in_unit' => true, 'show_if' => ['subkategori' => ['laptop', 'desktop', 'server']]],
-                'mac_address' => ['label' => 'MAC Address', 'type' => 'text', 'required' => false, 'in_unit' => true, 'show_if' => ['subkategori' => ['laptop', 'desktop', 'server']]],
+                'mac_address' => [
+                    'label' => 'MAC Address',
+                    'type' => 'text',
+                    'required' => false,
+                    'in_unit' => true,
+                    'rules' => ['regex:/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/'],
+                    'messages' => ['regex' => 'Format MAC Address salah. Gunakan format seperti 00:1A:2B:3C:4D:5E'],
+                    'show_if' => ['subkategori' => ['laptop', 'desktop', 'server']],
+                ],
             ],
 
             'JAR' => [
@@ -61,16 +67,28 @@ class AssetType extends Model
                     'kabel' => 'Kabel / Fiber Optic', 'lainnya' => 'Lainnya',
                 ], 'required' => true, 'in_batch' => true],
 
-                // 🔥 SPESIFIKASI TEKNIS DIPINDAH KE IN_UNIT 🔥
                 'jumlah_port' => ['label' => 'Jumlah Port', 'type' => 'number', 'required' => false, 'in_unit' => true],
                 'kecepatan' => ['label' => 'Kecepatan Port (Mbps/Gbps)', 'type' => 'text', 'required' => false, 'in_unit' => true],
                 'dukungan_poe' => ['label' => 'Dukungan PoE', 'type' => 'select', 'options' => ['Ya' => 'Ya', 'Tidak' => 'Tidak'], 'required' => false, 'in_unit' => true],
                 'versi_firmware' => ['label' => 'Versi Firmware', 'type' => 'text', 'required' => false, 'in_unit' => true],
-
-                // Field unit lainnya
                 'lokasi_rak' => ['label' => 'Nomor Rak / Identitas', 'type' => 'text', 'required' => false, 'in_unit' => true],
-                'mac_address' => ['label' => 'MAC Address', 'type' => 'text', 'required' => false, 'in_unit' => true],
-                'ip_address' => ['label' => 'IP Address', 'type' => 'text', 'required' => false, 'in_unit' => true],
+
+                'mac_address' => [
+                    'label' => 'MAC Address',
+                    'type' => 'text',
+                    'required' => false,
+                    'in_unit' => true,
+                    'rules' => ['regex:/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/'],
+                    'messages' => ['regex' => 'Format MAC Address salah. Gunakan format seperti 00:1A:2B:3C:4D:5E'],
+                ],
+                'ip_address' => [
+                    'label' => 'IP Address',
+                    'type' => 'text',
+                    'required' => false,
+                    'in_unit' => true,
+                    'rules' => ['ip'],
+                    'messages' => ['ip' => 'Format IP Address salah. Gunakan format seperti 192.168.1.1'],
+                ],
             ],
 
             'ELK' => [
@@ -79,7 +97,6 @@ class AssetType extends Model
                     'proyektor' => 'Proyektor', 'tv' => 'TV / Layar', 'kamera' => 'Kamera', 'audio' => 'Audio', 'ac' => 'AC', 'lainnya' => 'Lainnya',
                 ], 'required' => true, 'in_batch' => true],
 
-                // 🔥 SPESIFIKASI TEKNIS DIPINDAH KE IN_UNIT 🔥
                 'daya_listrik' => ['label' => 'Daya Listrik (Watt)', 'type' => 'number', 'required' => false, 'in_unit' => true],
                 'tegangan' => ['label' => 'Tegangan (Volt)', 'type' => 'number', 'required' => false, 'in_unit' => true],
                 'kapasitas_pendingin' => ['label' => 'Kapasitas Pendingin (PK)', 'type' => 'text', 'required' => false, 'in_unit' => true, 'show_if' => ['subkategori' => ['ac']]],
@@ -92,30 +109,61 @@ class AssetType extends Model
                     'ukur' => 'Alat Ukur', 'eksperimen' => 'Peralatan Eksperimen', 'mikroskop' => 'Mikroskop / Optik', 'lainnya' => 'Lainnya',
                 ], 'required' => true, 'in_batch' => true],
 
-                // 🔥 SPESIFIKASI TEKNIS DIPINDAH KE IN_UNIT 🔥
                 'fungsi_alat' => ['label' => 'Fungsi Instrumen', 'type' => 'text', 'required' => false, 'in_unit' => true],
                 'rentang_ukur' => ['label' => 'Rentang Pengukuran', 'type' => 'text', 'required' => false, 'in_unit' => true],
                 'akurasi' => ['label' => 'Akurasi / Ketelitian', 'type' => 'text', 'required' => false, 'in_unit' => true],
                 'satuan_ukur' => ['label' => 'Satuan Pengukuran', 'type' => 'text', 'required' => false, 'in_unit' => true],
 
-                // Kalibrasi tetap di batch sebagai penentu utama
                 'butuh_kalibrasi' => ['label' => 'Memerlukan Kalibrasi?', 'type' => 'select', 'options' => ['Ya' => 'Ya', 'Tidak' => 'Tidak'], 'required' => true, 'in_batch' => true],
                 'interval_kalibrasi' => ['label' => 'Interval (Bulan)', 'type' => 'number', 'required' => false, 'in_batch' => true, 'show_if' => ['butuh_kalibrasi' => ['Ya']]],
 
-                // Hasil kalibrasi per unit
                 'tgl_kalibrasi_terakhir' => ['label' => 'Tgl Kalibrasi Terakhir', 'type' => 'date', 'required' => false, 'in_unit' => true, 'show_if' => ['butuh_kalibrasi' => ['Ya']]],
                 'no_sertifikat_kalibrasi' => ['label' => 'No. Sertifikat Kalibrasi', 'type' => 'text', 'required' => false, 'in_unit' => true, 'show_if' => ['butuh_kalibrasi' => ['Ya']]],
             ],
 
             'MEB' => [
                 'hide_general' => true,
-                'subkategori' => ['label' => 'Jenis Mebel', 'type' => 'select', 'options' => [
-                    'meja' => 'Meja', 'kursi' => 'Kursi', 'lemari' => 'Lemari', 'rak' => 'Rak', 'lainnya' => 'Lainnya',
+                'subkategori' => ['label' => 'Jenis Mebel (Lepas)', 'type' => 'select', 'options' => [
+                    'meja' => 'Meja Kerja / Rapat',
+                    'kursi' => 'Kursi',
+                    'lemari' => 'Lemari Pakaian / Dokumen',
+                    'rak' => 'Rak Buku / Arsip',
+                    'sofa' => 'Sofa / Kursi Tamu',
+                    'lainnya' => 'Mebel Lainnya',
                 ], 'required' => true, 'in_batch' => true],
                 'bahan_utama' => ['label' => 'Bahan Utama', 'type' => 'select', 'options' => ['Kayu' => 'Kayu', 'Besi' => 'Besi', 'Kaca' => 'Kaca', 'Plastik' => 'Plastik', 'Kombinasi' => 'Kombinasi'], 'required' => true, 'in_batch' => true],
                 'dimensi' => ['label' => 'Dimensi (P x L x T cm)', 'type' => 'text', 'required' => false, 'in_batch' => true],
                 'kapasitas' => ['label' => 'Kapasitas/Day tampung', 'type' => 'text', 'required' => false, 'in_batch' => true],
                 'warna' => ['label' => 'Warna', 'type' => 'text', 'required' => false, 'in_batch' => true],
+            ],
+
+            'FUR' => [
+                'hide_general' => true,
+                'subkategori' => ['label' => 'Jenis Furnitur (Terpasang/Custom)', 'type' => 'select', 'options' => [
+                    'meja_custom' => 'Meja Custom (Lab/Kantor)',
+                    'lemari_builtin' => 'Lemari Built-in / Dinding',
+                    'partisi' => 'Partisi / Sekat Ruangan',
+                    'kitchen_set' => 'Kitchen Set / Pantry',
+                    'lainnya' => 'Furnitur Custom Lainnya',
+                ], 'required' => true, 'in_batch' => true],
+                'bahan_utama' => ['label' => 'Bahan Utama', 'type' => 'select', 'options' => ['Kayu' => 'Kayu', 'Besi' => 'Besi', 'Kaca' => 'Kaca', 'Plastik' => 'Plastik', 'Kombinasi' => 'Kombinasi'], 'required' => true, 'in_batch' => true],
+                'dimensi' => ['label' => 'Dimensi (P x L x T cm)', 'type' => 'text', 'required' => false, 'in_batch' => true],
+                'kapasitas' => ['label' => 'Kapasitas/Day tampung', 'type' => 'text', 'required' => false, 'in_batch' => true],
+                'warna' => ['label' => 'Warna', 'type' => 'text', 'required' => false, 'in_batch' => true],
+            ],
+
+            'ATK' => [
+                'hide_general' => false,
+                'subkategori' => ['label' => 'Kategori Perkakas / Komponen', 'type' => 'select', 'options' => [
+                    'tangan' => 'Peralatan Tangan (Obeng, Tang, Toolbox)',
+                    'listrik' => 'Peralatan Listrik (Solder, Bor)',
+                    'ukur' => 'Alat Ukur (Multimeter, Jangka Sorong)',
+                    'komponen' => 'Komponen Elektronika (Sensor, Resistor, IC, Arduino)',
+                    'lainnya' => 'Perkakas Lainnya',
+                ], 'required' => true, 'in_batch' => true],
+                'ukuran' => ['label' => 'Ukuran / Spesifikasi', 'type' => 'text', 'required' => false, 'in_batch' => true],
+                'material' => ['label' => 'Material', 'type' => 'text', 'required' => false, 'in_batch' => true],
+                'daya_listrik' => ['label' => 'Daya Listrik (Watt)', 'type' => 'number', 'required' => false, 'in_batch' => true, 'show_if' => ['subkategori' => ['listrik']]],
             ],
 
             'ARS' => [
@@ -150,9 +198,28 @@ class AssetType extends Model
                 'transmisi' => ['label' => 'Transmisi', 'type' => 'select', 'options' => ['Manual' => 'Manual', 'Otomatis' => 'Otomatis'], 'required' => false, 'in_batch' => true],
                 'warna' => ['label' => 'Warna', 'type' => 'text', 'required' => false, 'in_batch' => true],
                 'kapasitas_penumpang' => ['label' => 'Kapasitas Penumpang', 'type' => 'number', 'required' => false, 'in_batch' => true],
-                'no_rangka' => ['label' => 'Nomor Rangka (VIN)', 'type' => 'text', 'required' => true, 'in_unit' => true],
-                'no_mesin' => ['label' => 'Nomor Mesin', 'type' => 'text', 'required' => true, 'in_unit' => true],
-                'no_polisi' => ['label' => 'Nomor Polisi', 'type' => 'text', 'required' => true, 'in_unit' => true],
+                'no_rangka' => [
+                    'label' => 'Nomor Rangka (VIN)',
+                    'type' => 'text',
+                    'required' => true,
+                    'in_unit' => true,
+                    'rules' => ['regex:/^[A-HJ-NPR-Z0-9]{17}$/i'],
+                    'messages' => ['regex' => 'Nomor Rangka (VIN) harus terdiri dari tepat 17 karakter alfanumerik.'],
+                ],
+                'no_mesin' => [
+                    'label' => 'Nomor Mesin',
+                    'type' => 'text',
+                    'required' => true,
+                    'in_unit' => true,
+                    'rules' => 'max:50',
+                ],
+                'no_polisi' => [
+                    'label' => 'Nomor Polisi',
+                    'type' => 'text',
+                    'required' => true,
+                    'in_unit' => true,
+                    'rules' => 'max:15',
+                ],
                 'odometer' => ['label' => 'Odometer / KM Terakhir', 'type' => 'number', 'required' => false, 'in_unit' => true],
                 'masa_berlaku_stnk' => ['label' => 'Masa Berlaku STNK', 'type' => 'date', 'required' => false, 'in_unit' => true],
                 'file_stnk' => ['label' => 'Upload STNK (PDF/Gambar)', 'type' => 'file', 'required' => false, 'in_unit' => true],
@@ -217,28 +284,6 @@ class AssetType extends Model
                 'material_utama' => ['label' => 'Material Utama', 'type' => 'text', 'required' => false, 'in_batch' => true],
                 'tahun_pemasangan' => ['label' => 'Tahun Pemasangan', 'type' => 'number', 'required' => false, 'in_batch' => true],
                 'cakupan_wilayah' => ['label' => 'Cakupan Wilayah', 'type' => 'text', 'required' => false, 'in_batch' => true],
-            ],
-
-            'FUR' => [
-                'hide_general' => true,
-                'subkategori' => ['label' => 'Jenis Furniture', 'type' => 'select', 'options' => [
-                    'meja' => 'Meja', 'kursi' => 'Kursi', 'lemari' => 'Lemari', 'rak' => 'Rak', 'lainnya' => 'Lainnya',
-                ], 'required' => true, 'in_batch' => true],
-                'bahan_utama' => ['label' => 'Bahan Utama', 'type' => 'select', 'options' => ['Kayu' => 'Kayu', 'Besi' => 'Besi', 'Kaca' => 'Kaca', 'Plastik' => 'Plastik', 'Kombinasi' => 'Kombinasi'], 'required' => true, 'in_batch' => true],
-                'dimensi' => ['label' => 'Dimensi (P x L x T cm)', 'type' => 'text', 'required' => false, 'in_batch' => true],
-                'kapasitas' => ['label' => 'Kapasitas/Day tampung', 'type' => 'text', 'required' => false, 'in_batch' => true],
-                'warna' => ['label' => 'Warna', 'type' => 'text', 'required' => false, 'in_batch' => true],
-            ],
-
-            'ATK' => [
-                'hide_general' => false,
-                'subkategori' => ['label' => 'Kategori Perkakas/ATK', 'type' => 'select', 'options' => [
-                    'atk' => 'Alat Tulis Kantor (ATK)',
-                    'tangan' => 'Peralatan Tangan', 'listrik' => 'Peralatan Listrik', 'ukur' => 'Alat Ukur', 'lainnya' => 'Lainnya',
-                ], 'required' => true, 'in_batch' => true],
-                'ukuran' => ['label' => 'Ukuran / Spesifikasi', 'type' => 'text', 'required' => false, 'in_batch' => true],
-                'material' => ['label' => 'Material', 'type' => 'text', 'required' => false, 'in_batch' => true],
-                'daya_listrik' => ['label' => 'Daya Listrik (Watt)', 'type' => 'number', 'required' => false, 'in_batch' => true, 'show_if' => ['subkategori' => ['listrik']]],
             ],
 
             'LAN' => [

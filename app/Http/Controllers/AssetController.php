@@ -482,6 +482,13 @@ class AssetController extends Controller
             $rules['serial_numbers.*'] = ['required', 'string', 'distinct', Rule::unique('assets', 'serial_number')->whereNull('deleted_at')];
         }
 
+        $customMessages = [
+            // 🔥 Pesan error untuk Serial Number yang duplikat 🔥
+            'serial_numbers.*.unique' => 'Nomor Seri Pabrik (S/N) ini sudah terdaftar di sistem. Silakan gunakan nomor seri yang lain.',
+            'serial_numbers.*.required' => 'Nomor Seri Pabrik (S/N) wajib diisi.',
+            'serial_numbers.*.distinct' => 'Terdapat Nomor Seri (S/N) yang sama di dalam form ini. Pastikan setiap unit memiliki nomor seri yang berbeda.',
+        ];
+
         foreach ($schema as $key => $field) {
             if (isset($field['type']) && $field['type'] !== 'hidden') {
                 $rule = $field['required'] ? 'required' : 'nullable';
@@ -490,7 +497,6 @@ class AssetController extends Controller
                 } elseif ($field['type'] === 'select' && isset($field['options'])) {
                     $rule .= '|in:'.implode(',', array_keys($field['options']));
                 } elseif ($field['type'] === 'file') {
-                    // Handling multiple file
                     if (! empty($field['multiple'])) {
                         $rules["category_data.{$key}"] = $rule.'|array';
                         $rules["category_data.{$key}.*"] = 'file|mimes:pdf,jpg,jpeg,png|max:5120';
@@ -498,6 +504,27 @@ class AssetController extends Controller
                         continue;
                     } else {
                         $rule .= '|file|mimes:pdf,jpg,jpeg,png|max:5120';
+                    }
+                }
+
+                // 🔥 BACA RULE (Bisa String atau Array) 🔥
+                if (isset($field['rules'])) {
+                    if (is_array($field['rules'])) {
+                        $rule .= '|'.implode('|', $field['rules']);
+                    } else {
+                        $rule .= '|'.$field['rules'];
+                    }
+                }
+
+                // 🔥 BACA PESAN ERROR KUSTOM 🔥
+                if (isset($field['messages'])) {
+                    foreach ($field['messages'] as $ruleName => $msg) {
+                        if (isset($field['in_unit'])) {
+                            $customMessages["unit_data.*.{$key}.{$ruleName}"] = $msg;
+                        }
+                        if (isset($field['in_batch'])) {
+                            $customMessages["category_data.{$key}.{$ruleName}"] = $msg;
+                        }
                     }
                 }
 
@@ -510,7 +537,8 @@ class AssetController extends Controller
             }
         }
 
-        $validated = $request->validate($rules);
+        // 🔥 MASUKKAN CUSTOM MESSAGES KE VALIDASI 🔥
+        $validated = $request->validate($rules, $customMessages);
 
         if ($isStaticAsset) {
             $validated['funding_source'] = null;
@@ -529,7 +557,6 @@ class AssetController extends Controller
             $categoryData = $request->input('category_data', []);
             if ($request->hasFile('category_data')) {
                 foreach ($request->file('category_data') as $key => $fileOrFiles) {
-                    // Jika berupa array (multiple file)
                     if (is_array($fileOrFiles)) {
                         $paths = [];
                         foreach ($fileOrFiles as $file) {
@@ -538,9 +565,7 @@ class AssetController extends Controller
                             }
                         }
                         $categoryData[$key] = $paths;
-                    }
-                    // Single file biasa
-                    elseif ($fileOrFiles->isValid()) {
+                    } elseif ($fileOrFiles->isValid()) {
                         $categoryData[$key] = $fileOrFiles->store('legal-documents/batch', 'public');
                     }
                 }
@@ -687,6 +712,8 @@ class AssetController extends Controller
         ];
 
         $unitDataRules = [];
+        $customMessages = []; // 🔥 Wadah untuk pesan error kustom
+
         foreach ($schema as $key => $field) {
             if (isset($field['in_unit']) && $field['in_unit'] === true) {
                 $rule = $field['required'] ? 'required' : 'nullable';
@@ -697,12 +724,31 @@ class AssetController extends Controller
                 } elseif ($field['type'] === 'file') {
                     $rule .= '|file|mimes:pdf,jpg,jpeg,png|max:5120';
                 }
+
+                // 🔥 BACA RULE (Bisa String atau Array) 🔥
+                if (isset($field['rules'])) {
+                    if (is_array($field['rules'])) {
+                        $rule .= '|'.implode('|', $field['rules']);
+                    } else {
+                        $rule .= '|'.$field['rules'];
+                    }
+                }
+
+                // 🔥 BACA PESAN ERROR KUSTOM 🔥
+                if (isset($field['messages'])) {
+                    foreach ($field['messages'] as $ruleName => $msg) {
+                        $customMessages["unit_data.{$key}.{$ruleName}"] = $msg;
+                    }
+                }
+
                 $unitDataRules["unit_data.{$key}"] = $rule;
             }
         }
 
         $validated = $request->validate($rules);
-        $request->validate($unitDataRules);
+
+        // 🔥 MASUKKAN CUSTOM MESSAGES KE VALIDASI UNIT 🔥
+        $request->validate($unitDataRules, $customMessages);
 
         if (! $isStaticAsset) {
             $unit = Unit::find($validated['unit_id']);

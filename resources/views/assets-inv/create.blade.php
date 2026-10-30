@@ -62,6 +62,18 @@
             <form action="{{ route('assets-inv.store') }}" method="POST" enctype="multipart/form-data" id="assetForm">
                 @csrf
 
+                @if ($errors->any())
+                    <div
+                        style="background: #fee2e2; border: 1px solid #ef4444; border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem; color: #991b1b;">
+                        <h4 style="margin-top: 0; margin-bottom: 0.5rem; font-size: 1rem;">Gagal Menyimpan Data:</h4>
+                        <ul style="margin: 0; padding-left: 1.5rem;">
+                            @foreach ($errors->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
+
                 <div class="form-row">
                     <div class="form-group">
                         <label for="name">Nama Aset / Model <span style="color: red;">*</span></label>
@@ -284,6 +296,7 @@
 
     <script>
         window.assetSchemas = {!! json_encode($schemas) !!};
+        window.oldInput = {!! json_encode(old()) !!};
     </script>
 @endsection
 
@@ -502,6 +515,14 @@
                 unitSelect.appendChild(opt);
             });
             unitSelect.disabled = false;
+
+            // Restore old unit if exists
+            if (window.oldInput && window.oldInput.unit_id) {
+                if (allUnits.find(u => u.id == window.oldInput.unit_id && u.category === kategori)) {
+                    unitSelect.value = window.oldInput.unit_id;
+                    updateLocationOptions();
+                }
+            }
         }
 
         function updateLocationOptions() {
@@ -539,6 +560,13 @@
                 locationDetail.required = false;
                 detailLabel.innerHTML =
                     'Detail Penempatan <small style="font-weight: normal;">(opsional, mis. "di dalam lemari")</small>';
+
+                // Restore old location
+                if (window.oldInput && window.oldInput.location_id) {
+                    if (unit.locations.some(l => l.id == window.oldInput.location_id)) {
+                        locationSelect.value = window.oldInput.location_id;
+                    }
+                }
             }
         }
 
@@ -551,25 +579,21 @@
             const qtyInput = document.getElementById('quantity');
             const locationSection = document.getElementById('locationSection');
             const accountingSection = document.getElementById('accountingSection');
-            const unitTableWrapper = document.querySelector('.unit-table-wrapper'); // 🔥 Target Tabelnya Saja
+            const unitTableWrapper = document.querySelector('.unit-table-wrapper');
 
-            // Reset Container
             document.getElementById('batchFieldsContainer').innerHTML = '';
             dynamicBatchContainer.style.display = 'none';
 
-            // Reset Form Umum
             if (generalBrand) generalBrand.style.display = 'block';
             if (generalModel) generalModel.style.display = 'block';
             if (generalSerialHeader) generalSerialHeader.style.display = 'table-cell';
 
-            // Reset Kuantitas & Section
-            qtyInput.readOnly = false; // 🔥 Gunakan readOnly agar value tetap tersubmit
+            qtyInput.readOnly = false;
             qtyInput.max = 100;
             if (locationSection) locationSection.style.display = 'block';
             if (accountingSection) accountingSection.style.display = 'block';
-            if (unitTableWrapper) unitTableWrapper.style.display = 'block'; // 🔥 Tampilkan tabel secara default
+            if (unitTableWrapper) unitTableWrapper.style.display = 'block';
 
-            // Jika tidak ada tipe yang dipilih, hentikan proses
             if (!typeId || !window.assetSchemas[typeId]) {
                 currentSchema = {};
                 renderUnitBlocks();
@@ -591,14 +615,12 @@
             if (currentSchema.max_qty) {
                 qtyInput.value = currentSchema.max_qty;
                 qtyInput.max = currentSchema.max_qty;
-                qtyInput.readOnly = true; // 🔥 Kunci di angka 1
+                qtyInput.readOnly = true;
             }
 
             if (isStaticAsset) {
                 if (locationSection) locationSection.style.display = 'none';
                 if (accountingSection) accountingSection.style.display = 'none';
-
-                // 🔥 SEMBUNYIKAN HANYA TABELNYA, BUKAN INPUT KUANTITASNYA 🔥
                 if (unitTableWrapper) unitTableWrapper.style.display = 'none';
 
                 const unitSelect = document.getElementById('unit_id');
@@ -632,21 +654,26 @@
                 existingDynamicHeaders.forEach(header => header.remove());
             }
 
+            // Ambil data lama dari batch (jika ada)
+            const oldBatchData = window.oldInput.category_data || {};
+
             for (const [key, field] of Object.entries(currentSchema)) {
                 if (field.in_batch) {
                     hasBatchFields = true;
                     let inputHtml = '';
+                    let oldVal = oldBatchData[key] || '';
 
                     if (field.type === 'select') {
                         let options = `<option value="">-- Pilih --</option>`;
                         for (const [val, label] of Object.entries(field.options)) {
-                            options += `<option value="${val}">${label}</option>`;
+                            const selected = (oldVal == val) ? 'selected' : '';
+                            options += `<option value="${val}" ${selected}>${label}</option>`;
                         }
                         inputHtml =
                             `<select name="category_data[${key}]" id="batch_input_${key}" class="form-control" onchange="handleDependencies()" ${field.required ? 'required' : ''}>${options}</select>`;
                     } else if (field.type === 'textarea') {
                         inputHtml =
-                            `<textarea name="category_data[${key}]" id="batch_input_${key}" class="form-control" rows="2" ${field.required ? 'required' : ''}></textarea>`;
+                            `<textarea name="category_data[${key}]" id="batch_input_${key}" class="form-control" rows="2" ${field.required ? 'required' : ''}>${oldVal}</textarea>`;
                     } else if (field.type === 'file') {
                         const isMultiple = field.multiple ? 'multiple' : '';
                         const nameAttr = field.multiple ? `category_data[${key}][]` : `category_data[${key}]`;
@@ -654,7 +681,7 @@
                             `<input type="file" name="${nameAttr}" class="form-control" accept=".pdf,.jpg,.jpeg,.png" ${isMultiple} ${field.required ? 'required' : ''}>`;
                     } else {
                         inputHtml =
-                            `<input type="${field.type}" name="category_data[${key}]" id="batch_input_${key}" class="form-control" ${field.required ? 'required' : ''}>`;
+                            `<input type="${field.type}" name="category_data[${key}]" id="batch_input_${key}" class="form-control" value="${oldVal}" ${field.required ? 'required' : ''}>`;
                     }
 
                     const colStyle = field.type === 'textarea' ? 'flex: 1 1 100%;' :
@@ -740,17 +767,25 @@
 
             container.innerHTML = '';
 
+            const oldUnitData = window.oldInput.unit_data || {};
+            const oldSerialNumbers = window.oldInput.serial_numbers || [];
+            const oldConditions = window.oldInput.conditions || [];
+
             for (let i = 0; i < qty; i++) {
                 let rowHtml = `<td style="font-weight: 600; text-align: center;">#${i + 1}</td>`;
 
                 if (!hideGeneral) {
-                    rowHtml += `<td><input type="text" name="serial_numbers[]" class="form-control" required></td>`;
+                    const oldSerial = oldSerialNumbers[i] ? oldSerialNumbers[i] : '';
+                    rowHtml +=
+                        `<td><input type="text" name="serial_numbers[]" class="form-control" value="${oldSerial}" required></td>`;
                 }
 
                 for (const [key, field] of Object.entries(currentSchema)) {
                     if (field.in_unit) {
                         let inputHtml = '';
                         let displayStyle = 'table-cell';
+
+                        let oldVal = (oldUnitData[i] && oldUnitData[i][key]) ? oldUnitData[i][key] : '';
 
                         if (field.show_if) {
                             let isConditionMet = true;
@@ -768,7 +803,8 @@
                         if (field.type === 'select') {
                             let options = `<option value="">-- Pilih --</option>`;
                             for (const [val, label] of Object.entries(field.options)) {
-                                options += `<option value="${val}">${label}</option>`;
+                                const selected = (oldVal == val) ? 'selected' : '';
+                                options += `<option value="${val}" ${selected}>${label}</option>`;
                             }
                             inputHtml =
                                 `<select name="unit_data[${i}][${key}]" class="form-control" ${field.required ? 'required' : ''}>${options}</select>`;
@@ -777,7 +813,7 @@
                                 `<input type="file" name="unit_data[${i}][${key}]" class="form-control" accept=".pdf,.jpg,.jpeg,.png" ${field.required ? 'required' : ''}>`;
                         } else {
                             inputHtml =
-                                `<input type="${field.type}" name="unit_data[${i}][${key}]" class="form-control" ${field.required ? 'required' : ''}>`;
+                                `<input type="${field.type}" name="unit_data[${i}][${key}]" class="form-control" value="${oldVal}" ${field.required ? 'required' : ''}>`;
                         }
 
                         rowHtml += `<td style="display: ${displayStyle};">${inputHtml}</td>`;
@@ -788,11 +824,12 @@
                 if (hideCondition) {
                     conditionHtml = `<input type="hidden" name="conditions[]" value="Baik">`;
                 } else {
+                    const oldCond = oldConditions[i] ? oldConditions[i] : 'Baik';
                     conditionHtml = `
                         <select name="conditions[]" class="form-control" required>
-                            <option value="Baik">Baik</option>
-                            <option value="Rusak Ringan">Rusak Ringan</option>
-                            <option value="Rusak Berat">Rusak Berat</option>
+                            <option value="Baik" ${oldCond === 'Baik' ? 'selected' : ''}>Baik</option>
+                            <option value="Rusak Ringan" ${oldCond === 'Rusak Ringan' ? 'selected' : ''}>Rusak Ringan</option>
+                            <option value="Rusak Berat" ${oldCond === 'Rusak Berat' ? 'selected' : ''}>Rusak Berat</option>
                         </select>
                     `;
                 }
@@ -813,7 +850,24 @@
         }
 
         document.addEventListener('DOMContentLoaded', function() {
-            handleCategoryChange();
+            // 🔥 JIKA ADA ERROR VALIDASI, KEMBALIKAN PILIHAN KATEGORI & DATA UMUM 🔥
+            if (window.oldInput) {
+                if (window.oldInput.asset_type_id) document.getElementById('asset_type_id').value = window.oldInput
+                    .asset_type_id;
+                if (window.oldInput.name) document.getElementById('name').value = window.oldInput.name;
+                if (window.oldInput.brand) document.getElementById('brand').value = window.oldInput.brand;
+                if (window.oldInput.model) document.getElementById('model').value = window.oldInput.model;
+                if (window.oldInput.price) document.getElementById('price').value = window.oldInput.price;
+                if (window.oldInput.quantity) document.getElementById('quantity').value = window.oldInput.quantity;
+                if (window.oldInput.purchase_date) document.getElementById('purchase_date').value = window.oldInput
+                    .purchase_date;
+                if (window.oldInput.penanggung_jawab_id) document.getElementById('penanggung_jawab_id').value =
+                    window.oldInput.penanggung_jawab_id;
+                if (window.oldInput.funding_source) document.getElementById('funding_source').value = window
+                    .oldInput.funding_source;
+            }
+
+            handleCategoryChange(); // Gambar form pertama kali
         });
     </script>
 @endpush

@@ -291,29 +291,45 @@
                         }
                         inputHtml =
                             `<select name="unit_data[${key}]" class="form-control" ${field.required ? 'required' : ''}>${options}</select>`;
+
+                    } else if (field.type === 'file') {
+                        // 🔥 LOGIKA BARU: TAMPILKAN FILE YANG SUDAH ADA 🔥
+                        let existingFilesHtml = '';
+                        if (val) {
+                            existingFilesHtml +=
+                                '<div style="margin-bottom: 0.5rem; padding: 0.5rem; background: #f1f5f9; border-radius: 6px; font-size: 0.85rem;"><strong>File saat ini:</strong><br>';
+                            if (Array.isArray(val)) {
+                                val.forEach((filePath, idx) => {
+                                    existingFilesHtml +=
+                                        `<a href="/storage/${filePath}" target="_blank" style="color: #0ea5e9; text-decoration: underline; display: inline-block; margin-right: 10px;">📄 File ${idx + 1}</a>`;
+                                });
+                            } else {
+                                existingFilesHtml +=
+                                    `<a href="/storage/${val}" target="_blank" style="color: #0ea5e9; text-decoration: underline;">📄 Lihat File</a>`;
+                            }
+                            existingFilesHtml += '</div>';
+                        }
+
+                        const requiredAttr = (field.required && !val) ? 'required' : '';
+                        inputHtml =
+                            `${existingFilesHtml}<input type="file" name="unit_data[${key}]" class="form-control" accept=".pdf,.jpg,.jpeg,.png" ${requiredAttr}>`;
+
                     } else {
                         inputHtml =
                             `<input type="${field.type}" name="unit_data[${key}]" class="form-control" value="${val}" ${field.required ? 'required' : ''}>`;
                     }
 
-                    // Logika show_if
                     let display = 'block';
                     if (field.show_if) {
                         display = 'none';
                         for (const [depKey, allowed] of Object.entries(field.show_if)) {
-                            const depVal = window.oldBatchData ? window.oldBatchData[depKey] : null;
-                            // Note: Di halaman edit unit, kita anggap dependensi sudah pasti terpenuhi
-                            // karena batch tidak bisa diganti di sini. Kita cek apakah field ini memang
-                            // bagian dari schema batch tersebut.
-                            // Simplifikasi: Tampilkan jika tidak ada show_if, atau jika show_if sesuai dengan data batch.
-                            // Untuk edit unit, kita tampilkan saja asalkan field tersebut ada di schema.
                             display = 'block';
                         }
                     }
 
                     container.innerHTML += `
                     <div class="form-group conditional-field" style="width: 50%; padding-right: 1rem; box-sizing: border-box; display: ${display};">
-                        <label>${field.label} ${field.required ? '<span style="color:red;">*</span>' : ''}</label>
+                        <label>${field.label} ${field.required && !val ? '<span style="color:red;">*</span>' : ''}</label>
                         ${inputHtml}
                     </div>
                 `;

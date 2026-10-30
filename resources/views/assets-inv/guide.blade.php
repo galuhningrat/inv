@@ -157,10 +157,14 @@
                     <span>▼</span>
                 </div>
                 <div class="accordion-body">
-                    <p><strong>Mebel:</strong> Tidak perlu Merek/S/N. Cukup isi Jenis Mebel, Bahan (Kayu/Besi), dan Dimensi.
-                        Kuantitas bisa lebih dari 1 (misal: 10 Kursi).</p>
-                    <p><strong>Alat & Perkakas:</strong> Pilih subkategori. Jika memilih "Peralatan Listrik", akan muncul
-                        isian Daya Listrik (Watt).</p>
+                    <p><strong>Mebel Lepas (MEB):</strong> Digunakan untuk perabot yang mudah dipindahkan (Meja Kerja,
+                        Kursi, Rak Buku, Lemari, Sofa). Tidak perlu Merek/S/N. Cukup isi Bahan Utama dan Dimensi. Kuantitas
+                        bisa lebih dari 1 (misal: 10 Kursi).</p>
+                    <p><strong>Furnitur Custom/Terpasang (FUR):</strong> Digunakan untuk furnitur yang menyatu dengan
+                        bangunan (Meja Lab Cor, Lemari Built-in, Partisi Ruangan, Kitchen Set).</p>
+                    <p><strong>Alat & Perkakas (ATK):</strong> Digunakan untuk mencatat Perkakas (Obeng, Tang), Peralatan
+                        Listrik (Solder), Alat Ukur (Multimeter), dan <strong>Komponen Elektronika</strong> (Sensor,
+                        Resistor, Arduino). Jika memilih subkategori Listrik, isian Daya Listrik (Watt) akan muncul.</p>
                 </div>
             </div>
 

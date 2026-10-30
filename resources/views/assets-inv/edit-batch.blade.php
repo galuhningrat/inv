@@ -173,23 +173,49 @@
                         }
                         inputHtml =
                             `<select name="category_data[${key}]" id="batch_input_${key}" class="form-control" onchange="toggleDependencies()" ${field.required ? 'required' : ''}>${options}</select>`;
+
                     } else if (field.type === 'textarea') {
                         inputHtml =
                             `<textarea name="category_data[${key}]" id="batch_input_${key}" class="form-control" rows="2" ${field.required ? 'required' : ''}>${val}</textarea>`;
+
+                    } else if (field.type === 'file') {
+                        const isMultiple = field.multiple ? 'multiple' : '';
+                        const nameAttr = field.multiple ? `category_data[${key}][]` : `category_data[${key}]`;
+
+                        // 🔥 LOGIKA BARU: TAMPILKAN FILE YANG SUDAH ADA 🔥
+                        let existingFilesHtml = '';
+                        if (val) {
+                            existingFilesHtml +=
+                                '<div style="margin-bottom: 0.5rem; padding: 0.5rem; background: #f1f5f9; border-radius: 6px; font-size: 0.85rem;"><strong>File saat ini:</strong><br>';
+                            if (Array.isArray(val)) {
+                                val.forEach((filePath, idx) => {
+                                    existingFilesHtml +=
+                                        `<a href="/storage/${filePath}" target="_blank" style="color: #0ea5e9; text-decoration: underline; display: inline-block; margin-right: 10px;">📄 File ${idx + 1}</a>`;
+                                });
+                            } else {
+                                existingFilesHtml +=
+                                    `<a href="/storage/${val}" target="_blank" style="color: #0ea5e9; text-decoration: underline;">📄 Lihat File</a>`;
+                            }
+                            existingFilesHtml += '</div>';
+                        }
+
+                        // Required dihapus jika sudah ada file lama (agar tidak wajib upload ulang)
+                        const requiredAttr = (field.required && !val) ? 'required' : '';
+                        inputHtml =
+                            `${existingFilesHtml}<input type="file" name="${nameAttr}" class="form-control" accept=".pdf,.jpg,.jpeg,.png" ${isMultiple} ${requiredAttr}>`;
+
                     } else {
                         inputHtml =
                             `<input type="${field.type}" name="category_data[${key}]" id="batch_input_${key}" class="form-control" value="${val}" ${field.required ? 'required' : ''}>`;
                     }
 
                     const colSize = field.type === 'textarea' ? '100%' : '33.33%';
-
-                    // Sembunyikan dulu jika punya syarat show_if, nanti toggleDependencies yang memunculkan
                     let display = 'block';
                     if (field.show_if) display = 'none';
 
                     container.innerHTML += `
                     <div class="form-group conditional-field" data-field="${key}" style="width: ${colSize}; padding-right: 1rem; box-sizing: border-box; display: ${display};">
-                        <label>${field.label} ${field.required ? '<span style="color:red;">*</span>' : ''}</label>
+                        <label>${field.label} ${field.required && !val ? '<span style="color:red;">*</span>' : ''}</label>
                         ${inputHtml}
                     </div>
                 `;
@@ -197,8 +223,6 @@
             }
 
             if (hasFields) wrapper.style.display = 'block';
-
-            // Panggil toggle setelah render untuk ngecek kondisi awal
             toggleDependencies();
         }
 
@@ -210,18 +234,14 @@
             for (const [key, field] of Object.entries(schema)) {
                 if (field.show_if) {
                     let isConditionMet = true;
-
                     for (const [depKey, allowedValues] of Object.entries(field.show_if)) {
-                        // Baca nilai dari dropdown yang SAAT INI aktif di layar
                         const depInput = document.querySelector(`[name="category_data[${depKey}]"]`);
                         const currentValue = depInput ? depInput.value : '';
-
                         if (!allowedValues.includes(currentValue)) {
                             isConditionMet = false;
                             break;
                         }
                     }
-
                     const fieldWrapper = document.querySelector(`.conditional-field[data-field="${key}"]`);
                     if (fieldWrapper) {
                         fieldWrapper.style.display = isConditionMet ? 'block' : 'none';
@@ -232,10 +252,7 @@
 
         // 3. Event Listener
         document.addEventListener('DOMContentLoaded', function() {
-            // Gambar form pertama kali
             renderBatchFields();
-
-            // Gambar ulang HANYA jika Jenis Aset utama diganti
             document.getElementById('asset_type_id').addEventListener('change', renderBatchFields);
         });
     </script>

@@ -17,17 +17,9 @@ class BorrowingsExport implements FromCollection, WithHeadings, WithMapping
     public function headings(): array
     {
         return [
-            'No',
-            'ID Peminjaman',
-            'Nama Aset',
-            'Peminjam',
-            'Jabatan',
-            'Tanggal Pinjam',
-            'Tanggal Kembali',
-            'Tanggal Aktual Kembali',
-            'Tujuan',
-            'Status',
-            'Disetujui Oleh',
+            'No', 'ID Peminjaman', 'Nama Aset', 'Peminjam', 'Jabatan',
+            'Tanggal Pinjam', 'Tanggal Kembali', 'Tanggal Aktual Kembali',
+            'Tujuan', 'Status', 'Disetujui Oleh',
         ];
     }
 
@@ -42,8 +34,8 @@ class BorrowingsExport implements FromCollection, WithHeadings, WithMapping
             $borrowing->asset->name ?? '-',
             $borrowing->borrower_name,
             $borrowing->borrower_role,
-            $borrowing->borrow_date->format('d/m/Y'),
-            $borrowing->return_date->format('d/m/Y'),
+            $borrowing->borrow_date ? $borrowing->borrow_date->format('d/m/Y') : '-',
+            $borrowing->return_date ? $borrowing->return_date->format('d/m/Y') : '-',
             $borrowing->actual_return_date ? $borrowing->actual_return_date->format('d/m/Y') : '-',
             $borrowing->purpose,
             $borrowing->status,

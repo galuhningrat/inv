@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use App\Models\Asset;
 use App\Models\AssetBatch;
 use App\Models\AssetType;
@@ -106,7 +107,6 @@ class AssetController extends Controller
             $query->where('unit_id', $unitId);
         }
 
-        // 🔥 POIN 13: Handle Filter Status Baru
         if ($status) {
             if ($status === 'Tersedia') {
                 $query->where('status', 'Aktif');
@@ -175,8 +175,6 @@ class AssetController extends Controller
 
         $physicalGroups = $physicalQuery->get()->map(function ($batch) {
             $tersedia = $batch->assets->where('status', 'Tersedia')->count();
-
-            // Ambil nama unit dari aset pertama di batch tersebut
             $firstAsset = $batch->assets->first();
             $unitName = $firstAsset && $firstAsset->unit ? $firstAsset->unit->name : '-';
 
@@ -184,7 +182,7 @@ class AssetController extends Controller
                 'type' => 'Fisik',
                 'name' => $batch->name,
                 'category_label' => $batch->assetType->name ?? '-',
-                'unit_label' => $unitName, // 🔥 SUDAH DIPERBAIKI
+                'unit_label' => $unitName,
                 'quantity' => $batch->quantity,
                 'status_label' => $tersedia.' Tersedia',
                 'detail_route' => route('assets-inv.group-detail', ['batch_id' => $batch->id]),
@@ -208,7 +206,6 @@ class AssetController extends Controller
             $intangibleQuery->where('unit_id', $unitId);
         }
 
-        // 🔥 POIN 13: Handle Filter Status Baru
         if ($status) {
             if ($status === 'Tersedia') {
                 $intangibleQuery->where('status', 'Aktif');
@@ -225,7 +222,6 @@ class AssetController extends Controller
                 $first = $group->first();
                 $kadaluarsa = $group->where('status', 'Kadaluarsa')->count();
 
-                // 🔥 POIN 13: Tampilkan status non-fisik secara dinamis di halaman gabungan
                 if ($kadaluarsa > 0) {
                     $statusLabel = "{$kadaluarsa} Kadaluarsa";
                 } elseif ($group->where('status', 'Dihentikan')->count() > 0) {
@@ -351,7 +347,6 @@ class AssetController extends Controller
         foreach ($schema as $key => $field) {
             if (isset($field['in_batch'])) {
                 if (($field['type'] ?? '') === 'file') {
-                    // Handling multiple file di update
                     if (! empty($field['multiple'])) {
                         if ($request->hasFile("category_data.{$key}")) {
                             $existingPaths = $categoryData[$key] ?? [];
@@ -367,7 +362,6 @@ class AssetController extends Controller
                             $categoryData[$key] = $existingPaths;
                         }
                     } else {
-                        // Single file logic (sama seperti sebelumnya)
                         if ($request->hasFile("category_data.{$key}")) {
                             $file = $request->file("category_data.{$key}");
                             if ($file->isValid()) {
@@ -398,6 +392,8 @@ class AssetController extends Controller
             'residual_value' => $validated['residual_value'] ?? null,
             'category_data' => $categoryData,
         ]);
+
+        ActivityLog::record('UPDATE', "Mengupdate data induk aset: {$batch->name}");
 
         return redirect()->route('assets-inv.group-detail', ['batch_id' => $batch->id])
             ->with('success', 'Data Induk (Batch) berhasil diupdate!');
@@ -483,7 +479,6 @@ class AssetController extends Controller
         }
 
         $customMessages = [
-            // 🔥 Pesan error untuk Serial Number yang duplikat 🔥
             'serial_numbers.*.unique' => 'Nomor Seri Pabrik (S/N) ini sudah terdaftar di sistem. Silakan gunakan nomor seri yang lain.',
             'serial_numbers.*.required' => 'Nomor Seri Pabrik (S/N) wajib diisi.',
             'serial_numbers.*.distinct' => 'Terdapat Nomor Seri (S/N) yang sama di dalam form ini. Pastikan setiap unit memiliki nomor seri yang berbeda.',
@@ -507,7 +502,6 @@ class AssetController extends Controller
                     }
                 }
 
-                // 🔥 BACA RULE (Bisa String atau Array) 🔥
                 if (isset($field['rules'])) {
                     if (is_array($field['rules'])) {
                         $rule .= '|'.implode('|', $field['rules']);
@@ -516,7 +510,6 @@ class AssetController extends Controller
                     }
                 }
 
-                // 🔥 BACA PESAN ERROR KUSTOM 🔥
                 if (isset($field['messages'])) {
                     foreach ($field['messages'] as $ruleName => $msg) {
                         if (isset($field['in_unit'])) {
@@ -537,7 +530,6 @@ class AssetController extends Controller
             }
         }
 
-        // 🔥 MASUKKAN CUSTOM MESSAGES KE VALIDASI 🔥
         $validated = $request->validate($rules, $customMessages);
 
         if ($isStaticAsset) {
@@ -630,6 +622,8 @@ class AssetController extends Controller
 
             DB::commit();
 
+            ActivityLog::record('CREATE', "Menambahkan batch aset baru: {$batch->name} ({$created} unit)");
+
             return redirect()->route('assets-inv.index')->with('success', "Batch aset & {$created} unit berhasil ditambahkan!");
         } catch (\Exception $e) {
             DB::rollback();
@@ -712,7 +706,7 @@ class AssetController extends Controller
         ];
 
         $unitDataRules = [];
-        $customMessages = []; // 🔥 Wadah untuk pesan error kustom
+        $customMessages = [];
 
         foreach ($schema as $key => $field) {
             if (isset($field['in_unit']) && $field['in_unit'] === true) {
@@ -725,7 +719,6 @@ class AssetController extends Controller
                     $rule .= '|file|mimes:pdf,jpg,jpeg,png|max:5120';
                 }
 
-                // 🔥 BACA RULE (Bisa String atau Array) 🔥
                 if (isset($field['rules'])) {
                     if (is_array($field['rules'])) {
                         $rule .= '|'.implode('|', $field['rules']);
@@ -734,7 +727,6 @@ class AssetController extends Controller
                     }
                 }
 
-                // 🔥 BACA PESAN ERROR KUSTOM 🔥
                 if (isset($field['messages'])) {
                     foreach ($field['messages'] as $ruleName => $msg) {
                         $customMessages["unit_data.{$key}.{$ruleName}"] = $msg;
@@ -746,8 +738,6 @@ class AssetController extends Controller
         }
 
         $validated = $request->validate($rules);
-
-        // 🔥 MASUKKAN CUSTOM MESSAGES KE VALIDASI UNIT 🔥
         $request->validate($unitDataRules, $customMessages);
 
         if (! $isStaticAsset) {
@@ -811,6 +801,8 @@ class AssetController extends Controller
 
         $asset->save();
 
+        ActivityLog::record('UPDATE', "Mengupdate unit aset: {$asset->asset_id}");
+
         return redirect()->route('assets-inv.group-detail', ['batch_id' => $asset->asset_batch_id])
             ->with('success', 'Data unit aset berhasil diupdate!');
     }
@@ -822,13 +814,20 @@ class AssetController extends Controller
         $batchId = $asset->asset_batch_id;
 
         try {
+            $assetId = $asset->asset_id;
+            $batchName = $asset->batch->name ?? '-';
+
             if ($asset->image && Storage::disk('public')->exists($asset->image)) {
                 Storage::disk('public')->delete($asset->image);
             }
+
             $asset->qrCodes()->delete();
             $asset->delete();
 
+            ActivityLog::record('DELETE', "Menghapus unit aset: {$assetId} dari batch {$batchName}");
+
             $sisaUnit = Asset::where('asset_batch_id', $batchId)->count();
+
             if ($sisaUnit == 0) {
                 AssetBatch::find($batchId)?->delete();
 
@@ -837,6 +836,7 @@ class AssetController extends Controller
 
             return redirect()->route('assets-inv.group-detail', ['batch_id' => $batchId])
                 ->with('success', '1 unit aset berhasil dihapus!');
+
         } catch (\Exception $e) {
             return redirect()->route('assets-inv.index')
                 ->with('error', 'Gagal menghapus aset: '.$e->getMessage());
@@ -872,24 +872,48 @@ class AssetController extends Controller
         $this->authorize('delete', Asset::class);
         try {
             $ids = $request->ids;
+            $types = $request->types;
             $deleted = 0;
             DB::beginTransaction();
-            foreach ($ids as $id) {
-                $asset = Asset::find($id);
-                if ($asset) {
-                    if ($asset->image && Storage::disk('public')->exists($asset->image)) {
-                        Storage::disk('public')->delete($asset->image);
+
+            foreach ($ids as $index => $id) {
+                $type = $types[$index] ?? 'asset';
+
+                if ($type === 'batch') {
+                    $batch = AssetBatch::find($id);
+                    if ($batch) {
+                        foreach ($batch->assets as $asset) {
+                            if ($asset->image && Storage::disk('public')->exists($asset->image)) {
+                                Storage::disk('public')->delete($asset->image);
+                            }
+                            $asset->qrCodes()->delete();
+                            $asset->delete();
+                            $deleted++;
+                        }
+                        $batch->delete();
                     }
-                    $asset->qrCodes()->delete();
-                    $asset->delete();
-                    $deleted++;
+                } else {
+                    $asset = Asset::find($id);
+                    if ($asset) {
+                        if ($asset->image && Storage::disk('public')->exists($asset->image)) {
+                            Storage::disk('public')->delete($asset->image);
+                        }
+                        $asset->qrCodes()->delete();
+                        $asset->delete();
+                        $deleted++;
+                    }
                 }
             }
+
+            ActivityLog::record('BULK_DELETE', "Menghapus {$deleted} aset secara massal");
+
             DB::commit();
 
             return response()->json(['success' => true, 'message' => "{$deleted} aset berhasil dihapus."]);
         } catch (\Exception $e) {
             DB::rollback();
+
+            ActivityLog::record('ERROR', 'Gagal menghapus aset secara massal: '.$e->getMessage());
 
             return response()->json(['success' => false, 'message' => 'Gagal menghapus aset: '.$e->getMessage()], 500);
         }

@@ -82,11 +82,11 @@
             </tr>
         </thead>
         <tbody>
-            @foreach($data as $index => $maintenance)
+            @foreach ($data as $index => $maintenance)
                 <tr>
                     <td>{{ $index + 1 }}</td>
                     <td>{{ $maintenance->maintenance_id }}</td>
-                    <td>{{ $maintenance->asset->name ?? '-' }}</td>
+                    <td>{{ $maintenance->asset->batch->name ?? '-' }}</td>
                     <td>{{ $maintenance->type }}</td>
                     <td>{{ $maintenance->maintenance_date->format('d/m/Y') }}</td>
                     <td>{{ $maintenance->technician }}</td>

@@ -82,11 +82,11 @@
             </tr>
         </thead>
         <tbody>
-            @foreach($data as $index => $borrowing)
+            @foreach ($data as $index => $borrowing)
                 <tr>
                     <td>{{ $index + 1 }}</td>
                     <td>{{ $borrowing->borrowing_id }}</td>
-                    <td>{{ $borrowing->asset->name ?? '-' }}</td>
+                    <td>{{ $maintenance->asset->batch->name ?? '-' }}</td>
                     <td>{{ $borrowing->borrower_name }}</td>
                     <td>{{ $borrowing->borrower_role }}</td>
                     <td>{{ $borrowing->borrow_date->format('d/m/Y') }}</td>

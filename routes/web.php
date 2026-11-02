@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\Api\AssetDetailController;
 use App\Http\Controllers\AssetController;
 use App\Http\Controllers\AssetRequestController;
@@ -91,6 +92,8 @@ Route::middleware(['auth'])->group(function () {
     // User Management
     Route::middleware(['level:users'])->group(function () {
         Route::resource('users', UserController::class);
+
+        Route::get('/activity-logs', [ActivityLogController::class, 'index'])->name('activity-logs.index');
     });
 
     // Asset Requests Management

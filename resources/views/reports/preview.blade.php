@@ -84,7 +84,9 @@
                         <tfoot>
                             <tr style="background: var(--light-bg); font-weight: bold;">
                                 <td colspan="8" style="text-align: right;">Total Nilai Aset:</td>
-                                <td style="text-align: right;">Rp {{ number_format($data->sum('price'), 0, ',', '.') }}
+                                {{-- 🔥 UBAH CARA HITUNG TOTALNYA 🔥 --}}
+                                <td style="text-align: right;">Rp
+                                    {{ number_format($data->sum(fn($item) => $item->batch->price ?? 0), 0, ',', '.') }}
                                 </td>
                             </tr>
                             <tr>

@@ -17,16 +17,8 @@ class MaintenancesExport implements FromCollection, WithHeadings, WithMapping
     public function headings(): array
     {
         return [
-            'No',
-            'ID Maintenance',
-            'Nama Aset',
-            'Jenis Pemeliharaan',
-            'Tanggal',
-            'Biaya',
-            'Deskripsi',
-            'Teknisi',
-            'Status',
-            'Dicatat Oleh',
+            'No', 'ID Maintenance', 'Nama Aset', 'Jenis Pemeliharaan',
+            'Tanggal', 'Biaya', 'Deskripsi', 'Teknisi', 'Status', 'Dicatat Oleh',
         ];
     }
 
@@ -40,8 +32,8 @@ class MaintenancesExport implements FromCollection, WithHeadings, WithMapping
             $maintenance->maintenance_id,
             $maintenance->asset->name ?? '-',
             $maintenance->type,
-            $maintenance->maintenance_date->format('d/m/Y'),
-            'Rp ' . number_format($maintenance->cost, 0, ',', '.'),
+            $maintenance->maintenance_date ? $maintenance->maintenance_date->format('d/m/Y') : '-',
+            'Rp '.number_format($maintenance->cost, 0, ',', '.'),
             $maintenance->description,
             $maintenance->technician,
             $maintenance->status,

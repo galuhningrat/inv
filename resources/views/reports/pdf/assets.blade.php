@@ -83,24 +83,26 @@
             </tr>
         </thead>
         <tbody>
-            @foreach($data as $index => $asset)
+            @foreach ($data as $index => $asset)
                 <tr>
                     <td>{{ $index + 1 }}</td>
                     <td>{{ $asset->asset_id }}</td>
-                    <td>{{ $asset->name }}</td>
-                    <td>{{ $asset->assetType->name }}</td>
-                    <td>{{ $asset->brand }}</td>
-                    <td>{{ $asset->location }}</td>
-                    <td>{{ $asset->condition }}</td>
-                    <td>{{ $asset->status }}</td>
-                    <td>Rp {{ number_format($asset->price, 0, ',', '.') }}</td>
+                    {{-- 🔥 TAMBAHKAN ->batch 🔥 --}}
+                    <td>{{ $asset->batch->name ?? '-' }}</td>
+                    <td>{{ $asset->batch->assetType->name ?? '-' }}</td>
+                    <td>{{ $asset->batch->brand ?? '-' }}</td>
+                    <td>{{ $asset->location ?? '-' }}</td>
+                    <td>{{ $asset->condition ?? '-' }}</td>
+                    <td>{{ $asset->status ?? '-' }}</td>
+                    <td>Rp {{ number_format($asset->batch->price ?? 0, 0, ',', '.') }}</td>
                 </tr>
             @endforeach
         </tbody>
         <tfoot>
             <tr class="total">
                 <td colspan="8" style="text-align: right;">Total Nilai Aset:</td>
-                <td>Rp {{ number_format($data->sum('price'), 0, ',', '.') }}</td>
+                {{-- 🔥 UBAH CARA HITUNG TOTALNYA 🔥 --}}
+                <td>Rp {{ number_format($data->sum(fn($item) => $item->batch->price ?? 0), 0, ',', '.') }}</td>
             </tr>
         </tfoot>
     </table>

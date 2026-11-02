@@ -2,25 +2,25 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\AssetsExport;
+use App\Exports\BorrowingsExport;
+use App\Exports\FinancialExport;
+use App\Exports\MaintenancesExport;
 use App\Models\Asset;
 use App\Models\Borrowing;
 use App\Models\Maintenance;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Barryvdh\DomPDF\Facade\Pdf;
-use Maatwebsite\Excel\Facades\Excel;
-use App\Exports\AssetsExport;
-use App\Exports\BorrowingsExport;
-use App\Exports\MaintenancesExport;
-use App\Exports\FinancialExport;
 use Illuminate\Support\Facades\Gate;
+use Maatwebsite\Excel\Facades\Excel;
 
 class ReportController extends Controller
 {
     public function index()
     {
         $allowedTypes = collect(['assets', 'borrowing', 'maintenance', 'financial'])
-            ->filter(fn($type) => Gate::allows('view-report', $type))
+            ->filter(fn ($type) => Gate::allows('view-report', $type))
             ->values();
 
         return view('reports.index', compact('allowedTypes'));
@@ -35,9 +35,9 @@ class ReportController extends Controller
 
         switch ($type) {
             case 'assets':
-                $query = Asset::with('assetType');
+                $query = Asset::with(['batch.assetType']);
                 if (in_array($user->level, ['Kalab', 'Kaprodi'])) {
-                    $query->where('unit_id', $user->unit_id); 
+                    $query->where('unit_id', $user->unit_id);
                 }
                 $data = $query->get();
                 $title = 'LAPORAN INVENTARIS ASET';
@@ -70,11 +70,15 @@ class ReportController extends Controller
     public function exportPdf(Request $request)
     {
         $type = $request->type;
-        Gate::authorize('view-report', $type);  // Cek otorisasi
+
+        \App\Models\ActivityLog::record('EXPORT', "Mengekspor Laporan {$type} ke format PDF");
+
+        Gate::authorize('view-report', $type);
 
         $user = Auth::user();
+        $ids = $request->filled('ids') ? explode(',', $request->ids) : [];
+        $types = $request->filled('types') ? explode(',', $request->types) : [];
 
-        // Tentukan view PDF berdasarkan tipe
         $viewMap = [
             'assets' => 'reports.pdf.assets',
             'borrowing' => 'reports.pdf.borrowings',
@@ -82,18 +86,42 @@ class ReportController extends Controller
             'financial' => 'reports.pdf.financial',
         ];
 
-        if (!isset($viewMap[$type])) {
+        if (! isset($viewMap[$type])) {
             return back()->with('error', 'Jenis laporan tidak valid');
         }
 
-        // Ambil data sesuai tipe
         switch ($type) {
             case 'assets':
-                $query = Asset::with('assetType');
+                $query = Asset::with(['batch.assetType', 'batch']); // Eager load batch
+
                 // Scoping untuk Kalab/Kaprodi
                 if (in_array($user->level, ['Kalab', 'Kaprodi'])) {
                     $query->where('unit_id', $user->unit_id);
                 }
+
+                // 🔥 Filter berdasarkan ID yang dipilih
+                if (! empty($ids)) {
+                    $batchIds = [];
+                    $assetIds = [];
+                    foreach ($ids as $index => $id) {
+                        $typeSelected = $types[$index] ?? 'asset';
+                        if ($typeSelected === 'batch') {
+                            $batchIds[] = $id;
+                        } else {
+                            $assetIds[] = $id;
+                        }
+                    }
+
+                    $query->where(function ($q) use ($batchIds, $assetIds) {
+                        if (! empty($batchIds)) {
+                            $q->whereIn('asset_batch_id', $batchIds);
+                        }
+                        if (! empty($assetIds)) {
+                            $q->orWhereIn('id', $assetIds);
+                        }
+                    });
+                }
+
                 $data = $query->get();
                 $title = 'LAPORAN INVENTARIS ASET';
                 break;
@@ -128,18 +156,50 @@ class ReportController extends Controller
     public function exportExcel(Request $request)
     {
         $type = $request->type;
-        Gate::authorize('view-report', $type);  // Cek otorisasi
 
-        // Untuk Excel, kita tidak perlu scoping manual karena sudah di handle di Export class masing-masing
-        // Tapi kita tetap harus memastikan hanya tipe yang diizinkan
+        \App\Models\ActivityLog::record('EXPORT', "Mengekspor Laporan {$type} ke format Excel");
+
+        Gate::authorize('view-report', $type);
+
+        $ids = $request->filled('ids') ? explode(',', $request->ids) : [];
+        $types = $request->filled('types') ? explode(',', $request->types) : [];
+
         $allowedTypes = ['assets', 'borrowing', 'maintenance', 'financial'];
-        if (!in_array($type, $allowedTypes)) {
+        if (! in_array($type, $allowedTypes)) {
             return back()->with('error', 'Jenis laporan tidak valid');
         }
 
         switch ($type) {
             case 'assets':
-                return Excel::download(new AssetsExport, 'laporan-aset.xlsx');
+                // 🔥 Siapkan query data
+                $query = Asset::with(['batch.assetType']);
+
+                // Filter berdasarkan ID yang dipilih
+                if (! empty($ids)) {
+                    $batchIds = [];
+                    $assetIds = [];
+                    foreach ($ids as $index => $id) {
+                        $typeSelected = $types[$index] ?? 'asset';
+                        if ($typeSelected === 'batch') {
+                            $batchIds[] = $id;
+                        } else {
+                            $assetIds[] = $id;
+                        }
+                    }
+
+                    $query->where(function ($q) use ($batchIds, $assetIds) {
+                        if (! empty($batchIds)) {
+                            $q->whereIn('asset_batch_id', $batchIds);
+                        }
+                        if (! empty($assetIds)) {
+                            $q->orWhereIn('id', $assetIds);
+                        }
+                    });
+                }
+
+                // Kirim hasil query ke class Export
+                return Excel::download(new AssetsExport($query->get()), 'laporan-aset.xlsx');
+
             case 'borrowing':
                 return Excel::download(new BorrowingsExport, 'laporan-peminjaman.xlsx');
             case 'maintenance':

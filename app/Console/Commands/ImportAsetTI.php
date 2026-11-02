@@ -45,7 +45,7 @@ class ImportAsetTI extends Command
             return;
         }
 
-        // 2. Pastikan Unit Tersedia (Kita buat dua unit jika belum ada)
+        // 2. Pastikan Unit Tersedia
         $unitTI = Unit::firstOrCreate(
             ['name' => 'Teknik Informatika'],
             ['category' => 'Akademik', 'type' => 'prodi']
@@ -55,10 +55,12 @@ class ImportAsetTI extends Command
             ['category' => 'Akademik', 'type' => 'laboratorium']
         );
 
+        // 3. Pastikan Tipe Aset Tersedia (Termasuk FUR)
         $types = [
             'KOM' => AssetType::firstOrCreate(['code' => 'KOM'], ['name' => 'Komputer & Periferal']),
             'JAR' => AssetType::firstOrCreate(['code' => 'JAR'], ['name' => 'Jaringan']),
             'MEB' => AssetType::firstOrCreate(['code' => 'MEB'], ['name' => 'Mebel']),
+            'FUR' => AssetType::firstOrCreate(['code' => 'FUR'], ['name' => 'Furniture']),
             'ELK' => AssetType::firstOrCreate(['code' => 'ELK'], ['name' => 'Elektronik']),
             'ATK' => AssetType::firstOrCreate(['code' => 'ATK'], ['name' => 'Alat Tulis & Perkakas']),
             'LAN' => AssetType::firstOrCreate(['code' => 'LAN'], ['name' => 'Lainnya']),
@@ -106,10 +108,9 @@ class ImportAsetTI extends Command
                 $lokasiStr = trim($data[14] ?? '');
                 $keterangan = trim($data[15] ?? '');
 
-                // 🔥 TENTUKAN UNIT BERDASARKAN LOKASI 🔥
+                // Tentukan Unit berdasarkan Lokasi
                 $lowerLokasi = strtolower($lokasiStr);
-                $assignedUnitId = $unitTI->id; // Default ke Prodi TI
-
+                $assignedUnitId = $unitTI->id;
                 if (str_contains($lowerLokasi, 'lab') || str_contains($lowerLokasi, 'laboratorium') || str_contains($lowerLokasi, 'labkom')) {
                     $assignedUnitId = $unitLab->id;
                 }
@@ -148,6 +149,7 @@ class ImportAsetTI extends Command
                     if (str_contains($lowerSpesifikasi, 'poe')) {
                         $categoryData['dukungan_poe'] = 'Ya';
                     }
+
                 } elseif (str_contains($lowerName, 'desktop') || str_contains($lowerName, 'pc ') || str_contains($lowerName, 'laptop') || str_contains($lowerName, 'monitor') || str_contains($lowerName, 'keyboard') || str_contains($lowerName, 'mouse') || str_contains($lowerName, 'printer') || str_contains($lowerName, 'headphone') || str_contains($lowerName, 'aio') || str_contains($lowerName, 'deskbook')) {
                     $assetType = $types['KOM'];
                     $isClassified = true;
@@ -180,6 +182,7 @@ class ImportAsetTI extends Command
                     if (preg_match('/(windows [0-9]+|mac ?os|linux)/i', $spesifikasi, $m)) {
                         $categoryData['os'] = $m[1];
                     }
+
                 } elseif (str_contains($lowerName, 'proyektor') || str_contains($lowerName, 'infokus') || str_contains($lowerName, 'kipas') || str_contains($lowerName, 'dispenser') || str_contains($lowerName, 'tv ') || str_contains($lowerName, 'kamera') || str_contains($lowerName, 'speaker') || str_contains($lowerName, 'audio') || $lowerName === 'ac' || str_contains($lowerName, 'ac ')) {
                     $assetType = $types['ELK'];
                     $isClassified = true;
@@ -201,21 +204,36 @@ class ImportAsetTI extends Command
                     if (preg_match('/([0-9]+ ?watt)/i', $lowerSpesifikasi, $m)) {
                         $categoryData['daya_listrik'] = $m[1];
                     }
-                } elseif (str_contains($lowerName, 'meja') || str_contains($lowerName, 'kursi') || str_contains($lowerName, 'lemari') || str_contains($lowerName, 'rak') || str_contains($lowerName, 'papan') || str_contains($lowerName, 'whiteboard') || str_contains($lowerName, 'karpet') || str_contains($lowerName, 'sofa') || str_contains($lowerName, 'mading')) {
-                    $assetType = $types['MEB'];
-                    $isClassified = true;
 
-                    if (str_contains($lowerName, 'meja')) {
-                        $categoryData['subkategori'] = 'meja';
-                    } elseif (str_contains($lowerName, 'kursi')) {
-                        $categoryData['subkategori'] = 'kursi';
-                    } elseif (str_contains($lowerName, 'lemari')) {
-                        $categoryData['subkategori'] = 'lemari';
-                    } elseif (str_contains($lowerName, 'rak')) {
-                        $categoryData['subkategori'] = 'rak';
+                } elseif (str_contains($lowerName, 'meja') || str_contains($lowerName, 'kursi') || str_contains($lowerName, 'lemari') || str_contains($lowerName, 'rak') || str_contains($lowerName, 'papan') || str_contains($lowerName, 'whiteboard') || str_contains($lowerName, 'karpet') || str_contains($lowerName, 'sofa') || str_contains($lowerName, 'mading')) {
+
+                    // 🔥 PEMISAHAN MEB DAN FUR 🔥
+                    if (str_contains($lowerName, 'custom') || str_contains($lowerName, 'labkom') || str_contains($lowerName, 'built-in') || str_contains($lowerName, 'partisi') || str_contains($lowerName, 'kitchen')) {
+                        $assetType = $types['FUR'];
+                        if (str_contains($lowerName, 'meja')) {
+                            $categoryData['subkategori'] = 'meja_custom';
+                        } elseif (str_contains($lowerName, 'lemari')) {
+                            $categoryData['subkategori'] = 'lemari_builtin';
+                        } else {
+                            $categoryData['subkategori'] = 'lainnya';
+                        }
                     } else {
-                        $categoryData['subkategori'] = 'lainnya';
+                        $assetType = $types['MEB'];
+                        if (str_contains($lowerName, 'meja')) {
+                            $categoryData['subkategori'] = 'meja';
+                        } elseif (str_contains($lowerName, 'kursi')) {
+                            $categoryData['subkategori'] = 'kursi';
+                        } elseif (str_contains($lowerName, 'lemari')) {
+                            $categoryData['subkategori'] = 'lemari';
+                        } elseif (str_contains($lowerName, 'rak')) {
+                            $categoryData['subkategori'] = 'rak';
+                        } elseif (str_contains($lowerName, 'sofa')) {
+                            $categoryData['subkategori'] = 'sofa';
+                        } else {
+                            $categoryData['subkategori'] = 'lainnya';
+                        }
                     }
+                    $isClassified = true;
 
                     if (str_contains($lowerSpesifikasi, 'kayu')) {
                         $categoryData['bahan_utama'] = 'Kayu';
@@ -228,16 +246,18 @@ class ImportAsetTI extends Command
                     } else {
                         $categoryData['bahan_utama'] = 'Kombinasi';
                     }
+
                 } elseif (str_contains($kategoriExcel, 'Komponen') || str_contains($lowerName, 'sensor') || str_contains($lowerName, 'module') || str_contains($lowerName, 'resistor') || str_contains($lowerName, 'obeng') || str_contains($lowerName, 'tool') || str_contains($lowerName, 'tang') || str_contains($lowerName, 'mobo') || str_contains($lowerName, 'motherboard') || str_contains($lowerName, 'processor') || str_contains($lowerName, 'vga') || str_contains($lowerName, 'ram ') || str_contains($lowerName, 'led ') || str_contains($lowerName, 'kapasitor') || str_contains($lowerName, 'ic ') || str_contains($lowerName, 'baterai') || str_contains($lowerName, 'arduino') || str_contains($lowerName, 'esp32')) {
                     $assetType = $types['ATK'];
                     $isClassified = true;
 
+                    // 🔥 PEMISAHAN SUBKATEGORI ATK BARU 🔥
                     if (str_contains($lowerName, 'obeng') || str_contains($lowerName, 'tang') || str_contains($lowerName, 'tool')) {
                         $categoryData['subkategori'] = 'tangan';
-                    } elseif (str_contains($lowerName, 'vga') || str_contains($lowerName, 'processor')) {
+                    } elseif (str_contains($lowerName, 'vga') || str_contains($lowerName, 'processor') || str_contains($lowerName, 'mobo')) {
                         $categoryData['subkategori'] = 'listrik';
                     } else {
-                        $categoryData['subkategori'] = 'lainnya';
+                        $categoryData['subkategori'] = 'komponen';
                     }
                 }
 
@@ -251,7 +271,7 @@ class ImportAsetTI extends Command
                     $categoryData['keterangan_tambahan'] = $keterangan;
                 }
 
-                // 🔥 PEMISAHAN BATCH DAN UNIT 🔥
+                // --- PEMISAHAN BATCH DAN UNIT (Dinamis) ---
                 $schema = AssetType::getSchema($assetType->code);
                 $batchData = [];
                 $unitData = [];
@@ -260,7 +280,7 @@ class ImportAsetTI extends Command
                     if (isset($schema[$key]['in_unit']) && $schema[$key]['in_unit'] === true) {
                         $unitData[$key] = $value;
                     } else {
-                        $batchData[$key] = $value; // Masuk ke batch jika bukan in_unit (termasuk subkategori)
+                        $batchData[$key] = $value;
                     }
                 }
 
@@ -294,7 +314,7 @@ class ImportAsetTI extends Command
                         'asset_batch_id' => $batch->id,
                         'serial_number' => $serial,
                         'location' => $lokasiStr,
-                        'unit_id' => $assignedUnitId, // 🔥 Gunakan Unit yang sudah dideteksi
+                        'unit_id' => $assignedUnitId,
                         'condition' => $kondisi,
                         'status' => 'Tersedia',
                         'qr_code' => QrCode::generateCodeContent($assetType->code),
@@ -318,6 +338,8 @@ class ImportAsetTI extends Command
                 $this->error("❌ Baris {$row}: Gagal - ".$e->getMessage());
             }
         }
+
+        \App\Models\ActivityLog::record('IMPORT', "Import CSV Aset TI: {$success} batch berhasil, {$skip} gagal.");
 
         fclose($handle);
         $this->info('=========================================');

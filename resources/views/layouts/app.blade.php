@@ -17,16 +17,12 @@
 
     <!-- 🔥 CSS UNTUK HORIZONTAL SCROLL HINT 🔥 -->
     <style>
-        /* 🔥 CSS SCROLL HINT FINAL (ANTI KEPOTONG) 🔥 */
         .scroll-hint {
             position: fixed;
             bottom: 40px;
-            /* Jarak dari bawah */
             left: 50%;
             transform: translateX(-50%);
-            /* Posisi tengah */
             background: #1e293b;
-            /* Warna gelap */
             color: #f8fafc;
             padding: 10px 20px;
             border-radius: 50px;
@@ -34,30 +30,22 @@
             font-weight: 500;
             box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
             z-index: 99999;
-            /* Pastikan paling atas */
-
-            /* 🔥 KUNCI ANTI KEPOTONG 🔥 */
             width: max-content;
             max-width: 95vw;
             white-space: nowrap;
             display: block;
-            /* Bukan flex, agar teks tidak terlipat */
-
             opacity: 0;
             visibility: hidden;
             transition: all 0.3s ease;
             pointer-events: none;
-            /* Agar tidak menghalangi klik */
         }
 
         .scroll-hint.show {
             opacity: 1;
             visibility: visible;
             transform: translateX(-50%) translateY(-10px);
-            /* Efek naik dikit */
         }
 
-        /* Styling kotak tombol keyboard */
         .scroll-hint .kbd {
             background: #334155;
             color: #e2e8f0;
@@ -137,6 +125,7 @@
                     </a>
                 @endif
 
+                {{-- MENU PENGGUNA & LOG AKTIVITAS --}}
                 @if (in_array('users', $userPermissions))
                     <a href="{{ route('users.index') }}"
                         class="nav-link {{ request()->routeIs('users.*') ? 'active' : '' }}" data-page="users">
@@ -147,6 +136,20 @@
                             <path d="M16 3.13a4 4 0 0 1 0 7.75" />
                         </svg>
                         <span>Pengguna</span>
+                    </a>
+
+                    <a href="{{ route('activity-logs.index') }}"
+                        class="nav-link {{ request()->routeIs('activity-logs.*') ? 'active' : '' }}"
+                        data-page="activity-logs">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <polyline points="14,2 14,8 20,8" />
+                            <line x1="16" y1="13" x2="8" y2="13" />
+                            <line x1="16" y1="17" x2="8" y2="17" />
+                            <polyline points="10,9 9,9 8,9" />
+                        </svg>
+                        <span>Log Aktivitas</span>
                     </a>
                 @endif
 
@@ -369,7 +372,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             initializeSidebar();
             initializeFlashMessages();
-            initializeScrollHint(); // 🔥 Panggil fungsi scroll hint
+            initializeScrollHint();
             updateServerTime();
             setInterval(updateServerTime, 1000);
         });
@@ -392,7 +395,6 @@
                 });
             }
 
-            // Handle resize
             window.addEventListener('resize', handleResize);
         }
 
@@ -447,7 +449,6 @@
             icon.textContent = isDarkMode ? '☀️' : '🌙';
         }
 
-        // Apply saved dark mode preference
         if (localStorage.getItem('darkMode') === 'true') {
             document.body.classList.add('dark-mode');
             document.getElementById('darkModeToggleIcon').textContent = '☀️';
@@ -463,13 +464,11 @@
         function updateServerTime() {
             const now = new Date();
 
-            // Format waktu: HH.mm.ss
             const hours = String(now.getHours()).padStart(2, '0');
             const minutes = String(now.getMinutes()).padStart(2, '0');
             const seconds = String(now.getSeconds()).padStart(2, '0');
             const timeString = `${hours}.${minutes}.${seconds}`;
 
-            // Format tanggal: Day, dd Mon yyyy
             const days = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
             const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 
@@ -480,7 +479,6 @@
 
             const dateString = `${dayName}, ${day} ${monthName} ${year}`;
 
-            // Gabungkan: HH.mm.ss • Day, dd Mon yyyy
             const element = document.getElementById('footerServerTime');
             if (element) {
                 element.textContent = `${timeString} • ${dateString}`;
@@ -500,9 +498,7 @@
             }
         }
 
-        // 🔥 FUNGSI BARU UNTUK HORIZONTAL SCROLL HINT 🔥
         function initializeScrollHint() {
-            // Jangan tampilkan di HP (karena HP pakai swipe)
             if (window.innerWidth <= 768) return;
 
             const scrollableElements = document.querySelectorAll('.table-wrapper, .data-table-container, .content-area');
@@ -517,16 +513,13 @@
             if (hasHorizontalScroll) {
                 const hint = document.getElementById('scrollHint');
                 if (hint) {
-                    // Cek kapan terakhir kali ditampilkan (cooldown 30 detik agar tidak spam)
                     const lastShown = sessionStorage.getItem('scrollHintLastShown');
                     if (lastShown && (Date.now() - lastShown < 30000)) return;
 
-                    // Delay sedikit agar render tabel selesai
                     setTimeout(() => {
                         hint.classList.add('show');
                         sessionStorage.setItem('scrollHintLastShown', Date.now());
 
-                        // Hilangkan setelah 5 detik
                         setTimeout(() => {
                             hint.classList.remove('show');
                         }, 5000);

@@ -23,7 +23,9 @@ class AssetsExport implements FromCollection, WithHeadings, WithMapping, WithSty
         if ($this->assets) {
             return $this->assets;
         }
-        return Asset::with('assetType')->get();
+
+        // Eager load batch dan assetType untuk menghindari N+1 query
+        return Asset::with(['batch.assetType'])->get();
     }
 
     public function headings(): array
@@ -48,18 +50,26 @@ class AssetsExport implements FromCollection, WithHeadings, WithMapping, WithSty
         static $no = 0;
         $no++;
 
+        // Ambil data dengan aman (mendukung data lama yang mungkin tidak punya batch)
+        $name = $asset->name ?? $asset->batch->name ?? '-';
+        $brand = $asset->brand ?? $asset->batch->brand ?? '-';
+        $price = $asset->price ?? $asset->batch->price ?? 0;
+        $purchaseDate = $asset->purchase_date ?? $asset->batch->purchase_date ?? null;
+        $assetTypeName = $asset->assetType->name ?? $asset->batch->assetType->name ?? '-';
+
         return [
             $no,
-            $asset->asset_id,
-            $asset->name,
-            $asset->assetType->name ?? '-',
-            $asset->brand,
-            $asset->serial_number,
-            'Rp ' . number_format($asset->price, 0, ',', '.'),
-            $asset->purchase_date->format('d/m/Y'),
-            $asset->location,
-            $asset->condition,
-            $asset->status,
+            $asset->asset_id ?? '-',
+            $name,
+            $assetTypeName,
+            $brand,
+            $asset->serial_number ?? '-',
+            'Rp '.number_format($price, 0, ',', '.'),
+            // 🔥 Menggunakan Nullsafe untuk mencegah error jika tanggal null 🔥
+            $purchaseDate ? $purchaseDate->format('d/m/Y') : '-',
+            $asset->location ?? '-',
+            $asset->condition ?? '-',
+            $asset->status ?? '-',
         ];
     }
 

@@ -114,19 +114,17 @@
         }
     </style>
 
-    <div class="page-container">
+    @if ($view === 'fisik')
         <div class="bulk-action-bar" id="bulkActionBar">
-            <!-- existing content -->
+            <p><span id="selectedCount">0</span> aset terpilih</p>
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                <button class="btn btn-secondary" onclick="exportSelected('pdf')">📄 Export PDF</button>
+                <button class="btn btn-success" onclick="exportSelected('excel')">📊 Export Excel</button>
+                <button class="btn" onclick="toggleBulkMode()">Batal</button>
+                <button class="btn btn-danger" onclick="bulkDelete()">Hapus Terpilih</button>
+            </div>
         </div>
-    </div>
-
-    <div class="bulk-action-bar" id="bulkActionBar">
-        <p><span id="selectedCount">0</span> aset dipilih</p>
-        <div style="display: flex; gap: 0.5rem;">
-            <button class="btn" onclick="cancelBulkMode()">Batal</button>
-            <button class="btn btn-danger" onclick="bulkDelete()">Hapus Terpilih</button>
-        </div>
-    </div>
+    @endif
 
     <div class="data-table-container">
         <div class="view-toggle-wrapper">
@@ -184,7 +182,6 @@
                     @endforeach
                 </select>
 
-                {{-- 🔥 TOMBOL PANDUAN (Terpadu) 🔥 --}}
                 <a href="{{ route('guides.index') }}" class="btn btn-secondary"
                     style="background: #f3f4f6; color: #374151; border: 1px solid #e5e7eb;">
                     📖 Panduan
@@ -201,8 +198,9 @@
                 <thead>
                     @if ($view === 'fisik')
                         <tr>
+                            {{-- Hanya tampilkan header checkbox di view fisik --}}
                             <th class="col-checkbox" style="width: 40px;"><input type="checkbox" id="selectAll"
-                                    onchange="toggleSelectAll()"></th>
+                                    onchange="toggleSelectAll(this)"></th>
                             <th>ID Aset</th>
                             <th>Gambar</th>
                             <th>Nama Aset</th>
@@ -286,7 +284,10 @@
                         @if ($isGrouped)
                             @forelse($grouped as $batch)
                                 <tr>
-                                    <td class="col-checkbox"></td>
+                                    <td class="col-checkbox">
+                                        <input type="checkbox" class="asset-checkbox" value="{{ $batch->id }}"
+                                            data-type="batch" onchange="updateSelectedCount()">
+                                    </td>
                                     <td><span style="color: var(--text-secondary);">—</span></td>
                                     <td>
                                         <img src="{{ $batch->assets->first()->image_url ?? asset('assets/logo-stti.png') }}"
@@ -341,7 +342,7 @@
                                 <tr>
                                     <td class="col-checkbox">
                                         <input type="checkbox" class="asset-checkbox" value="{{ $asset->id }}"
-                                            onchange="updateSelectedCount()">
+                                            data-type="asset" onchange="updateSelectedCount()">
                                     </td>
                                     <td><strong>{{ $asset->asset_id }}</strong></td>
                                     <td>
@@ -451,13 +452,17 @@
     </div>
 
     <!-- easy touch button -->
-    <div class="easy-touch-button" id="easyTouchBtn">
+    <div class="easy-touch-button snap-right" id="easyTouchBtn" onclick="toggleEasyTouchMenu(event)">
         <img src="{{ asset('assets/logo-stti.png') }}" alt="Quick Menu">
     </div>
+
     <div class="easy-touch-menu" id="easyTouchMenu">
-        <div class="menu-item" onclick="toggleBulkMode()" title="Mode Pilih">
-            <span class="icon">☑️</span>
-        </div>
+        {{-- HANYA TAMPILKAN TOMBOL BULK DI VIEW FISIK --}}
+        @if ($view === 'fisik')
+            <div class="menu-item" onclick="toggleBulkMode()" title="Mode Pilih">
+                <span class="icon">☑️</span>
+            </div>
+        @endif
         @can('create', App\Models\Asset::class)
             <div class="menu-item" onclick="window.location.href='{{ route('assets-inv.create') }}'" title="Tambah Aset">
                 <span class="icon">➕</span>
@@ -486,6 +491,67 @@
 
 @push('styles')
     <style>
+        /* CSS Bulk Action */
+        .bulk-action-bar {
+            display: none;
+            padding: 1rem 2rem;
+            background-color: var(--primary-color);
+            color: white;
+            align-items: center;
+            justify-content: space-between;
+            animation: fadeIn 0.3s;
+            margin: 0 2rem 1rem 2rem;
+            border-radius: 8px;
+        }
+
+        .bulk-action-bar.active {
+            display: flex;
+        }
+
+        .bulk-action-bar p {
+            margin: 0;
+            font-weight: 600;
+        }
+
+        .bulk-action-bar .btn {
+            background-color: white;
+            color: var(--primary-color);
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .bulk-action-bar .btn-danger {
+            background-color: #ef4444;
+            color: white;
+        }
+
+        .bulk-action-bar .btn-success {
+            background-color: #10b981;
+            color: white;
+        }
+
+        .bulk-action-bar .btn-secondary {
+            background-color: #64748b;
+            color: white;
+        }
+
+        .bulk-action-bar .btn:hover {
+            opacity: 0.8;
+        }
+
+        /* Sembunyikan checkbox secara default */
+        .data-table .col-checkbox {
+            width: 40px;
+            display: none;
+        }
+
+        .data-table.bulk-mode-active .col-checkbox {
+            display: table-cell;
+        }
+
         .page-container {
             width: 100%;
             max-width: 100%;
@@ -522,6 +588,73 @@
                 text-align: center;
             }
         }
+
+        /* 🔥 FIX TAMPILAN HP (TABEL SCROLL & SPASI BAWAH) 🔥 */
+        .table-wrapper {
+            display: block !important;
+            width: 100% !important;
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .data-table {
+            min-width: 900px !important;
+        }
+
+        .content-area,
+        .data-table-container {
+            padding-bottom: 100px !important;
+        }
+
+        /* 🔥 CSS UNTUK DRAG & DROP EASY TOUCH 🔥 */
+        .easy-touch-button {
+            position: fixed;
+            width: 60px;
+            height: 60px;
+            background-color: var(--primary-color);
+            border-radius: 50%;
+            box-shadow: var(--shadow-lg);
+            display: flex !important;
+            align-items: center;
+            justify-content: center;
+            cursor: grab;
+            z-index: 99999;
+            transition: opacity 0.3s ease;
+            user-select: none;
+            -webkit-user-drag: none;
+            /* Default posisi */
+            right: 30px;
+            bottom: 90px;
+        }
+
+        .easy-touch-button.faded {
+            opacity: 0.5 !important;
+        }
+
+        .easy-touch-button:hover {
+            opacity: 1 !important;
+        }
+
+        .easy-touch-button img {
+            width: 50%;
+            height: 50%;
+            object-fit: contain;
+            pointer-events: none;
+        }
+
+        .easy-touch-button.snap-left {
+            left: 20px;
+            right: auto;
+        }
+
+        .easy-touch-button.snap-right {
+            right: 20px;
+            left: auto;
+        }
+
+        .easy-touch-menu {
+            z-index: 99998;
+        }
     </style>
 @endpush
 
@@ -529,36 +662,133 @@
     <script>
         let bulkModeActive = false;
         let selectedAssets = [];
+        let isDragging = false;
+        let hasDragged = false;
+        let startX, startY, initialLeft, initialTop;
+        let fadeTimeout;
 
         document.addEventListener('DOMContentLoaded', function() {
             const easyTouchBtn = document.getElementById('easyTouchBtn');
-            const easyTouchMenu = document.getElementById('easyTouchMenu');
 
-            if (window.innerWidth <= 1024) {
-                easyTouchBtn.style.display = 'flex';
+            // --- LOGIKA DRAG & DROP EASY TOUCH ---
+            if (easyTouchBtn) {
+                easyTouchBtn.addEventListener('pointerdown', (e) => {
+                    isDragging = true;
+                    hasDragged = false;
+                    easyTouchBtn.style.cursor = 'grabbing';
+                    easyTouchBtn.classList.remove('faded');
+                    clearTimeout(fadeTimeout);
+
+                    const rect = easyTouchBtn.getBoundingClientRect();
+                    startX = e.clientX;
+                    startY = e.clientY;
+                    initialLeft = rect.left;
+                    initialTop = rect.top;
+
+                    // Hapus kelas snap agar bebas digeser
+                    easyTouchBtn.classList.remove('snap-left', 'snap-right');
+                    easyTouchBtn.style.right = 'auto';
+                    easyTouchBtn.style.bottom = 'auto';
+                    easyTouchBtn.style.left = `${initialLeft}px`;
+                    easyTouchBtn.style.top = `${initialTop}px`;
+
+                    easyTouchBtn.setPointerCapture(e.pointerId);
+                });
+
+                easyTouchBtn.addEventListener('pointermove', (e) => {
+                    if (!isDragging) return;
+
+                    const dx = e.clientX - startX;
+                    const dy = e.clientY - startY;
+
+                    // Toleransi 5px untuk mendeteksi apakah ini drag atau klik biasa
+                    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) hasDragged = true;
+                    if (!hasDragged) return;
+
+                    let newLeft = initialLeft + dx;
+                    let newTop = initialTop + dy;
+
+                    // Batasi agar tidak keluar layar
+                    const maxLeft = window.innerWidth - easyTouchBtn.offsetWidth;
+                    const maxTop = window.innerHeight - easyTouchBtn.offsetHeight;
+                    newLeft = Math.max(0, Math.min(newLeft, maxLeft));
+                    newTop = Math.max(0, Math.min(newTop, maxTop));
+
+                    easyTouchBtn.style.left = `${newLeft}px`;
+                    easyTouchBtn.style.top = `${newTop}px`;
+                });
+
+                easyTouchBtn.addEventListener('pointerup', (e) => {
+                    if (!isDragging) return;
+                    isDragging = false;
+                    easyTouchBtn.style.cursor = 'grab';
+                    easyTouchBtn.releasePointerCapture(e.pointerId);
+
+                    if (!hasDragged) return;
+
+                    // --- LOGIKA SNAPPING KE KIRI / KANAN ---
+                    const btnCenter = easyTouchBtn.getBoundingClientRect().left + (easyTouchBtn
+                        .offsetWidth / 2);
+                    const screenCenter = window.innerWidth / 2;
+
+                    if (btnCenter < screenCenter) {
+                        easyTouchBtn.style.left = '20px';
+                        easyTouchBtn.style.right = 'auto';
+                        easyTouchBtn.classList.add('snap-left');
+                    } else {
+                        easyTouchBtn.style.left = 'auto';
+                        easyTouchBtn.style.right = '20px';
+                        easyTouchBtn.classList.add('snap-right');
+                    }
+
+                    // --- LOGIKA AUTO-FADE 3 DETIK ---
+                    fadeTimeout = setTimeout(() => {
+                        easyTouchBtn.classList.add('faded');
+                    }, 3000);
+                });
             }
 
-            easyTouchBtn.addEventListener('click', function(e) {
-                e.stopPropagation();
-                easyTouchMenu.classList.toggle('active');
-            });
-
+            // --- SISA FILTER (Search & Dropdown) ---
             const searchInput = document.getElementById('assetSearch');
-            let searchTimeout;
-            searchInput.addEventListener('input', function() {
-                clearTimeout(searchTimeout);
-                searchTimeout = setTimeout(() => {
-                    applyFilters();
-                }, 500);
-            });
+            if (searchInput) {
+                let searchTimeout;
+                searchInput.addEventListener('input', function() {
+                    clearTimeout(searchTimeout);
+                    searchTimeout = setTimeout(() => {
+                        applyFilters();
+                    }, 500);
+                });
+            }
+            if (document.getElementById('filterUnit')) document.getElementById('filterUnit').addEventListener(
+                'change', applyFilters);
+            if (document.getElementById('filterStatus')) document.getElementById('filterStatus').addEventListener(
+                'change', applyFilters);
+            if (document.getElementById('filterType')) document.getElementById('filterType').addEventListener(
+                'change', applyFilters);
+        });
 
-            document.getElementById('filterUnit').addEventListener('change', applyFilters);
-            document.getElementById('filterStatus').addEventListener('change', applyFilters);
-            document.getElementById('filterType').addEventListener('change', applyFilters);
+        // 🔥 FUNGSI BUKA/TUTUP MENU EASY TOUCH 🔥
+        function toggleEasyTouchMenu(event) {
+            if (hasDragged) {
+                hasDragged = false;
+                return;
+            }
+            if (event) event.stopPropagation();
+            const menu = document.getElementById('easyTouchMenu');
+            if (menu) menu.classList.toggle('active');
+        }
 
-            document.addEventListener('click', function() {
-                easyTouchMenu.classList.remove('active');
-            });
+        // 🔥 TUTUP MENU JIKA KLIK DI LUAR AREA 🔥
+        document.addEventListener('click', function(e) {
+            const menu = document.getElementById('easyTouchMenu');
+            const btn = document.getElementById('easyTouchBtn');
+            if (menu && menu.classList.contains('active')) {
+                if (!menu.contains(e.target) && !btn.contains(e.target)) {
+                    menu.classList.remove('active');
+                } else if (e.target.closest('.menu-item')) {
+                    menu.classList.remove('active');
+                }
+            }
         });
 
         function applyFilters() {
@@ -580,6 +810,8 @@
             bulkModeActive = !bulkModeActive;
             const table = document.getElementById('assetsTable');
             const bulkBar = document.getElementById('bulkActionBar');
+            if (!table || !bulkBar) return;
+
             if (bulkModeActive) {
                 table.classList.add('bulk-mode-active');
                 bulkBar.classList.add('active');
@@ -587,36 +819,39 @@
                 table.classList.remove('bulk-mode-active');
                 bulkBar.classList.remove('active');
                 document.querySelectorAll('.asset-checkbox').forEach(cb => cb.checked = false);
-                document.getElementById('selectAll').checked = false;
+                const selectAll = document.getElementById('selectAll');
+                if (selectAll) selectAll.checked = false;
                 updateSelectedCount();
             }
-            document.getElementById('easyTouchMenu').classList.remove('active');
         }
 
-        function cancelBulkMode() {
-            toggleBulkMode();
-        }
-
-        function toggleSelectAll() {
-            const selectAll = document.getElementById('selectAll');
-            document.querySelectorAll('.asset-checkbox').forEach(cb => {
-                cb.checked = selectAll.checked;
-            });
+        function toggleSelectAll(selectAllCheckbox) {
+            document.querySelectorAll('.asset-checkbox').forEach(cb => cb.checked = selectAllCheckbox.checked);
             updateSelectedCount();
         }
 
         function updateSelectedCount() {
-            const checked = document.querySelectorAll('.asset-checkbox:checked');
-            selectedAssets = Array.from(checked).map(cb => cb.value);
-            document.getElementById('selectedCount').textContent = selectedAssets.length;
+            const checkboxes = document.querySelectorAll('.asset-checkbox:checked');
+            selectedAssets = Array.from(checkboxes).map(cb => cb.value);
+            const countElement = document.getElementById('selectedCount');
+            if (countElement) countElement.textContent = selectedAssets.length;
         }
 
         function bulkDelete() {
-            if (selectedAssets.length === 0) {
-                showToast('Pilih minimal satu aset', 'error');
+            const checkboxes = document.querySelectorAll('.asset-checkbox:checked');
+            const ids = [];
+            const types = [];
+            checkboxes.forEach(cb => {
+                ids.push(cb.value);
+                types.push(cb.dataset.type || 'asset');
+            });
+
+            if (ids.length === 0) {
+                showToast('Pilih minimal satu aset terlebih dahulu', 'error');
                 return;
             }
-            if (!confirm(`Apakah Anda yakin ingin menghapus ${selectedAssets.length} aset?`)) return;
+            if (!confirm(`Apakah Anda yakin ingin menghapus ${ids.length} aset/grup terpilih?`)) return;
+
             showLoading();
             fetch('{{ route('assets.bulk-delete') }}', {
                     method: 'POST',
@@ -625,7 +860,8 @@
                         'X-CSRF-TOKEN': '{{ csrf_token() }}'
                     },
                     body: JSON.stringify({
-                        ids: selectedAssets
+                        ids: ids,
+                        types: types
                     })
                 })
                 .then(response => response.json())
@@ -635,13 +871,38 @@
                         showToast(data.message, 'success');
                         setTimeout(() => window.location.reload(), 1000);
                     } else {
-                        showToast('Gagal menghapus aset', 'error');
+                        showToast(data.message || 'Gagal menghapus aset', 'error');
                     }
                 })
                 .catch(error => {
                     hideLoading();
-                    showToast('Terjadi kesalahan', 'error');
+                    showToast('Terjadi kesalahan pada server', 'error');
+                    console.error(error);
                 });
+        }
+
+        // 🔥 LOGIKA EXPORT TERPILIH (FIX: Sertakan types) 🔥
+        function exportSelected(format) {
+            const checkboxes = document.querySelectorAll('.asset-checkbox:checked');
+            const ids = [];
+            const types = [];
+
+            checkboxes.forEach(cb => {
+                ids.push(cb.value);
+                types.push(cb.dataset.type || 'asset');
+            });
+
+            if (ids.length === 0) {
+                showToast('Pilih minimal satu aset terlebih dahulu', 'error');
+                return;
+            }
+
+            const idsParam = ids.join(',');
+            const typesParam = types.join(',');
+            let baseUrl = format === 'pdf' ? '{{ route('reports.export.pdf') }}' : '{{ route('reports.export.excel') }}';
+
+            window.location.href = `${baseUrl}?type=assets&ids=${idsParam}&types=${typesParam}`;
+            showToast(`Menyiapkan file ${format.toUpperCase()}...`, 'info');
         }
 
         function exportAssets() {
@@ -654,14 +915,5 @@
                 behavior: 'smooth'
             });
         }
-
-        window.addEventListener('resize', function() {
-            if (window.innerWidth <= 1024) {
-                easyTouchBtn.style.display = 'flex';
-            } else {
-                easyTouchBtn.style.display = 'none';
-                easyTouchMenu.classList.remove('active');
-            }
-        });
     </script>
 @endpush

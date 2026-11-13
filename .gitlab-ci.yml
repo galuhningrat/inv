@@ -1,0 +1,47 @@
+stages:
+  - build-container
+  - deploy
+
+variables:
+  TAG_IMAGE: $CI_COMMIT_SHA
+
+build-app:
+  image: docker:29
+  stage: build-container
+  services:
+    - docker:dind
+  before_script:
+    - cp .env-example .env
+    - echo "DB_CONNECTION=${DB_CONNECTION}" >> .env
+    - echo "DB_HOST=${DB_HOST}" >> .env
+    - echo "DB_PORT=${DB_PORT}" >> .env
+    - echo "DB_DATABASE=${DB_DATABASE}" >> .env
+    - echo "DB_USERNAME=${DB_USERNAME}" >> .env
+    - echo "DB_PASSWORD=${DB_PASSWORD}" >> .env
+    - cat .env
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+  script:
+    - docker build -t "$CI_REGISTRY_IMAGE:latest" .
+    - docker build -t "$CI_REGISTRY_IMAGE:$TAG_IMAGE" .
+    - docker push "$CI_REGISTRY_IMAGE" --all-tags
+  only:
+    - main
+
+deploy-production:
+  stage: deploy
+  image: alpine:latest
+  before_script:
+    - "which ssh-agent || ( apk update && apk add --no-cache openssh )"
+    - mkdir -p ~/.ssh
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_rsa
+    - chmod 700 ~/.ssh/id_rsa
+    - eval "$(ssh-agent -s)"
+    - ssh-add ~/.ssh/id_rsa
+    - '[[ -f /.dockerenv ]] && echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config'
+  script:
+    - ssh -o StrictHostKeyChecking=no ${SSH_USER}@${SSH_PRODUCTION} "sudo docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY && sudo docker pull $CI_REGISTRY_IMAGE:$TAG_IMAGE && docker stop $CONATINER_NAME && docker container rm $CONATINER_NAME && $DOCKER_RUN_CMD $CI_REGISTRY_IMAGE:$TAG_IMAGE"
+  environment:
+    name: production
+  when: manual
+  only:
+    - main

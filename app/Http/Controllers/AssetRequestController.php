@@ -1,0 +1,1191 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Asset;
+use App\Models\AssetBatch;
+use App\Models\AssetRequest;
+use App\Models\AssetRequestItem;
+use App\Models\LightReceiptLog;
+use App\Models\AssetType;
+use App\Models\QrCode;
+use App\Models\RolloverLog;
+use App\Models\ServiceRequestItem;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+
+class AssetRequestController extends Controller
+{
+    public function index(Request $request)
+    {
+        $query = AssetRequest::with('requester', 'items', 'verifier', 'approver');
+
+        $user = Auth::user();
+        if (in_array($user->level, ['Kaprodi', 'Kalab'])) {
+            $query->whereHas('items', function ($q) use ($user) {
+                $q->where('unit_id', $user->unit_id);
+            });
+        }
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        $requests = $query->latest()->paginate(10);
+
+        return view('requests.index', compact('requests'));
+    }
+
+    public function createService(Request $request, ?string $category = null)
+    {
+        $this->authorize('create', AssetRequest::class);
+
+        if (! $category) {
+            return redirect()->route('requests.index')
+                ->with('info', 'Silakan pilih jenis jasa melalui tombol "+ Tambah Pengajuan Baru".');
+        }
+
+        $validCategories = array_keys(ServiceRequestItem::CATEGORIES);
+        if (! in_array($category, $validCategories, true)) {
+            abort(404, 'Kategori jasa tidak ditemukan.');
+        }
+
+        $user = Auth::user();
+        $categoryLabel = ServiceRequestItem::CATEGORIES[$category];
+        $schema = ServiceRequestItem::SERVICE_DATA_SCHEMA[$category] ?? [];
+
+        $canChooseUnit = in_array($user->level, ['Sarpras', 'Admin']);
+        $units = $canChooseUnit
+            ? \App\Models\Unit::whereNotNull('category')->orderBy('category')->orderBy('name')->get()
+            : collect();
+        $currentUnitName = $user->unit_id ? \App\Models\Unit::find($user->unit_id)?->name : null;
+
+        $priorities = ['Normal', 'Mendesak', 'Sangat Mendesak'];
+
+        $assets = $category === 'pemeliharaan'
+            ? Asset::with('batch')->get()->sortBy('batch.name')->values()
+            : collect();
+
+        return view('requests.create-service', compact(
+            'category',
+            'categoryLabel',
+            'schema',
+            'canChooseUnit',
+            'units',
+            'currentUnitName',
+            'priorities',
+            'assets'
+        ));
+    }
+
+    public function searchMaintenanceAssets(Request $request)
+    {
+        $validated = $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'page' => ['nullable', 'integer', 'min:1'],
+        ]);
+
+        $keyword = mb_strtolower(trim($validated['q'] ?? ''));
+
+        // Minimal 2 karakter sebelum pencarian dijalankan
+        if (mb_strlen($keyword) < 2) {
+            return response()->json([
+                'results' => [],
+                'pagination' => ['more' => false],
+            ]);
+        }
+
+        $tokens = preg_split('/\s+/', $keyword, -1, PREG_SPLIT_NO_EMPTY);
+
+        $assets = Asset::with(['batch', 'unit', 'location_ref'])
+            ->where(function ($query) use ($tokens) {
+                foreach ($tokens as $token) {
+                    $search = '%' . $token . '%';
+
+                    // Semua token harus ditemukan pada setidaknya salah satu field
+                    $query->where(function ($subQuery) use ($search) {
+                        $subQuery->whereRaw('LOWER(asset_id) LIKE ?', [$search])
+                            ->orWhereRaw('LOWER(location) LIKE ?', [$search])
+                            ->orWhereHas('batch', function ($q) use ($search) {
+                                $q->whereRaw('LOWER(name) LIKE ?', [$search])
+                                    ->orWhereRaw('LOWER(brand) LIKE ?', [$search])
+                                    ->orWhereRaw('LOWER(model) LIKE ?', [$search]);
+                            });
+                    });
+                }
+            })
+            ->orderByRaw("
+                CASE
+                    WHEN LOWER(asset_id) = ? THEN 1
+                    WHEN LOWER(asset_id) LIKE ? THEN 2
+                    WHEN EXISTS (SELECT 1 FROM asset_batches WHERE asset_batches.id = assets.asset_batch_id AND LOWER(name) LIKE ?) THEN 3
+                    WHEN LOWER(location) LIKE ? THEN 4
+                    ELSE 5
+                END
+            ", [$keyword, $keyword . '%', $keyword . '%', $keyword . '%'])
+            ->paginate(20);
+
+        return response()->json([
+            'results' => $assets->getCollection()->map(function ($asset) {
+                return [
+                    'id' => $asset->id,
+                    'text' => $asset->asset_id . ' — ' . ($asset->batch->name ?? 'Tanpa Nama'),
+                    'asset_id' => $asset->asset_id,
+                    'name' => $asset->batch->name ?? '-',
+                    'brand' => $asset->batch->brand ?? '-',
+                    'model' => $asset->batch->model ?? '-',
+                    'location' => $asset->location ?? '-',
+                ];
+            })->values(),
+
+            'pagination' => [
+                'more' => $assets->hasMorePages(),
+            ],
+        ]);
+    }
+
+    public function storeService(Request $request, string $category)
+    {
+        $this->authorize('create', AssetRequest::class);
+
+        $validCategories = array_keys(ServiceRequestItem::CATEGORIES);
+        if (! in_array($category, $validCategories, true)) {
+            abort(404, 'Kategori jasa tidak ditemukan.');
+        }
+
+        $user = Auth::user();
+        $canChooseUnit = in_array($user->level, ['Sarpras', 'Admin']);
+
+        $rules = [
+            'items' => 'required|array|min:1',
+            'items.*.item_name' => 'required|string|max:255',
+            'items.*.specification' => 'nullable|string|max:255',
+            'items.*.quantity' => 'required|integer|min:1',
+            'items.*.unit' => 'required|string|max:50',
+            'items.*.estimated_price_per_unit' => 'nullable|numeric|min:0',
+            'items.*.unit_id' => 'required|exists:units,id',
+            'items.*.priority' => 'required|in:Normal,Mendesak,Sangat Mendesak',
+            'items.*.reason' => 'required|string',
+        ];
+
+        $schema = ServiceRequestItem::SERVICE_DATA_SCHEMA[$category] ?? [];
+        foreach ($schema as $field => $fieldRules) {
+            $type = $fieldRules['type'] ?? 'string';
+            $required = ! empty($fieldRules['required']);
+            $in = ! empty($fieldRules['in']) ? '|in:' . implode(',', $fieldRules['in']) : '';
+
+            $rule = $required ? 'required' : 'nullable';
+            $rule .= match ($type) {
+                'integer' => '|integer',
+                'numeric' => '|numeric',
+                'date' => '|date',
+                'url' => '|url',
+                default => '|string|max:1000',
+            };
+            if (isset($fieldRules['min'])) {
+                $rule .= '|min:' . $fieldRules['min'];
+            }
+            $rule .= $in;
+
+            $rules["items.*.service_data.$field"] = $rule;
+        }
+
+        if ($category === 'pemeliharaan') {
+            $rules['items.*.service_data.asset_id'] = 'required|exists:assets,id';
+        }
+
+        $validated = $request->validate($rules);
+
+        foreach ($validated['items'] as $idx => $item) {
+            if (! $canChooseUnit && $item['unit_id'] != $user->unit_id) {
+                return back()->withInput()->withErrors([
+                    "items.$idx.unit_id" => 'Anda hanya boleh mengajukan untuk unit Anda sendiri.',
+                ]);
+            }
+        }
+
+        $firstItem = $validated['items'][0];
+
+        DB::beginTransaction();
+        try {
+            $assetRequest = AssetRequest::create([
+                'requester_id' => Auth::id(),
+                'unit_id' => $firstItem['unit_id'],
+                'period_month' => now()->month,
+                'period_year' => now()->year,
+                'request_type' => 'jasa',
+                'service_category' => $category,
+                'alasan_pengajuan' => null,
+                'related_asset_id' => null,
+                'priority' => $firstItem['priority'],
+                'reason' => $firstItem['reason'],
+                'status' => 'Pending',
+            ]);
+
+            foreach ($validated['items'] as $item) {
+                $serviceData = [];
+                foreach ($schema as $field => $_) {
+                    if (isset($item['service_data'][$field])) {
+                        $serviceData[$field] = $item['service_data'][$field];
+                    }
+                }
+
+                $assetRequest->serviceItems()->create([
+                    'unit_id' => $item['unit_id'],
+                    'priority' => $item['priority'],
+                    'alasan_pengajuan' => null,
+                    'reason' => $item['reason'],
+                    'service_category' => $category,
+                    'item_name' => $item['item_name'],
+                    'specification' => $item['specification'] ?? null,
+                    'quantity' => $item['quantity'],
+                    'unit' => $item['unit'],
+                    'estimated_price_per_unit' => $item['estimated_price_per_unit'] ?? null,
+                    'service_data' => $serviceData,
+                    'approval_status' => 'pending',
+                ]);
+            }
+
+            DB::commit();
+
+            return redirect()->route('requests.index')
+                ->with('success', 'Pengajuan jasa berhasil dikirim, menunggu verifikasi Tim Sarpras!');
+        } catch (\Exception $e) {
+            DB::rollback();
+
+            return redirect()->back()->withInput()
+                ->with('error', 'Gagal mengirim pengajuan jasa: ' . $e->getMessage());
+        }
+    }
+
+    public function create()
+    {
+        $user = Auth::user();
+        $assetTypes = AssetType::all();
+        $priorities = ['Normal', 'Mendesak', 'Sangat Mendesak'];
+        $alasanOptions = ['Pengadaan Baru', 'Penggantian', 'Pengisian Kembali'];
+        $assets = Asset::with('batch')->get()->sortBy('batch.name')->values();
+
+        $canChooseUnit = in_array($user->level, ['Sarpras', 'Admin']);
+        $units = $canChooseUnit
+            ? \App\Models\Unit::whereNotNull('category')->orderBy('category')->orderBy('name')->get()
+            : collect();
+        $currentUnitName = $user->unit_id ? \App\Models\Unit::find($user->unit_id)?->name : null;
+
+        $nonFisikCategories = \App\Models\IntangibleAsset::CATEGORIES;
+        $habisPakaiCategories = AssetRequestItem::HABIS_PAKAI_CATEGORIES;
+        $unitsFisik = AssetRequestItem::UNITS_FISIK;
+        $unitsNonFisik = AssetRequestItem::UNITS_NON_FISIK;
+        $sifatBarangFisik = AssetRequestItem::SIFAT_BARANG_FISIK;
+        $sifatBarangNonFisik = AssetRequestItem::SIFAT_BARANG_NON_FISIK;
+
+        return view('requests.create', compact(
+            'assetTypes',
+            'priorities',
+            'alasanOptions',
+            'assets',
+            'canChooseUnit',
+            'units',
+            'currentUnitName',
+            'nonFisikCategories',
+            'habisPakaiCategories',
+            'unitsFisik',
+            'unitsNonFisik',
+            'sifatBarangFisik',
+            'sifatBarangNonFisik'
+        ));
+    }
+
+    public function store(Request $request)
+    {
+        $this->authorize('create', AssetRequest::class);
+
+        $user = Auth::user();
+        $canChooseUnit = in_array($user->level, ['Sarpras', 'Admin']);
+
+        $customMessages = [
+            'items.*.quantity.min' => 'Jumlah barang minimal 1.',
+            'items.*.unit_id.required' => 'Unit pengaju wajib dipilih.',
+            'items.*.related_asset_id.required' => 'Aset yang diganti wajib dipilih jika alasan pengajuan adalah Penggantian.',
+            'items.*.asset_type_id.required' => 'Jenis aset wajib dipilih untuk barang fisik tidak habis pakai.',
+            'items.*.category.required' => 'Kategori wajib dipilih sesuai sifat barang.',
+        ];
+
+        $validated = $request->validate([
+            // ... (rules yang sudah ada) ...
+        ], $customMessages);
+
+        $validated = $request->validate([
+            'jenis_barang' => 'sometimes|nullable|in:Habis Pakai,Tidak Habis Pakai,Jasa',
+            'kategori_barang' => 'sometimes|nullable|in:ATK,Konsumsi,Alat,Furniture,Lainnya',
+
+            'items' => 'required|array|min:1',
+            'items.*.item_type' => 'required|in:Fisik,Non-Fisik',
+            'items.*.sifat_barang' => 'required|in:Tidak Habis Pakai,Habis Pakai,Jasa',
+            'items.*.asset_type_id' => 'nullable|exists:asset_types,id',
+            'items.*.item_name' => 'required|string|max:255',
+            'items.*.specification' => 'nullable|string|max:255',
+            'items.*.category' => 'nullable|string|max:100',
+            'items.*.quantity' => 'required|integer|min:1',
+            'items.*.unit' => 'required|string|max:50',
+            'items.*.estimated_price_per_unit' => 'nullable|numeric|min:0',
+
+            'items.*.unit_id' => 'required|exists:units,id',
+            'items.*.priority' => 'required|in:Normal,Mendesak,Sangat Mendesak',
+            'items.*.alasan_pengajuan' => 'required|in:Pengadaan Baru,Penggantian,Pengisian Kembali',
+            'items.*.reason' => 'required|string',
+            'items.*.related_asset_id' => 'nullable|exists:assets,id',
+        ]);
+
+        foreach ($validated['items'] as $idx => $item) {
+            $comboValid = ($item['item_type'] === 'Fisik' && in_array($item['sifat_barang'], AssetRequestItem::SIFAT_BARANG_FISIK))
+                || ($item['item_type'] === 'Non-Fisik' && in_array($item['sifat_barang'], AssetRequestItem::SIFAT_BARANG_NON_FISIK));
+
+            if (! $comboValid) {
+                return back()->withInput()->withErrors([
+                    "items.$idx.sifat_barang" => 'Kombinasi Jenis Item dan Sifat Barang tidak valid.',
+                ]);
+            }
+
+            if ($item['item_type'] === 'Fisik' && $item['sifat_barang'] !== 'Habis Pakai') {
+                if (empty($item['asset_type_id'])) {
+                    return back()->withInput()->withErrors(["items.$idx.asset_type_id" => 'Jenis Aset wajib dipilih.']);
+                }
+            } elseif ($item['item_type'] === 'Fisik' && $item['sifat_barang'] === 'Habis Pakai') {
+                if (empty($item['category']) || ! array_key_exists($item['category'], AssetRequestItem::HABIS_PAKAI_CATEGORIES)) {
+                    return back()->withInput()->withErrors(["items.$idx.category" => 'Kategori Habis Pakai wajib dipilih.']);
+                }
+            } elseif ($item['item_type'] === 'Non-Fisik' && $item['sifat_barang'] !== 'Jasa') {
+                if (empty($item['category']) || ! array_key_exists($item['category'], \App\Models\IntangibleAsset::CATEGORIES)) {
+                    return back()->withInput()->withErrors(["items.$idx.category" => 'Kategori Non-Fisik wajib dipilih.']);
+                }
+            }
+
+            if ($item['alasan_pengajuan'] === 'Penggantian' && empty($item['related_asset_id'])) {
+                return back()->withInput()->withErrors([
+                    "items.$idx.related_asset_id" => 'Aset yang diganti wajib dipilih untuk alasan Penggantian.',
+                ]);
+            }
+
+            if (! $canChooseUnit && $item['unit_id'] != $user->unit_id) {
+                return back()->withInput()->withErrors([
+                    "items.$idx.unit_id" => 'Anda hanya boleh mengajukan untuk unit Anda sendiri.',
+                ]);
+            }
+        }
+
+        $firstItem = $validated['items'][0];
+
+        DB::beginTransaction();
+        try {
+            $assetRequest = AssetRequest::create([
+                'requester_id' => Auth::id(),
+                'unit_id' => $firstItem['unit_id'],
+                'period_month' => now()->month,
+                'period_year' => now()->year,
+                'jenis_barang' => $validated['jenis_barang'] ?? null,
+                'kategori_barang' => $validated['kategori_barang'] ?? null,
+                'alasan_pengajuan' => $firstItem['alasan_pengajuan'],
+                'related_asset_id' => $firstItem['related_asset_id'] ?? null,
+                'priority' => $firstItem['priority'],
+                'reason' => $firstItem['reason'],
+                'status' => 'Pending',
+            ]);
+
+            foreach ($validated['items'] as $item) {
+                $assetRequest->items()->create([
+                    'item_type' => $item['item_type'],
+                    'sifat_barang' => $item['sifat_barang'],
+                    'asset_type_id' => $item['asset_type_id'] ?? null,
+                    'item_name' => $item['item_name'],
+                    'specification' => $item['specification'] ?? null,
+                    'category' => $item['category'] ?? null,
+                    'quantity' => $item['quantity'],
+                    'unit' => $item['unit'],
+                    'estimated_price_per_unit' => $item['estimated_price_per_unit'] ?? null,
+                    'unit_id' => $item['unit_id'],
+                    'priority' => $item['priority'],
+                    'alasan_pengajuan' => $item['alasan_pengajuan'],
+                    'reason' => $item['reason'],
+                    'related_asset_id' => $item['related_asset_id'] ?? null,
+                ]);
+            }
+
+            DB::commit();
+
+            return redirect()->route('requests.index')
+                ->with('success', 'Pengajuan berhasil dikirim, menunggu verifikasi Tim Sarpras!');
+        } catch (\Exception $e) {
+            DB::rollback();
+
+            return redirect()->back()->withInput()
+                ->with('error', 'Gagal mengirim pengajuan: ' . $e->getMessage());
+        }
+    }
+
+    public function show(AssetRequest $assetRequest)
+    {
+        $this->authorize('view', $assetRequest);
+
+        $assetRequest->load(
+            'requester',
+            'items.assetType',
+            'items.unit',
+            'items.rolledFrom.approver',
+            'items.relatedAsset',
+            'serviceItems.unit',
+            'verifier',
+            'approver',
+            'relatedAsset'
+        );
+
+        $units = \App\Models\Unit::pluck('name', 'id');
+
+        return view('requests.show', compact('assetRequest', 'units'));
+    }
+
+    public function verify(Request $request, AssetRequest $assetRequest)
+    {
+        if (! in_array(Auth::user()->level, ['PJ Pengadaan', 'Admin'])) {
+            abort(403, 'Hanya PJ Pengadaan yang dapat memverifikasi pengajuan.');
+        }
+        if ($assetRequest->status !== 'Pending') {
+            return redirect()->back()->with('error', 'Pengajuan ini sudah diproses sebelumnya.');
+        }
+
+        $validated = $request->validate([
+            'verification_notes' => 'nullable|string',
+        ]);
+
+        $assetRequest->update([
+            'status' => 'Diverifikasi',
+            'verified_by' => Auth::id(),
+            'verified_at' => now(),
+            'verification_notes' => $validated['verification_notes'] ?? null,
+        ]);
+
+        return redirect()->route('requests.index')
+            ->with('success', 'Pengajuan diverifikasi, diteruskan ke Ketua STTI untuk persetujuan final!');
+    }
+
+    public function approve(AssetRequest $assetRequest)
+    {
+        if (Auth::user()->level !== 'Rektor') {
+            abort(403, 'Hanya Rektor yang dapat menyetujui pengajuan.');
+        }
+
+        if ($assetRequest->status !== 'Diverifikasi') {
+            return redirect()->back()->with('error', 'Pengajuan harus diverifikasi Tim Sarpras terlebih dahulu.');
+        }
+
+        $assetRequest->update([
+            'status' => 'Disetujui',
+            'approved_by' => Auth::id(),
+            'approved_at' => now(),
+        ]);
+
+        return redirect()->route('requests.index')
+            ->with('success', 'Pengajuan disetujui!');
+    }
+
+    public function disburseFund(Request $request, AssetRequest $assetRequest)
+    {
+        if (Auth::user()->level !== 'Keuangan') {
+            abort(403, 'Hanya Bagian Keuangan yang dapat mengonfirmasi pencairan dana.');
+        }
+
+        if ($assetRequest->status !== 'Disetujui') {
+            return redirect()->back()->with('error', 'Pengajuan harus disetujui Rektor terlebih dahulu.');
+        }
+
+        $validated = $request->validate([
+            'disbursement_notes' => 'nullable|string',
+        ]);
+
+        $assetRequest->update([
+            'status' => 'Dana Cair',
+            'disbursed_by' => Auth::id(),
+            'disbursed_at' => now(),
+            'disbursement_notes' => $validated['disbursement_notes'] ?? null,
+        ]);
+
+        return redirect()->route('requests.index')
+            ->with('success', 'Dana dikonfirmasi cair, diteruskan ke PJ Pengadaan untuk proses pembelian!');
+    }
+
+    public function reject(Request $request, AssetRequest $assetRequest)
+    {
+        if (Auth::user()->level !== 'Rektor' || $assetRequest->status !== 'Diverifikasi') {
+            abort(403, 'Hanya Rektor yang dapat menolak pengajuan pada tahap ini.');
+        }
+
+        $validated = $request->validate(['approval_notes' => 'nullable|string']);
+
+        $assetRequest->update([
+            'status' => 'Ditolak',
+            'approved_by' => Auth::id(),
+            'approved_at' => now(),
+            'approval_notes' => $validated['approval_notes'] ?? null,
+        ]);
+
+        return redirect()->route('requests.index')->with('success', 'Pengajuan ditolak!');
+    }
+
+    public function showReceiveForm(AssetRequest $assetRequest)
+    {
+        if (Auth::user()->level !== 'Sarpras' && Auth::user()->level !== 'Admin') {
+            abort(403, 'Hanya Bagian Sarpras yang dapat melakukan registrasi aset.');
+        }
+        if (!in_array($assetRequest->status, ['Dikonfirmasi', 'Diterima Sebagian'])) {
+            return redirect()->route('requests.index')->with('error', 'Barang belum dikonfirmasi diterima secara fisik oleh PJ Pengadaan atau sudah selesai diterima.');
+        }
+
+        // Load data header dan item dengan status approval-nya
+        $assetRequest->load([
+            'requester',
+            'unit',
+            'items' => function ($query) {
+                $query->receivable()->with('assetType');
+            },
+            'serviceItems' => function ($query) {
+                $query->receivable();
+            }
+        ]);
+
+        $allowedLevelsForPJ = ['Sarpras', 'Admin', 'Kalab', 'Kaprodi', 'Dosen', 'Karyawan'];
+        $usersByLevel = \App\Models\User::whereIn('level', $allowedLevelsForPJ)
+            ->orderBy('name')
+            ->get()
+            ->groupBy('level');
+
+        // Cek apakah ada item fisik yang butuh penempatan lokasi
+        $hasPhysical = $assetRequest->items->contains(
+            fn($item) => $item->item_type === 'Fisik' && $item->sifat_barang !== 'Habis Pakai'
+        );
+
+        $units = $hasPhysical ? \App\Models\Unit::with('locations')->whereNotNull('category')->orderBy('category')->orderBy('name')->get() : collect();
+        $categories = \App\Models\IntangibleAsset::CATEGORIES;
+        $habisPakaiCategories = AssetRequestItem::HABIS_PAKAI_CATEGORIES;
+        $reminderOptions = ['' => 'Tidak ada pengingat', '30' => '30 hari sebelum', '14' => '14 hari sebelum', '7' => '7 hari sebelum'];
+
+        $unitsForJs = $units->map(function ($u) {
+            return [
+                'id' => $u->id,
+                'name' => $u->name,
+                'category' => $u->category,
+                'locations' => $u->locations->map(function ($l) {
+                    return ['id' => $l->id, 'name' => $l->name];
+                })->values(),
+            ];
+        })->values();
+
+        return view('requests.receive', compact('assetRequest', 'usersByLevel', 'units', 'hasPhysical', 'unitsForJs', 'categories', 'habisPakaiCategories', 'reminderOptions'));
+    }
+
+    public function receive(Request $request, AssetRequest $assetRequest)
+    {
+        if (Auth::user()->level !== 'Sarpras' && Auth::user()->level !== 'Admin') {
+            abort(403, 'Hanya Bagian Sarpras yang dapat melakukan registrasi aset.');
+        }
+
+        // 🔥 POIN 12: Anti Double-Submit & Locking
+        $assetRequest = AssetRequest::where('id', $assetRequest->id)->lockForUpdate()->firstOrFail();
+
+        if (!in_array($assetRequest->status, ['Dikonfirmasi', 'Diterima Sebagian'])) {
+            return redirect()->route('requests.index')->with('error', 'Barang belum dikonfirmasi diterima secara fisik atau sudah selesai diterima.');
+        }
+
+        $assetRequest->load([
+            'items' => function ($query) {
+                $query->receivable();
+            },
+        ]);
+
+        $hasPhysical = $assetRequest->items->contains(
+            fn($item) => $item->item_type === 'Fisik' && $item->sifat_barang !== 'Habis Pakai'
+        );
+
+        // ============ BLOK VALIDASI POIN 9 ============
+        $rules = [
+            'purchase_date' => 'required|date',
+            'penanggung_jawab_id' => 'required|exists:users,id',
+        ];
+
+        if ($hasPhysical) {
+            $rules['unit_id'] = 'required|exists:units,id';
+            $unit = \App\Models\Unit::find($request->unit_id);
+            $hasLocations = $unit && $unit->locations()->exists();
+
+            $rules['location_id'] = $hasLocations ? 'required|exists:locations,id' : 'nullable';
+            $rules['location_detail'] = $hasLocations ? 'nullable|string|max:255' : 'required|string|max:255';
+        }
+
+        foreach ($assetRequest->items as $item) {
+            if ($item->isLightReceipt()) {
+                $remaining = $item->quantity - ($item->received_quantity ?? 0);
+                $rules["received_quantities.{$item->id}"] = "required|integer|min:0|max:{$remaining}";
+                $rules["receipt_notes.{$item->id}"] = 'nullable|string|max:1000';
+                $rules["receipt_proof_files.{$item->id}"] = 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120';
+            } elseif ($item->item_type === 'Fisik') {
+                $rules["brand.{$item->id}"] = 'required|string|max:255';
+                $rules["model.{$item->id}"] = 'nullable|string|max:255';
+                $rules["prices.{$item->id}"] = 'required|numeric|min:0';
+                $rules["received_quantities.{$item->id}"] = 'required|integer|min:1|max:' . $item->quantity;
+
+                // 🔥 POIN 9.2: Wajibkan field berdasarkan jumlah riil yang diterima
+                $receivedQty = (int) $request->input("received_quantities.{$item->id}", 0);
+                for ($i = 0; $i < $receivedQty; $i++) {
+                    $rules["images.{$item->id}.{$i}"] = 'required|image|mimes:jpg,jpeg,png,webp|max:2048';
+                    $rules["serial_numbers.{$item->id}.{$i}"] = 'required|string|distinct|unique:assets,serial_number';
+                    $rules["conditions.{$item->id}.{$i}"] = 'required|in:Baik,Rusak Ringan,Rusak Berat';
+                    $rules["expired_dates.{$item->id}.{$i}"] = 'nullable|date';
+                    $rules["unit_names.{$item->id}.{$i}"] = 'nullable|string|max:255';
+                }
+            } else {
+                $rules["categories.{$item->id}"] = 'required|in:' . implode(',', array_keys(\App\Models\IntangibleAsset::CATEGORIES));
+                $rules["vendors.{$item->id}"] = 'required|string|max:255';
+                $rules["prices.{$item->id}"] = 'required|numeric|min:0';
+                $rules["funding_sources.{$item->id}"] = 'nullable|string|max:255';
+                $rules["contract_numbers.{$item->id}"] = 'nullable|string|max:255';
+                $rules["license_types.{$item->id}"] = 'required|in:Berlangganan,Selamanya';
+                $rules["expiry_dates.{$item->id}"] = 'required_if:license_types.' . $item->id . ',Berlangganan|nullable|date|after_or_equal:purchase_date';
+                $rules["reminder_days.{$item->id}"] = 'nullable|in:30,14,7';
+                $rules["access_urls.{$item->id}"] = 'nullable|url|max:255';
+                $rules["certificate_files.{$item->id}"] = 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120';
+
+                // wildcard (*) untuk validasi distinct product key dan email
+                $rules["product_keys.{$item->id}"] = 'nullable|array';
+                $rules["product_keys.{$item->id}.*"] = 'nullable|string|max:255|distinct';
+
+                $rules["assigned_emails.{$item->id}"] = 'nullable|array';
+                $rules["assigned_emails.{$item->id}.*"] = 'nullable|email|max:255';
+            }
+        }
+
+        $validated = $request->validate($rules);
+
+        $locationName = $hasPhysical && ! empty($validated['location_id']) ? \App\Models\Location::find($validated['location_id'])->name : null;
+        $locationString = trim(collect([$locationName, $validated['location_detail'] ?? null])->filter()->implode(' - '));
+
+        // 🔥 POIN 11: Array untuk melacak file yang baru di-upload
+        $uploadedFiles = [];
+
+        DB::beginTransaction();
+        try {
+            $createdAssets = [];
+
+            foreach ($assetRequest->items as $item) {
+                if ($item->isLightReceipt()) {
+                    $proofPath = null;
+                    if ($request->hasFile("receipt_proof_files.{$item->id}")) {
+                        // POIN 15: Simpan bukti ke local (privat)
+                        $proofPath = $request->file("receipt_proof_files.{$item->id}")->store('receipt-proofs', 'local');
+                        $uploadedFiles[] = $proofPath;
+                    }
+
+                    $qtyNow = $validated['received_quantities'][$item->id] ?? 0;
+
+                    if ($qtyNow > 0 || $validated['receipt_notes'][$item->id] || $proofPath) {
+                        LightReceiptLog::create([
+                            'asset_request_item_id' => $item->id,
+                            'received_quantity' => $qtyNow,
+                            'notes' => $validated['receipt_notes'][$item->id] ?? null,
+                            'proof_file' => $proofPath,
+                            'received_by' => Auth::id(),
+                        ]);
+                    }
+
+                    $item->update([
+                        'received_quantity' => ($item->received_quantity ?? 0) + $qtyNow,
+                    ]);
+                } elseif ($item->item_type === 'Fisik') {
+                    $batch = AssetBatch::create([
+                        'asset_type_id' => $item->asset_type_id,
+                        'name' => $item->item_name,
+                        'brand' => $validated['brand'][$item->id],
+                        'model' => $validated['model'][$item->id] ?? $item->specification,
+                        'price' => $validated['prices'][$item->id],
+                        'purchase_date' => $validated['purchase_date'],
+                    ]);
+
+                    $receivedQty = $validated['received_quantities'][$item->id];
+
+                    for ($i = 0; $i < $receivedQty; $i++) {
+                        // Foto fisik tetap di public
+                        $unitImagePath = $request->file("images.{$item->id}.{$i}")->store('assets', 'public');
+                        $uploadedFiles[] = $unitImagePath;
+
+                        $asset = new Asset;
+                        $asset->asset_batch_id = $batch->id;
+                        $asset->serial_number = $validated['serial_numbers'][$item->id][$i];
+                        $asset->location = $locationString;
+                        $asset->location_id = $validated['location_id'] ?? null;
+                        $asset->location_detail = $validated['location_detail'] ?? null;
+                        $asset->unit_id = $validated['unit_id'];
+                        $asset->condition = $validated['conditions'][$item->id][$i];
+                        $asset->status = 'Tersedia';
+                        $asset->image = $unitImagePath;
+                        $asset->penanggung_jawab_id = $validated['penanggung_jawab_id'] ?? $assetRequest->requester_id;
+                        $asset->asset_request_id = $assetRequest->id;
+                        $asset->qr_code = QrCode::generateCodeContent($item->assetType->code);
+                        $asset->save();
+
+                        $createdAssets[] = $asset;
+
+                        QrCode::create(['asset_id' => $asset->id, 'code_content' => $asset->qr_code, 'status' => 'Aktif']);
+                    }
+
+                    $item->update(['received_quantity' => ($item->received_quantity ?? 0) + $receivedQty]);
+                } else {
+                    $certificatePath = null;
+                    if ($request->hasFile("certificate_files.{$item->id}")) {
+                        // POIN 15: Simpan sertifikat ke local (privat)
+                        $certificatePath = $request->file("certificate_files.{$item->id}")->store('intangible-certificates', 'local');
+                        $uploadedFiles[] = $certificatePath;
+                    }
+
+                    for ($i = 0; $i < $item->quantity; $i++) {
+                        $intangible = \App\Models\IntangibleAsset::create([
+                            'name' => $item->item_name,
+                            'category' => $validated['categories'][$item->id],
+                            'vendor' => $validated['vendors'][$item->id],
+                            'price' => $validated['prices'][$item->id],
+                            'activation_date' => $validated['purchase_date'],
+                            'funding_source' => $validated['funding_sources'][$item->id] ?? null,
+                            'contract_number' => $validated['contract_numbers'][$item->id] ?? null,
+                            'license_type' => $validated['license_types'][$item->id],
+                            'expiry_date' => $validated['expiry_dates'][$item->id] ?? null,
+                            'reminder_days' => $validated['reminder_days'][$item->id] ?? null,
+                            'quota' => null,
+                            'unit_id' => $assetRequest->unit_id,
+                            'pic_id' => $validated['penanggung_jawab_id'] ?? null,
+                            'access_url' => $validated['access_urls'][$item->id] ?? null,
+                            'certificate_file' => $certificatePath,
+                            'product_key' => $validated['product_keys'][$item->id][$i] ?? null,
+                            'assigned_user_email' => $validated['assigned_emails'][$item->id][$i] ?? null,
+                            'status' => 'Aktif',
+                            'created_by' => Auth::id(),
+                            'asset_request_id' => $assetRequest->id,
+                        ]);
+                        $createdAssets[] = $intangible;
+                    }
+                }
+            }
+
+            // Logika Penggantian Aset
+            if ($assetRequest->alasan_pengajuan === 'Penggantian' && $assetRequest->related_asset_id) {
+                $oldAsset = Asset::find($assetRequest->related_asset_id);
+                if ($oldAsset) {
+                    $newAsset = $createdAssets[0] ?? null;
+                    if ($newAsset && $newAsset instanceof Asset) {
+                        $oldAsset->update(['status' => 'Diganti', 'replaces_asset_id' => $newAsset->id, 'updated_at' => now()]);
+                        session()->flash('replacement_notification', [
+                            'old_asset_id' => $oldAsset->asset_id,
+                            'old_asset_name' => $oldAsset->batch->name ?? 'Aset',
+                            'new_asset_id' => $newAsset->asset_id,
+                            'new_asset_name' => $newAsset->batch->name ?? 'Aset',
+                        ]);
+                    }
+                }
+            }
+
+            // Cek apakah semua item sudah diterima sepenuhnya
+            $allReceived = $assetRequest->items->every(function ($item) {
+                return ($item->received_quantity ?? 0) >= $item->quantity;
+            });
+
+            if ($allReceived) {
+                $assetRequest->update(['status' => 'Diterima']);
+            } else {
+                $assetRequest->update(['status' => 'Diterima Sebagian']);
+            }
+
+            DB::commit();
+
+            return redirect()->route('requests.index')
+                ->with('success', 'Semua item berhasil diregistrasi ke inventaris!');
+        } catch (\Exception $e) {
+            DB::rollback();
+
+            // 🔥 POIN 11: Jika gagal, hapus file yang sudah terlanjur di-upload
+            foreach ($uploadedFiles as $file) {
+                $disk = str_contains($file, 'receipt-proofs') || str_contains($file, 'intangible-certificates') ? 'local' : 'public';
+                \Illuminate\Support\Facades\Storage::disk($disk)->delete($file);
+            }
+
+            return redirect()->back()->withInput()->with('error', 'Gagal memproses registrasi: ' . $e->getMessage());
+        }
+    }
+
+    public function showCompleteServiceForm(AssetRequest $assetRequest)
+    {
+        if (! in_array(Auth::user()->level, ['Sarpras', 'Admin'])) {
+            abort(403, 'Hanya Bagian Sarpras yang dapat menyelesaikan jasa.');
+        }
+        if (! $assetRequest->isServiceRequest()) {
+            return redirect()->route('requests.index')->with('error', 'Dokumen ini bukan pengajuan jasa.');
+        }
+        if ($assetRequest->status !== 'Dana Cair') {
+            return redirect()->route('requests.index')->with('error', 'Dana untuk pengajuan ini belum dicairkan.');
+        }
+
+        $assetRequest->load('serviceItems.unit', 'requester');
+
+        return view('requests.complete-service', compact('assetRequest'));
+    }
+
+    public function completeService(Request $request, AssetRequest $assetRequest)
+    {
+        if (! in_array(Auth::user()->level, ['Sarpras', 'Admin'])) {
+            abort(403, 'Hanya Bagian Sarpras yang dapat menyelesaikan jasa.');
+        }
+        if (! $assetRequest->isServiceRequest()) {
+            return redirect()->route('requests.index')->with('error', 'Dokumen ini bukan pengajuan jasa.');
+        }
+        if ($assetRequest->status !== 'Dana Cair') {
+            return redirect()->route('requests.index')->with('error', 'Dana untuk pengajuan ini belum dicairkan.');
+        }
+
+        $assetRequest->load('serviceItems');
+
+        $rules = [
+            'completion_date' => 'required|date',
+            'items' => 'required|array',
+        ];
+        foreach ($assetRequest->serviceItems as $item) {
+            $rules["items.{$item->id}.executor"] = 'required|string|max:255';
+            $rules["items.{$item->id}.actual_cost"] = 'nullable|numeric|min:0';
+            $rules["items.{$item->id}.completion_notes"] = 'nullable|string|max:1000';
+            $rules["items.{$item->id}.bast_file"] = 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120';
+        }
+
+        $validated = $request->validate($rules);
+
+        DB::beginTransaction();
+        try {
+            foreach ($assetRequest->serviceItems as $item) {
+                $bastPath = $item->bast_file;
+                if ($request->hasFile("items.{$item->id}.bast_file")) {
+                    if ($item->bast_file && \Illuminate\Support\Facades\Storage::disk('public')->exists($item->bast_file)) {
+                        \Illuminate\Support\Facades\Storage::disk('public')->delete($item->bast_file);
+                    }
+                    $bastPath = $request->file("items.{$item->id}.bast_file")->store('bast-files', 'public');
+                }
+
+                $item->update([
+                    'completed_at' => $validated['completion_date'],
+                    'completion_notes' => $validated["items"][$item->id]['completion_notes'] ?? null,
+                    'executor' => $validated["items"][$item->id]['executor'],
+                    'actual_cost' => $validated["items"][$item->id]['actual_cost'] ?? null,
+                    'bast_file' => $bastPath,
+                ]);
+            }
+
+            $assetRequest->update(['status' => 'Selesai']);
+
+            DB::commit();
+
+            return redirect()->route('requests.index')
+                ->with('success', 'Jasa berhasil ditandai selesai! BAST telah tersimpan.');
+        } catch (\Exception $e) {
+            DB::rollback();
+
+            return redirect()->back()->withInput()
+                ->with('error', 'Gagal menyelesaikan jasa: ' . $e->getMessage());
+        }
+    }
+
+    public function destroy(AssetRequest $assetRequest)
+    {
+        $this->authorize('delete', $assetRequest);
+        $assetRequest->delete();
+        return redirect()->route('requests.index')->with('success', 'Pengajuan berhasil dihapus!');
+    }
+
+    public function confirmPhysical(Request $request, AssetRequest $assetRequest)
+    {
+        if (Auth::user()->level !== 'PJ Pengadaan') {
+            abort(403, 'Hanya PJ Pengadaan yang dapat mengonfirmasi penerimaan fisik barang.');
+        }
+
+        if ($assetRequest->status !== 'Dana Cair') {
+            return redirect()->back()->with('error', 'Dana untuk pengajuan ini belum dicairkan Bagian Keuangan.');
+        }
+
+        $validated = $request->validate([
+            'confirmation_notes' => 'nullable|string',
+        ]);
+
+        $assetRequest->update([
+            'status' => 'Dikonfirmasi',
+            'confirmed_by' => Auth::id(),
+            'confirmed_at' => now(),
+            'confirmation_notes' => $validated['confirmation_notes'] ?? null,
+        ]);
+
+        return redirect()->route('requests.index')
+            ->with('success', 'Penerimaan fisik dikonfirmasi, diteruskan ke Sarpras untuk registrasi!');
+    }
+
+    public function approval(AssetRequest $assetRequest)
+    {
+        if (Auth::user()->level !== 'Rektor') {
+            abort(403, 'Hanya Rektor yang dapat mengakses halaman approval.');
+        }
+
+        if ($assetRequest->status !== 'Diverifikasi') {
+            return redirect()->route('requests.index')->with('error', 'Pengajuan belum diverifikasi.');
+        }
+
+        $assetRequest->load(
+            'items.assetType',
+            'items.unit',
+            'items.rolledFrom',
+            'serviceItems.unit',
+            'requester',
+            'unit'
+        );
+
+        $units = \App\Models\Unit::pluck('name', 'id');
+
+        return view('requests.approval', compact('assetRequest', 'units'));
+    }
+
+    public function approveItem(Request $request, AssetRequest $assetRequest, AssetRequestItem $item)
+    {
+        if (Auth::user()->level !== 'Rektor') {
+            abort(403);
+        }
+
+        if ($item->asset_request_id !== $assetRequest->id) {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'action' => 'required|in:approved,rejected,deferred',
+            'approval_notes' => 'required_if:action,rejected,deferred|nullable|string',
+        ]);
+
+        $item->update([
+            'approval_status' => $validated['action'],
+            'approval_notes' => $validated['approval_notes'] ?? null,
+            'approved_by' => Auth::id(),
+            'approved_at' => now(),
+        ]);
+
+        $this->updateRequestStatus($assetRequest);
+
+        $message = match ($validated['action']) {
+            'approved' => 'Item disetujui.',
+            'rejected' => 'Item ditolak.',
+            'deferred' => 'Item ditangguhkan dan akan di-rollover ke bulan depan.',
+        };
+
+        return redirect()->back()->with('success', $message);
+    }
+
+    public function approveServiceItem(Request $request, AssetRequest $assetRequest, ServiceRequestItem $item)
+    {
+        if (Auth::user()->level !== 'Rektor') {
+            abort(403);
+        }
+
+        if ($item->asset_request_id !== $assetRequest->id) {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'action' => 'required|in:approved,rejected,deferred',
+            'approval_notes' => 'required_if:action,rejected,deferred|nullable|string',
+        ]);
+
+        $item->update([
+            'approval_status' => $validated['action'],
+            'approval_notes' => $validated['approval_notes'] ?? null,
+            'approved_by' => Auth::id(),
+            'approved_at' => now(),
+        ]);
+
+        $this->updateRequestStatus($assetRequest);
+
+        $message = match ($validated['action']) {
+            'approved' => 'Item jasa disetujui.',
+            'rejected' => 'Item jasa ditolak.',
+            'deferred' => 'Item jasa ditangguhkan dan akan di-rollover ke bulan depan.',
+        };
+
+        return redirect()->back()->with('success', $message);
+    }
+
+    private function updateRequestStatus(AssetRequest $assetRequest)
+    {
+        $assetRequest->load('items', 'serviceItems');
+
+        $allItems = $assetRequest->items->concat($assetRequest->serviceItems);
+
+        $pending = $allItems->where('approval_status', 'pending')->count();
+        $rejected = $allItems->where('approval_status', 'rejected')->count();
+        $approved = $allItems->where('approval_status', 'approved')->count();
+
+        if ($pending > 0) {
+            return;
+        }
+
+        if ($rejected > 0 && $approved === 0) {
+            $assetRequest->update([
+                'status' => 'Ditolak',
+                'approved_by' => Auth::id(),
+                'approved_at' => now(),
+                'approval_notes' => 'Semua item ditolak.',
+            ]);
+        } else {
+            $assetRequest->update([
+                'status' => 'Disetujui',
+                'approved_by' => Auth::id(),
+                'approved_at' => now(),
+            ]);
+        }
+
+        $deferredAssetItems = $assetRequest->items->where('approval_status', 'deferred');
+        if ($deferredAssetItems->count() > 0) {
+            $this->rolloverDeferredItems($assetRequest, $deferredAssetItems);
+        }
+
+        $deferredServiceItems = $assetRequest->serviceItems->where('approval_status', 'deferred');
+        if ($deferredServiceItems->count() > 0) {
+            $this->rolloverDeferredServiceItems($assetRequest, $deferredServiceItems);
+        }
+    }
+
+    private function rolloverDeferredItems(AssetRequest $assetRequest, $deferredItems)
+    {
+        $nextMonth = now()->addMonth();
+        $targetMonth = $nextMonth->month;
+        $targetYear = $nextMonth->year;
+
+        $existingDraft = AssetRequest::where('unit_id', $assetRequest->unit_id)
+            ->where('period_month', $targetMonth)
+            ->where('period_year', $targetYear)
+            ->whereIn('status', ['Pending', 'Diverifikasi'])
+            ->first();
+
+        if (! $existingDraft) {
+            $existingDraft = AssetRequest::create([
+                'requester_id' => $assetRequest->requester_id,
+                'unit_id' => $assetRequest->unit_id,
+                'period_month' => $targetMonth,
+                'period_year' => $targetYear,
+                'jenis_barang' => $assetRequest->jenis_barang,
+                'kategori_barang' => $assetRequest->kategori_barang,
+                'alasan_pengajuan' => $assetRequest->alasan_pengajuan,
+                'priority' => $assetRequest->priority,
+                'reason' => $assetRequest->reason . ' (Rollover dari bulan ' . $assetRequest->period_month . '/' . $assetRequest->period_year . ')',
+                'status' => 'Pending',
+            ]);
+        }
+
+        foreach ($deferredItems as $item) {
+            // CEGAH DUPLIKASI: Cek apakah item ini sudah pernah di-rollover ke draft tersebut
+            $alreadyRolledOver = $existingDraft->items()->where('rolled_from_item_id', $item->id)->exists();
+            if ($alreadyRolledOver) {
+                continue; // Lewati jika sudah ada
+            }
+
+            $newItem = $existingDraft->items()->create([
+                'item_type' => $item->item_type,
+                'sifat_barang' => $item->sifat_barang,
+                'asset_type_id' => $item->asset_type_id,
+                'item_name' => $item->item_name,
+                'specification' => $item->specification,
+                'category' => $item->category,
+                'quantity' => $item->quantity,
+                'unit' => $item->unit,
+                'estimated_price_per_unit' => $item->estimated_price_per_unit,
+                'approval_status' => 'pending',
+                'rolled_from_item_id' => $item->id,
+                'unit_id' => $item->unit_id,
+                'priority' => $item->priority,
+                'alasan_pengajuan' => $item->alasan_pengajuan,
+                'reason' => $item->reason,
+                'related_asset_id' => $item->related_asset_id,
+            ]);
+
+            RolloverLog::create([
+                'original_item_id' => $item->id,
+                'new_item_id' => $newItem->id,
+                'source_month' => $assetRequest->period_month,
+                'source_year' => $assetRequest->period_year,
+                'target_month' => $targetMonth,
+                'target_year' => $targetYear,
+                'reason' => $item->approval_notes ?? 'Ditangguhkan oleh Rektor',
+            ]);
+        }
+
+        session()->flash('rollover_notification', [
+            'count' => $deferredItems->count(),
+            'month' => $targetMonth,
+            'year' => $targetYear,
+        ]);
+    }
+
+    private function rolloverDeferredServiceItems(AssetRequest $assetRequest, $deferredItems)
+    {
+        $nextMonth = now()->addMonth();
+        $targetMonth = $nextMonth->month;
+        $targetYear = $nextMonth->year;
+
+        $existingDraft = AssetRequest::where('unit_id', $assetRequest->unit_id)
+            ->where('period_month', $targetMonth)
+            ->where('period_year', $targetYear)
+            ->where('request_type', 'jasa')
+            ->where('service_category', $assetRequest->service_category)
+            ->whereIn('status', ['Pending', 'Diverifikasi'])
+            ->first();
+
+        if (! $existingDraft) {
+            $existingDraft = AssetRequest::create([
+                'requester_id' => $assetRequest->requester_id,
+                'unit_id' => $assetRequest->unit_id,
+                'period_month' => $targetMonth,
+                'period_year' => $targetYear,
+                'request_type' => 'jasa',
+                'service_category' => $assetRequest->service_category,
+                'alasan_pengajuan' => null,
+                'priority' => $assetRequest->priority,
+                'reason' => $assetRequest->reason . ' (Rollover dari bulan ' . $assetRequest->period_month . '/' . $assetRequest->period_year . ')',
+                'status' => 'Pending',
+            ]);
+        }
+
+        foreach ($deferredItems as $item) {
+            // CEGAH DUPLIKASI
+            $alreadyRolledOver = $existingDraft->serviceItems()->where('rolled_from_item_id', $item->id)->exists();
+            if ($alreadyRolledOver) {
+                continue;
+            }
+
+            $existingDraft->serviceItems()->create([
+                'unit_id' => $item->unit_id,
+                'priority' => $item->priority,
+                'alasan_pengajuan' => null,
+                'reason' => $item->reason,
+                'service_category' => $item->service_category,
+                'item_name' => $item->item_name,
+                'specification' => $item->specification,
+                'quantity' => $item->quantity,
+                'unit' => $item->unit,
+                'estimated_price_per_unit' => $item->estimated_price_per_unit,
+                'service_data' => $item->service_data,
+                'approval_status' => 'pending',
+                'rolled_from_item_id' => $item->id,
+            ]);
+        }
+
+        session()->flash('rollover_notification', [
+            'count' => $deferredItems->count(),
+            'month' => $targetMonth,
+            'year' => $targetYear,
+        ]);
+    }
+}

@@ -20,6 +20,45 @@ class UserSeeder extends Seeder
                 'status' => 'Aktif',
                 'avatar' => 'assets/admin.png'
             ],
+<<<<<<< HEAD
+=======
+            [
+                'name' => 'Staff Sarpras',
+                'username' => 'sarpras',
+                'email' => 'sarpras@stti.ac.id',
+                'password' => Hash::make('sarpras123'),
+                'level' => 'Sarpras',
+                'status' => 'Aktif',
+                'avatar' => 'assets/sarpras.png'
+            ],
+            [
+                'name' => 'Muhammad Sugiarto, S.E., M.M.',
+                'username' => 'rektor',
+                'email' => 'rektor@stti.ac.id',
+                'password' => Hash::make('rektor123'),
+                'level' => 'Rektor',
+                'status' => 'Aktif',
+                'avatar' => 'assets/rektor.png'
+            ],
+            [
+                'name' => 'Bima Azis Kusuma, S.T., M.T.',
+                'username' => 'kaprodi',
+                'email' => 'kaprodi@stti.ac.id',
+                'password' => Hash::make('kaprodi123'),
+                'level' => 'Kaprodi',
+                'status' => 'Aktif',
+                'avatar' => 'assets/kaprodi.png'
+            ],
+            [
+                'name' => 'Mrs. Nazilah',
+                'username' => 'keuangan',
+                'email' => 'mrsnazilah@stti.ac.id',
+                'password' => Hash::make('keuangan123'),
+                'level' => 'Keuangan',
+                'status' => 'Aktif',
+                'avatar' => 'assets/keuangan.png'
+            ],
+>>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e
         ];
 
         foreach ($users as $user) {
@@ -30,4 +69,8 @@ class UserSeeder extends Seeder
             );
         }
     }
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e

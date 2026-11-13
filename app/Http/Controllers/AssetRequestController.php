@@ -6,7 +6,10 @@ use App\Models\Asset;
 use App\Models\AssetBatch;
 use App\Models\AssetRequest;
 use App\Models\AssetRequestItem;
+<<<<<<< HEAD
 use App\Models\LightReceiptLog;
+=======
+>>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e
 use App\Models\AssetType;
 use App\Models\QrCode;
 use App\Models\RolloverLog;
@@ -64,7 +67,11 @@ class AssetRequestController extends Controller
         $priorities = ['Normal', 'Mendesak', 'Sangat Mendesak'];
 
         $assets = $category === 'pemeliharaan'
+<<<<<<< HEAD
             ? Asset::with('batch')->get()->sortBy('batch.name')->values()
+=======
+            ? Asset::orderBy('name')->get()
+>>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e
             : collect();
 
         return view('requests.create-service', compact(
@@ -79,6 +86,7 @@ class AssetRequestController extends Controller
         ));
     }
 
+<<<<<<< HEAD
     public function searchMaintenanceAssets(Request $request)
     {
         $validated = $request->validate([
@@ -145,6 +153,8 @@ class AssetRequestController extends Controller
         ]);
     }
 
+=======
+>>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e
     public function storeService(Request $request, string $category)
     {
         $this->authorize('create', AssetRequest::class);
@@ -265,7 +275,11 @@ class AssetRequestController extends Controller
         $assetTypes = AssetType::all();
         $priorities = ['Normal', 'Mendesak', 'Sangat Mendesak'];
         $alasanOptions = ['Pengadaan Baru', 'Penggantian', 'Pengisian Kembali'];
+<<<<<<< HEAD
         $assets = Asset::with('batch')->get()->sortBy('batch.name')->values();
+=======
+        $assets = Asset::orderBy('name')->get();
+>>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e
 
         $canChooseUnit = in_array($user->level, ['Sarpras', 'Admin']);
         $units = $canChooseUnit
@@ -304,6 +318,7 @@ class AssetRequestController extends Controller
         $user = Auth::user();
         $canChooseUnit = in_array($user->level, ['Sarpras', 'Admin']);
 
+<<<<<<< HEAD
         $customMessages = [
             'items.*.quantity.min' => 'Jumlah barang minimal 1.',
             'items.*.unit_id.required' => 'Unit pengaju wajib dipilih.',
@@ -316,6 +331,8 @@ class AssetRequestController extends Controller
             // ... (rules yang sudah ada) ...
         ], $customMessages);
 
+=======
+>>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e
         $validated = $request->validate([
             'jenis_barang' => 'sometimes|nullable|in:Habis Pakai,Tidak Habis Pakai,Jasa',
             'kategori_barang' => 'sometimes|nullable|in:ATK,Konsumsi,Alat,Furniture,Lainnya',
@@ -537,6 +554,7 @@ class AssetRequestController extends Controller
         if (Auth::user()->level !== 'Sarpras' && Auth::user()->level !== 'Admin') {
             abort(403, 'Hanya Bagian Sarpras yang dapat melakukan registrasi aset.');
         }
+<<<<<<< HEAD
         if (!in_array($assetRequest->status, ['Dikonfirmasi', 'Diterima Sebagian'])) {
             return redirect()->route('requests.index')->with('error', 'Barang belum dikonfirmasi diterima secara fisik oleh PJ Pengadaan atau sudah selesai diterima.');
         }
@@ -564,6 +582,22 @@ class AssetRequestController extends Controller
             fn($item) => $item->item_type === 'Fisik' && $item->sifat_barang !== 'Habis Pakai'
         );
 
+=======
+        if ($assetRequest->status !== 'Dikonfirmasi') {
+            return redirect()->route('requests.index')->with('error', 'Barang belum dikonfirmasi diterima secara fisik oleh PJ Pengadaan.');
+        }
+
+        $assetRequest->load([
+            'items' => function ($query) {
+                $query->receivable()->with('assetType');
+            },
+        ]);
+
+        $usersByLevel = \App\Models\User::orderBy('name')->get()->groupBy('level');
+        $hasPhysical = $assetRequest->items->contains(
+            fn($item) => $item->item_type === 'Fisik' && $item->sifat_barang !== 'Habis Pakai'
+        );
+>>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e
         $units = $hasPhysical ? \App\Models\Unit::with('locations')->whereNotNull('category')->orderBy('category')->orderBy('name')->get() : collect();
         $categories = \App\Models\IntangibleAsset::CATEGORIES;
         $habisPakaiCategories = AssetRequestItem::HABIS_PAKAI_CATEGORIES;
@@ -588,12 +622,17 @@ class AssetRequestController extends Controller
         if (Auth::user()->level !== 'Sarpras' && Auth::user()->level !== 'Admin') {
             abort(403, 'Hanya Bagian Sarpras yang dapat melakukan registrasi aset.');
         }
+<<<<<<< HEAD
 
         // 🔥 POIN 12: Anti Double-Submit & Locking
         $assetRequest = AssetRequest::where('id', $assetRequest->id)->lockForUpdate()->firstOrFail();
 
         if (!in_array($assetRequest->status, ['Dikonfirmasi', 'Diterima Sebagian'])) {
             return redirect()->route('requests.index')->with('error', 'Barang belum dikonfirmasi diterima secara fisik atau sudah selesai diterima.');
+=======
+        if ($assetRequest->status !== 'Dikonfirmasi') {
+            return redirect()->route('requests.index')->with('error', 'Barang belum dikonfirmasi diterima secara fisik.');
+>>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e
         }
 
         $assetRequest->load([
@@ -601,34 +640,53 @@ class AssetRequestController extends Controller
                 $query->receivable();
             },
         ]);
+<<<<<<< HEAD
 
+=======
+>>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e
         $hasPhysical = $assetRequest->items->contains(
             fn($item) => $item->item_type === 'Fisik' && $item->sifat_barang !== 'Habis Pakai'
         );
 
+<<<<<<< HEAD
         // ============ BLOK VALIDASI POIN 9 ============
         $rules = [
             'purchase_date' => 'required|date',
             'penanggung_jawab_id' => 'required|exists:users,id',
+=======
+        $rules = [
+            'purchase_date' => 'required|date',
+            'penanggung_jawab_id' => 'nullable|exists:users,id',
+>>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e
         ];
 
         if ($hasPhysical) {
             $rules['unit_id'] = 'required|exists:units,id';
+<<<<<<< HEAD
             $unit = \App\Models\Unit::find($request->unit_id);
             $hasLocations = $unit && $unit->locations()->exists();
 
             $rules['location_id'] = $hasLocations ? 'required|exists:locations,id' : 'nullable';
             $rules['location_detail'] = $hasLocations ? 'nullable|string|max:255' : 'required|string|max:255';
+=======
+            $rules['location_id'] = 'nullable|exists:locations,id';
+            $rules['location_detail'] = 'nullable|string|max:255';
+>>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e
         }
 
         foreach ($assetRequest->items as $item) {
             if ($item->isLightReceipt()) {
+<<<<<<< HEAD
                 $remaining = $item->quantity - ($item->received_quantity ?? 0);
                 $rules["received_quantities.{$item->id}"] = "required|integer|min:0|max:{$remaining}";
+=======
+                $rules["received_quantities.{$item->id}"] = 'nullable|integer|min:0';
+>>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e
                 $rules["receipt_notes.{$item->id}"] = 'nullable|string|max:1000';
                 $rules["receipt_proof_files.{$item->id}"] = 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120';
             } elseif ($item->item_type === 'Fisik') {
                 $rules["brand.{$item->id}"] = 'required|string|max:255';
+<<<<<<< HEAD
                 $rules["model.{$item->id}"] = 'nullable|string|max:255';
                 $rules["prices.{$item->id}"] = 'required|numeric|min:0';
                 $rules["received_quantities.{$item->id}"] = 'required|integer|min:1|max:' . $item->quantity;
@@ -636,6 +694,11 @@ class AssetRequestController extends Controller
                 // 🔥 POIN 9.2: Wajibkan field berdasarkan jumlah riil yang diterima
                 $receivedQty = (int) $request->input("received_quantities.{$item->id}", 0);
                 for ($i = 0; $i < $receivedQty; $i++) {
+=======
+                $rules["model.{$item->id}"] = 'nullable|string|max:255'; // TAMBAHAN: Model
+                $rules["prices.{$item->id}"] = 'required|numeric|min:0';
+                for ($i = 0; $i < $item->quantity; $i++) {
+>>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e
                     $rules["images.{$item->id}.{$i}"] = 'required|image|mimes:jpg,jpeg,png,webp|max:2048';
                     $rules["serial_numbers.{$item->id}.{$i}"] = 'required|string|distinct|unique:assets,serial_number';
                     $rules["conditions.{$item->id}.{$i}"] = 'required|in:Baik,Rusak Ringan,Rusak Berat';
@@ -649,6 +712,7 @@ class AssetRequestController extends Controller
                 $rules["funding_sources.{$item->id}"] = 'nullable|string|max:255';
                 $rules["contract_numbers.{$item->id}"] = 'nullable|string|max:255';
                 $rules["license_types.{$item->id}"] = 'required|in:Berlangganan,Selamanya';
+<<<<<<< HEAD
                 $rules["expiry_dates.{$item->id}"] = 'required_if:license_types.' . $item->id . ',Berlangganan|nullable|date|after_or_equal:purchase_date';
                 $rules["reminder_days.{$item->id}"] = 'nullable|in:30,14,7';
                 $rules["access_urls.{$item->id}"] = 'nullable|url|max:255';
@@ -660,6 +724,16 @@ class AssetRequestController extends Controller
 
                 $rules["assigned_emails.{$item->id}"] = 'nullable|array';
                 $rules["assigned_emails.{$item->id}.*"] = 'nullable|email|max:255';
+=======
+                $rules["expiry_dates.{$item->id}"] = 'required_if:license_types.' . $item->id . ',Berlangganan|nullable|date';
+                $rules["reminder_days.{$item->id}"] = 'nullable|in:30,14,7';
+                $rules["access_urls.{$item->id}"] = 'nullable|url|max:255';
+                $rules["certificate_files.{$item->id}"] = 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120';
+                for ($i = 0; $i < $item->quantity; $i++) {
+                    $rules["product_keys.{$item->id}.{$i}"] = 'nullable|string|max:255';
+                    $rules["assigned_emails.{$item->id}.{$i}"] = 'nullable|email|max:255';
+                }
+>>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e
             }
         }
 
@@ -668,15 +742,19 @@ class AssetRequestController extends Controller
         $locationName = $hasPhysical && ! empty($validated['location_id']) ? \App\Models\Location::find($validated['location_id'])->name : null;
         $locationString = trim(collect([$locationName, $validated['location_detail'] ?? null])->filter()->implode(' - '));
 
+<<<<<<< HEAD
         // 🔥 POIN 11: Array untuk melacak file yang baru di-upload
         $uploadedFiles = [];
 
+=======
+>>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e
         DB::beginTransaction();
         try {
             $createdAssets = [];
 
             foreach ($assetRequest->items as $item) {
                 if ($item->isLightReceipt()) {
+<<<<<<< HEAD
                     $proofPath = null;
                     if ($request->hasFile("receipt_proof_files.{$item->id}")) {
                         // POIN 15: Simpan bukti ke local (privat)
@@ -700,6 +778,20 @@ class AssetRequestController extends Controller
                         'received_quantity' => ($item->received_quantity ?? 0) + $qtyNow,
                     ]);
                 } elseif ($item->item_type === 'Fisik') {
+=======
+                    $proofPath = $request->hasFile("receipt_proof_files.{$item->id}")
+                        ? $request->file("receipt_proof_files.{$item->id}")->store('receipt-proofs', 'public')
+                        : null;
+
+                    $item->update([
+                        'received_quantity' => $validated['received_quantities'][$item->id] ?? $item->quantity,
+                        'receipt_notes' => $validated['receipt_notes'][$item->id] ?? null,
+                        'receipt_proof_file' => $proofPath,
+                    ]);
+                } elseif ($item->item_type === 'Fisik') {
+
+                    // 1. SIMPAN BATCH
+>>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e
                     $batch = AssetBatch::create([
                         'asset_type_id' => $item->asset_type_id,
                         'name' => $item->item_name,
@@ -709,6 +801,7 @@ class AssetRequestController extends Controller
                         'purchase_date' => $validated['purchase_date'],
                     ]);
 
+<<<<<<< HEAD
                     $receivedQty = $validated['received_quantities'][$item->id];
 
                     for ($i = 0; $i < $receivedQty; $i++) {
@@ -716,6 +809,12 @@ class AssetRequestController extends Controller
                         $unitImagePath = $request->file("images.{$item->id}.{$i}")->store('assets', 'public');
                         $uploadedFiles[] = $unitImagePath;
 
+=======
+                    for ($i = 0; $i < $item->quantity; $i++) {
+                        $unitImagePath = $request->file("images.{$item->id}.{$i}")->store('assets', 'public');
+
+                        // 2. SIMPAN UNIT
+>>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e
                         $asset = new Asset;
                         $asset->asset_batch_id = $batch->id;
                         $asset->serial_number = $validated['serial_numbers'][$item->id][$i];
@@ -735,6 +834,7 @@ class AssetRequestController extends Controller
 
                         QrCode::create(['asset_id' => $asset->id, 'code_content' => $asset->qr_code, 'status' => 'Aktif']);
                     }
+<<<<<<< HEAD
 
                     $item->update(['received_quantity' => ($item->received_quantity ?? 0) + $receivedQty]);
                 } else {
@@ -744,6 +844,12 @@ class AssetRequestController extends Controller
                         $certificatePath = $request->file("certificate_files.{$item->id}")->store('intangible-certificates', 'local');
                         $uploadedFiles[] = $certificatePath;
                     }
+=======
+                } else {
+                    $certificatePath = $request->hasFile("certificate_files.{$item->id}")
+                        ? $request->file("certificate_files.{$item->id}")->store('intangible-certificates', 'public')
+                        : null;
+>>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e
 
                     for ($i = 0; $i < $item->quantity; $i++) {
                         $intangible = \App\Models\IntangibleAsset::create([
@@ -773,6 +879,7 @@ class AssetRequestController extends Controller
                 }
             }
 
+<<<<<<< HEAD
             // Logika Penggantian Aset
             if ($assetRequest->alasan_pengajuan === 'Penggantian' && $assetRequest->related_asset_id) {
                 $oldAsset = Asset::find($assetRequest->related_asset_id);
@@ -780,6 +887,21 @@ class AssetRequestController extends Controller
                     $newAsset = $createdAssets[0] ?? null;
                     if ($newAsset && $newAsset instanceof Asset) {
                         $oldAsset->update(['status' => 'Diganti', 'replaces_asset_id' => $newAsset->id, 'updated_at' => now()]);
+=======
+            if ($assetRequest->alasan_pengajuan === 'Penggantian' && $assetRequest->related_asset_id) {
+                $oldAsset = Asset::find($assetRequest->related_asset_id);
+
+                if ($oldAsset) {
+                    $newAsset = $createdAssets[0] ?? null;
+
+                    if ($newAsset && $newAsset instanceof Asset) {
+                        $oldAsset->update([
+                            'status' => 'Diganti',
+                            'replaces_asset_id' => $newAsset->id,
+                            'updated_at' => now(),
+                        ]);
+
+>>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e
                         session()->flash('replacement_notification', [
                             'old_asset_id' => $oldAsset->asset_id,
                             'old_asset_name' => $oldAsset->batch->name ?? 'Aset',
@@ -790,6 +912,7 @@ class AssetRequestController extends Controller
                 }
             }
 
+<<<<<<< HEAD
             // Cek apakah semua item sudah diterima sepenuhnya
             $allReceived = $assetRequest->items->every(function ($item) {
                 return ($item->received_quantity ?? 0) >= $item->quantity;
@@ -801,6 +924,9 @@ class AssetRequestController extends Controller
                 $assetRequest->update(['status' => 'Diterima Sebagian']);
             }
 
+=======
+            $assetRequest->update(['status' => 'Diterima']);
+>>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e
             DB::commit();
 
             return redirect()->route('requests.index')
@@ -808,12 +934,15 @@ class AssetRequestController extends Controller
         } catch (\Exception $e) {
             DB::rollback();
 
+<<<<<<< HEAD
             // 🔥 POIN 11: Jika gagal, hapus file yang sudah terlanjur di-upload
             foreach ($uploadedFiles as $file) {
                 $disk = str_contains($file, 'receipt-proofs') || str_contains($file, 'intangible-certificates') ? 'local' : 'public';
                 \Illuminate\Support\Facades\Storage::disk($disk)->delete($file);
             }
 
+=======
+>>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e
             return redirect()->back()->withInput()->with('error', 'Gagal memproses registrasi: ' . $e->getMessage());
         }
     }
@@ -1086,12 +1215,15 @@ class AssetRequestController extends Controller
         }
 
         foreach ($deferredItems as $item) {
+<<<<<<< HEAD
             // CEGAH DUPLIKASI: Cek apakah item ini sudah pernah di-rollover ke draft tersebut
             $alreadyRolledOver = $existingDraft->items()->where('rolled_from_item_id', $item->id)->exists();
             if ($alreadyRolledOver) {
                 continue; // Lewati jika sudah ada
             }
 
+=======
+>>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e
             $newItem = $existingDraft->items()->create([
                 'item_type' => $item->item_type,
                 'sifat_barang' => $item->sifat_barang,
@@ -1159,12 +1291,15 @@ class AssetRequestController extends Controller
         }
 
         foreach ($deferredItems as $item) {
+<<<<<<< HEAD
             // CEGAH DUPLIKASI
             $alreadyRolledOver = $existingDraft->serviceItems()->where('rolled_from_item_id', $item->id)->exists();
             if ($alreadyRolledOver) {
                 continue;
             }
 
+=======
+>>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e
             $existingDraft->serviceItems()->create([
                 'unit_id' => $item->unit_id,
                 'priority' => $item->priority,

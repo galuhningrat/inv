@@ -11,6 +11,7 @@ class Unit extends Model
 
     protected $fillable = ['name', 'type', 'category'];
 
+<<<<<<< HEAD
     /**
      * 🔥 Accessor untuk mendapatkan Kode Unit secara otomatis
      */
@@ -57,6 +58,8 @@ class Unit extends Model
         return substr($initials, 0, 4) ?: 'UNT';
     }
 
+=======
+>>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e
     public function users()
     {
         return $this->hasMany(User::class);

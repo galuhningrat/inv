@@ -9,6 +9,7 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
+<<<<<<< HEAD
             // 1. Buat Unit & Kategori baru (Rektorat, UPT, Prasarana, dll)
             RestructureUnitsSeeder::class,
 
@@ -23,3 +24,11 @@ class DatabaseSeeder extends Seeder
         ]);
     }
 }
+=======
+            AssetTypeSeeder::class, // Harus pertama
+            UserSeeder::class,      // Harus kedua (untuk foreign key peminjaman/request)
+            AssetSeeder::class,     // Terakhir, karena butuh AssetType
+        ]);
+    }
+}
+>>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e

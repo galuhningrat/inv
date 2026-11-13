@@ -1,6 +1,7 @@
 <div class="form-row">
     <div class="form-group">
         <label>Aset yang Ingin Diperbaiki / Dipelihara <span style="color: red;">*</span></label>
+<<<<<<< HEAD
         <select name="items[{{ $index }}][service_data][asset_id]"
             class="form-control js-asset-search"
             data-asset-select="{{ $index }}"
@@ -22,6 +23,17 @@
             </option>
             @endif
             @endif
+=======
+        <select name="items[{{ $index }}][service_data][asset_id]" class="form-control"
+            data-asset-select="{{ $index }}" onchange="fillAssetInfo({{ $index }}, this)" required>
+            <option value="">-- Pilih Aset --</option>
+            @foreach ($assets as $asset)
+                <option value="{{ $asset->id }}" data-code="{{ $asset->asset_id }}" data-name="{{ $asset->name }}"
+                    data-location="{{ $asset->location ?? '-' }}" data-brand="{{ $asset->brand ?? '-' }}">
+                    {{ $asset->asset_id }} — {{ $asset->name }}
+                </option>
+            @endforeach
+>>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e
         </select>
     </div>
 
@@ -29,9 +41,15 @@
         <label>Jenis Pemeliharaan <span style="color: red;">*</span></label>
         <select name="items[{{ $index }}][service_data][maintenance_type]" class="form-control" required>
             <option value="">-- Pilih Jenis --</option>
+<<<<<<< HEAD
             <option value="Preventif" {{ ($oldItem['service_data']['maintenance_type'] ?? '') === 'Preventif' ? 'selected' : '' }}>Preventif (Pencegahan / Rutin)</option>
             <option value="Kuratif (Ringan)" {{ ($oldItem['service_data']['maintenance_type'] ?? '') === 'Kuratif (Ringan)' ? 'selected' : '' }}>Kuratif (Ringan) — Perbaikan</option>
             <option value="Emergency" {{ ($oldItem['service_data']['maintenance_type'] ?? '') === 'Emergency' ? 'selected' : '' }}>Emergency — Darurat</option>
+=======
+            <option value="Preventif">Preventif (Pencegahan / Rutin)</option>
+            <option value="Kuratif (Ringan)">Kuratif (Ringan) — Perbaikan</option>
+            <option value="Emergency">Emergency — Darurat</option>
+>>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e
         </select>
     </div>
 </div>
@@ -86,3 +104,40 @@
         placeholder="Catatan tambahan untuk Tim Sarpras / vendor (opsional)"></textarea>
 </div>
 
+<<<<<<< HEAD
+=======
+{{-- Script auto-fill --}}
+@push('scripts')
+    <script>
+        function fillAssetInfo(index, selectEl) {
+            const opt = selectEl.options[selectEl.selectedIndex];
+            const codeEl = document.getElementById(`asset_code_${index}`);
+            const locEl = document.getElementById(`asset_location_${index}`);
+            if (!codeEl || !locEl) return;
+            codeEl.textContent = opt?.dataset?.code || '—';
+            locEl.textContent = opt?.dataset?.location || '—';
+
+            // Auto-fill input "Lokasi Spesifik" dari lokasi aset.
+            // Hanya isi kalau input masih kosong ATAU nilainya dari auto-fill sebelumnya.
+            // Kalau user sudah edit manual (autofilled = 'false'), jangan ditimpa.
+            const locInput = selectEl.closest('.item-row')?.querySelector('input[name*="[service_data][location]"]');
+            if (locInput) {
+                const currentVal = locInput.value.trim();
+                const isAutoFilled = locInput.dataset.autofilled === 'true';
+                if (currentVal === '' || isAutoFilled) {
+                    locInput.value = opt?.dataset?.location || '';
+                    locInput.dataset.autofilled = 'true';
+                }
+            }
+        }
+
+        // Saat halaman dimuat (mis. setelah validasi gagal), isi info untuk yang sudah terpilih
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('[data-asset-select]').forEach(selectEl => {
+                const idx = selectEl.getAttribute('data-asset-select');
+                if (selectEl.value) fillAssetInfo(idx, selectEl);
+            });
+        });
+    </script>
+@endpush
+>>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e

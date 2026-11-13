@@ -23,7 +23,11 @@ class StakeholderSeeder extends Seeder
         $users = [
             ['name' => 'Sugiharto', 'username' => 'sugiharto', 'email' => 'sugiharto@stti.ac.id', 'level' => 'Ketua', 'unit_id' => $unitRektorat->id],
             ['name' => 'Pak Harry', 'username' => 'harry', 'email' => 'harry@stti.ac.id', 'level' => 'Sarana dan Prasarana', 'unit_id' => $unitSarpras->id],
+<<<<<<< HEAD
             ['name' => 'Pak Rizal', 'username' => 'rizal',  'email' => 'rizal@stti.ac.id', 'level' => 'Penanggung Jawab Pengadaan', 'unit_id' => $unitSarpras->id],
+=======
+            ['name' => 'Pak Rizal', 'username' => 'rizal', 'email' => 'rizal@stti.ac.id', 'level' => 'Penanggung Jawab Pengadaan', 'unit_id' => $unitSarpras->id],
+>>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e
             ['name' => 'Pak Zaky', 'username' => 'zaky', 'email' => 'zaky@stti.ac.id', 'level' => 'Tim Pemeliharaan', 'unit_id' => $unitSarpras->id],
 
             ['name' => 'Pak Siswo', 'username' => 'siswo', 'email' => 'siswo@stti.ac.id', 'level' => 'Kepala Laboratorium', 'unit_id' => $unitTI->id],
@@ -51,10 +55,17 @@ class StakeholderSeeder extends Seeder
         // 3. Insert ke Database
         foreach ($users as $u) {
             User::create([
+<<<<<<< HEAD
                 'name' => $u['username'],
                 'username' => $u['username'],
                 'email' => $u['email'],
                 'password' => Hash::make('1234'), // Default password
+=======
+                'name' => $u['name'],
+                'username' => $u['username'],
+                'email' => $u['email'],
+                'password' => Hash::make('password123'), // Default password
+>>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e
                 'level' => $u['level'],
                 'unit_id' => $u['unit_id'],
                 'status' => 'Aktif',

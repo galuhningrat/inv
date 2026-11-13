@@ -106,8 +106,13 @@ class IntangibleAsset extends Model
 
                 // Format harga
                 if ($key === 'price') {
+<<<<<<< HEAD
                     $oldValue = $oldValue !== null ? 'Rp ' . number_format((float) $oldValue, 0, ',', '.') : '-';
                     $newValue = $newValue !== null ? 'Rp ' . number_format((float) $newValue, 0, ',', '.') : '-';
+=======
+                    $oldValue = $oldValue !== null ? 'Rp '.number_format((float) $oldValue, 0, ',', '.') : '-';
+                    $newValue = $newValue !== null ? 'Rp '.number_format((float) $newValue, 0, ',', '.') : '-';
+>>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e
                 }
 
                 $tracked[$key] = [
@@ -128,7 +133,11 @@ class IntangibleAsset extends Model
                 'user_id' => auth()->id(),
                 'action' => 'updated',
                 'changes' => $tracked,
+<<<<<<< HEAD
                 'description' => 'Mengubah: ' . implode(', ', $changedLabels),
+=======
+                'description' => 'Mengubah: '.implode(', ', $changedLabels),
+>>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e
             ]);
         });
 
@@ -164,6 +173,7 @@ class IntangibleAsset extends Model
     ];
 
     protected $fillable = [
+<<<<<<< HEAD
         'name',
         'description',
         'category',
@@ -188,6 +198,13 @@ class IntangibleAsset extends Model
         'status',
         'created_by',
         'asset_request_id',
+=======
+        'name', 'description', 'category', 'category_data', 'vendor',
+        'price', 'acquisition_method', 'activation_date', 'funding_source', 'contract_number',
+        'license_type', 'billing_model', 'expiry_date', 'reminder_days',
+        'quota', 'unit_id', 'pic_id', 'access_url', 'certificate_file',
+        'product_key', 'assigned_user_email', 'status', 'created_by', 'asset_request_id',
+>>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e
     ];
 
     protected $casts = [
@@ -198,6 +215,7 @@ class IntangibleAsset extends Model
         'product_key' => 'encrypted', // Enkripsi otomatis
     ];
 
+<<<<<<< HEAD
     protected static function boot()
     {
         parent::boot();
@@ -213,6 +231,23 @@ class IntangibleAsset extends Model
             }
         });
     }
+=======
+    // protected static function boot()
+    // {
+    //     parent::boot();
+
+    //     static::creating(function ($item) {
+    //         if (empty($item->asset_code)) {
+    //             // Gunakan UUID atau mekanisme lock untuk mencegah duplikasi di concurrent request
+    //             // Untuk prototipe, kita tetap gunakan logika count dengan safety net
+    //             $year = date('Y');
+    //             $lastAsset = self::whereYear('created_at', $year)->withTrashed()->lockForUpdate()->orderBy('id', 'desc')->first();
+    //             $count = $lastAsset ? intval(substr($lastAsset->asset_code, -4)) + 1 : 1;
+    //             $item->asset_code = sprintf('NF/%s/%04d', $year, $count);
+    //         }
+    //     });
+    // }
+>>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e
 
     public function unit()
     {

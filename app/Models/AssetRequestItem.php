@@ -55,6 +55,7 @@ class AssetRequestItem extends Model
 
     protected $fillable = [
         'asset_request_id',
+<<<<<<< HEAD
         'item_type',
         'sifat_barang',
         'asset_type_id',
@@ -63,6 +64,8 @@ class AssetRequestItem extends Model
         'received_quantity',
         'receipt_notes',
         'receipt_proof_file',
+=======
+>>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e
         'unit_id',
         'priority',
         'alasan_pengajuan',
@@ -147,6 +150,7 @@ class AssetRequestItem extends Model
             || ($this->item_type === 'Non-Fisik' && $this->sifat_barang === 'Jasa');
     }
 
+<<<<<<< HEAD
     /**
      * Relasi ke histori penerimaan ringan (Light Receipt)
      * Digunakan untuk mencatat setiap transaksi penerimaan (bisa berkali-kali).
@@ -156,6 +160,8 @@ class AssetRequestItem extends Model
         return $this->hasMany(LightReceiptLog::class, 'asset_request_item_id');
     }
 
+=======
+>>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e
     // ============================================================
     //  RELASI
     // ============================================================

@@ -44,19 +44,10 @@ class QrCodeController extends Controller
 
     public function print(QrCode $qrCode)
     {
-<<<<<<< HEAD
-        // 🔥 Muat relasi asset, batch, dan assetType
-        $qrCode->load('asset.batch.assetType');
-
-        $qrCodeSvg = QrCodeGenerator::size(300)
-            ->format('svg')
-            ->errorCorrection('H')
-=======
         $qrCode->load('asset');
 
         $qrCodeSvg = QrCodeGenerator::size(150)
             ->format('svg')
->>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e
             ->generate(route('asset.detail', ['qrcode' => $qrCode->code_content]));
 
         return view('qrcodes.print', compact('qrCode', 'qrCodeSvg'));
@@ -88,8 +79,4 @@ class QrCodeController extends Controller
         return redirect()->route('qrcodes.index')
             ->with('success', 'Data QR Code berhasil dihapus!');
     }
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e

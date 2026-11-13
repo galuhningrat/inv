@@ -4,24 +4,11 @@ namespace Tests\Feature;
 
 use App\Models\AssetType;
 use App\Models\User;
-<<<<<<< HEAD
-use Illuminate\Foundation\Testing\DatabaseTransactions;
-=======
 use Illuminate\Foundation\Testing\RefreshDatabase;
->>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e
 use Tests\TestCase;
 
 class AssetCreationTest extends TestCase
 {
-<<<<<<< HEAD
-    use DatabaseTransactions;
-
-    public function test_sarpras_can_create_tanah_without_location()
-    {
-        // 🔥 Jangan pakai seeder, buat manual jika kosong
-        $sarpras = User::where('level', 'Sarpras')->first() ?? User::factory()->create(['level' => 'Sarpras']);
-        $tanahType = AssetType::where('code', 'TNH')->first() ?? AssetType::create(['code' => 'TNH', 'name' => 'Tanah']);
-=======
     use RefreshDatabase;
 
     protected function setUp(): void
@@ -34,7 +21,6 @@ class AssetCreationTest extends TestCase
     {
         $sarpras = User::where('level', 'Sarpras')->first();
         $tanahType = AssetType::where('code', 'TNH')->first();
->>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e
 
         $response = $this->actingAs($sarpras)->post(route('assets-inv.store'), [
             'asset_type_id' => $tanahType->id,
@@ -62,13 +48,8 @@ class AssetCreationTest extends TestCase
 
     public function test_tanah_creation_fails_if_sertifikat_is_missing()
     {
-<<<<<<< HEAD
-        $sarpras = User::where('level', 'Sarpras')->first() ?? User::factory()->create(['level' => 'Sarpras']);
-        $tanahType = AssetType::where('code', 'TNH')->first() ?? AssetType::create(['code' => 'TNH', 'name' => 'Tanah']);
-=======
         $sarpras = User::where('level', 'Sarpras')->first();
         $tanahType = AssetType::where('code', 'TNH')->first();
->>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e
 
         $response = $this->actingAs($sarpras)->post(route('assets-inv.store'), [
             'asset_type_id' => $tanahType->id,

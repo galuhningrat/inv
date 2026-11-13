@@ -1,29 +1,6 @@
 <div class="form-row">
     <div class="form-group">
         <label>Aset yang Ingin Diperbaiki / Dipelihara <span style="color: red;">*</span></label>
-<<<<<<< HEAD
-        <select name="items[{{ $index }}][service_data][asset_id]"
-            class="form-control js-asset-search"
-            data-asset-select="{{ $index }}"
-            data-search-url="{{ route('requests.assets.search') }}"
-            required>
-            <option value="">Ketik kode, nama, merek, atau lokasi aset...</option>
-
-            {{-- PENTING: Pertahankan opsi terpilih saat validasi gagal (old input) --}}
-            @if(isset($oldItem['service_data']['asset_id']))
-            @php
-            $selectedAsset = \App\Models\Asset::with('batch')->find($oldItem['service_data']['asset_id']);
-            @endphp
-            @if($selectedAsset)
-            <option value="{{ $selectedAsset->id }}"
-                data-code="{{ $selectedAsset->asset_id }}"
-                data-location="{{ $selectedAsset->location ?? '-' }}"
-                selected>
-                {{ $selectedAsset->asset_id }} — {{ $selectedAsset->batch->name ?? '' }}
-            </option>
-            @endif
-            @endif
-=======
         <select name="items[{{ $index }}][service_data][asset_id]" class="form-control"
             data-asset-select="{{ $index }}" onchange="fillAssetInfo({{ $index }}, this)" required>
             <option value="">-- Pilih Aset --</option>
@@ -33,7 +10,6 @@
                     {{ $asset->asset_id }} — {{ $asset->name }}
                 </option>
             @endforeach
->>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e
         </select>
     </div>
 
@@ -41,15 +17,9 @@
         <label>Jenis Pemeliharaan <span style="color: red;">*</span></label>
         <select name="items[{{ $index }}][service_data][maintenance_type]" class="form-control" required>
             <option value="">-- Pilih Jenis --</option>
-<<<<<<< HEAD
-            <option value="Preventif" {{ ($oldItem['service_data']['maintenance_type'] ?? '') === 'Preventif' ? 'selected' : '' }}>Preventif (Pencegahan / Rutin)</option>
-            <option value="Kuratif (Ringan)" {{ ($oldItem['service_data']['maintenance_type'] ?? '') === 'Kuratif (Ringan)' ? 'selected' : '' }}>Kuratif (Ringan) — Perbaikan</option>
-            <option value="Emergency" {{ ($oldItem['service_data']['maintenance_type'] ?? '') === 'Emergency' ? 'selected' : '' }}>Emergency — Darurat</option>
-=======
             <option value="Preventif">Preventif (Pencegahan / Rutin)</option>
             <option value="Kuratif (Ringan)">Kuratif (Ringan) — Perbaikan</option>
             <option value="Emergency">Emergency — Darurat</option>
->>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e
         </select>
     </div>
 </div>
@@ -104,8 +74,6 @@
         placeholder="Catatan tambahan untuk Tim Sarpras / vendor (opsional)"></textarea>
 </div>
 
-<<<<<<< HEAD
-=======
 {{-- Script auto-fill --}}
 @push('scripts')
     <script>
@@ -140,4 +108,3 @@
         });
     </script>
 @endpush
->>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e

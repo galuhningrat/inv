@@ -107,11 +107,6 @@ Route::middleware(['auth'])->group(function () {
         Route::resource('requests', AssetRequestController::class)
             ->parameters(['requests' => 'assetRequest'])
             ->except(['edit', 'update']);
-<<<<<<< HEAD
-        Route::get('/requests/assets/search', [AssetRequestController::class, 'searchMaintenanceAssets'])
-            ->name('requests.assets.search');
-=======
->>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e
         Route::post('/requests/{assetRequest}/verify', [AssetRequestController::class, 'verify'])->name('requests.verify');
         Route::post('/requests/{assetRequest}/approve', [AssetRequestController::class, 'approve'])->name('requests.approve');
         Route::post('/requests/{assetRequest}/reject', [AssetRequestController::class, 'reject'])->name('requests.reject');

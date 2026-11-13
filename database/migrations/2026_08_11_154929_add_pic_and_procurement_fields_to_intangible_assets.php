@@ -9,11 +9,7 @@ return new class extends Migration {
     {
         Schema::table('intangible_assets', function (Blueprint $table) {
             $table->foreignId('pic_id')->nullable()->after('unit_id')->constrained('users')->onDelete('set null');
-<<<<<<< HEAD
-            $table->text('product_key')->nullable()->after('quota');
-=======
             $table->string('product_key')->nullable()->after('quota');
->>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e
             $table->string('assigned_user_email')->nullable()->after('product_key');
             $table->foreignId('asset_request_id')->nullable()->after('created_by')->constrained('asset_requests')->onDelete('set null');
         });
@@ -27,8 +23,4 @@ return new class extends Migration {
             $table->dropColumn(['product_key', 'assigned_user_email']);
         });
     }
-<<<<<<< HEAD
 };
-=======
-};
->>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e

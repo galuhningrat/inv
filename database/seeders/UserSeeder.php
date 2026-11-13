@@ -20,8 +20,6 @@ class UserSeeder extends Seeder
                 'status' => 'Aktif',
                 'avatar' => 'assets/admin.png'
             ],
-<<<<<<< HEAD
-=======
             [
                 'name' => 'Staff Sarpras',
                 'username' => 'sarpras',
@@ -58,7 +56,6 @@ class UserSeeder extends Seeder
                 'status' => 'Aktif',
                 'avatar' => 'assets/keuangan.png'
             ],
->>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e
         ];
 
         foreach ($users as $user) {
@@ -69,8 +66,4 @@ class UserSeeder extends Seeder
             );
         }
     }
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> 39cb6caecfad6984e017629417d9109f6fb3cc7e

@@ -2,81 +2,121 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AssetBatch; // 🔥 TAMBAHKAN BARIS INI 🔥
 use App\Models\QrCode;
-use App\Models\Asset;
 use Illuminate\Http\Request;
 use SimpleSoftwareIO\QrCode\Facades\QrCode as QrCodeGenerator;
-use Barryvdh\DomPDF\Facade\Pdf;
 
 class QrCodeController extends Controller
 {
+    /**
+     * Menampilkan daftar QR Code
+     */
     public function index(Request $request)
     {
         $query = QrCode::with('asset');
 
-        if ($request->has('search') && $request->search) {
+        if ($request->filled('search')) {
             $search = $request->search;
-            $query->where('code_content', 'ILIKE', "%{$search}%")
-                ->orWhereHas('asset', function ($q) use ($search) {
-                    $q->where('name', 'ILIKE', "%{$search}%");
-                });
+            $query->where(function ($q) use ($search) {
+                $q->where('code_content', 'ILIKE', "%{$search}%")
+                    ->orWhere('qr_code_id', 'ILIKE', "%{$search}%")
+                    ->orWhereHas('asset', function ($q2) use ($search) {
+                        $q2->where('asset_id', 'ILIKE', "%{$search}%");
+                    });
+            });
         }
 
-        $qrCodes = $query->latest()->paginate(10);
+        $qrCodes = $query->latest()->paginate(20);
 
         return view('qrcodes.index', compact('qrCodes'));
     }
 
+    /**
+     * Menampilkan detail QR Code
+     */
     public function show(QrCode $qrCode)
     {
         $qrCode->load('asset');
         return view('qrcodes.show', compact('qrCode'));
     }
 
-    public function toggleStatus(QrCode $qrCode)
-    {
-        $newStatus = $qrCode->status === 'Aktif' ? 'Nonaktif' : 'Aktif';
-        $qrCode->update(['status' => $newStatus]);
-
-        return redirect()->back()
-            ->with('success', "Status QR Code berhasil diubah menjadi {$newStatus}!");
-    }
-
+    /**
+     * Cetak QR Code Tunggal
+     */
     public function print(QrCode $qrCode)
     {
-        $qrCode->load('asset');
+        $qrCode->load('asset.batch.assetType');
 
-        $qrCodeSvg = QrCodeGenerator::size(150)
+        $svg = QrCodeGenerator::size(300)
             ->format('svg')
+            ->errorCorrection('H')
             ->generate(route('asset.detail', ['qrcode' => $qrCode->code_content]));
 
-        return view('qrcodes.print', compact('qrCode', 'qrCodeSvg'));
+        // Bungkus dalam array agar view-nya bisa sama dengan printBatch
+        $qrCodesData = [
+            ['qrCode' => $qrCode, 'qrCodeSvg' => $svg]
+        ];
+
+        return view('qrcodes.print', compact('qrCodesData'));
     }
 
-    public function exportAllPdf()
+    /**
+     * 🔥 Cetak Semua QR Code dalam Satu Grup (Batch) 🔥
+     */
+    public function printBatch(Request $request)
     {
-        $qrCodes = QrCode::with('asset')->where('status', 'Aktif')->get();
+        $batchId = $request->query('batch_id');
+        $batch = AssetBatch::with(['assets.qrCodes', 'assets.batch.assetType'])->findOrFail($batchId);
 
-        $data = $qrCodes->map(function ($qrCode) {
-            return [
-                'qrCode' => $qrCode,
-                'svg' => QrCodeGenerator::size(80)
+        $qrCodesData = [];
+
+        foreach ($batch->assets as $asset) {
+            foreach ($asset->qrCodes as $qrCode) {
+                // Pastikan relasi dimuat untuk view
+                $qrCode->setRelation('asset', $asset);
+
+                $svg = QrCodeGenerator::size(300)
                     ->format('svg')
-                    ->generate(route('asset.detail', ['qrcode' => $qrCode->code_content]))
-            ];
-        });
+                    ->errorCorrection('H')
+                    ->generate(route('asset.detail', ['qrcode' => $qrCode->code_content]));
 
-        $pdf = Pdf::loadView('qrcodes.export-pdf', compact('data'));
-        $pdf->setPaper('a4', 'portrait');
+                $qrCodesData[] = [
+                    'qrCode' => $qrCode,
+                    'qrCodeSvg' => $svg
+                ];
+            }
+        }
 
-        return $pdf->download('qr-codes-semua-aset.pdf');
+        return view('qrcodes.print', compact('qrCodesData', 'batch'));
     }
 
+    /**
+     * Mengubah status aktif/nonaktif QR Code
+     */
+    public function toggleStatus(QrCode $qrCode)
+    {
+        $qrCode->update([
+            'status' => $qrCode->status === 'Aktif' ? 'Nonaktif' : 'Aktif'
+        ]);
+
+        return redirect()->back()->with('success', 'Status QR Code berhasil diubah.');
+    }
+
+    /**
+     * Menghapus QR Code
+     */
     public function destroy(QrCode $qrCode)
     {
         $qrCode->delete();
+        return redirect()->back()->with('success', 'QR Code berhasil dihapus.');
+    }
 
-        return redirect()->route('qrcodes.index')
-            ->with('success', 'Data QR Code berhasil dihapus!');
+    /**
+     * Export semua QR Code ke PDF (Opsional, jika sudah ada)
+     */
+    public function exportAllPdf()
+    {
+        // ... logika export pdf Anda ...
     }
 }

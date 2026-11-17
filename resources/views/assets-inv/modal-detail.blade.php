@@ -1,8 +1,8 @@
 <div class="asset-detail-modal-content">
     @php
-        $schema = \App\Models\AssetType::getSchema($asset->batch->assetType->code ?? '');
-        $batchData = $asset->batch->category_data ?? [];
-        $unitData = $asset->unit_data ?? [];
+    $schema = \App\Models\AssetType::getSchema($asset->batch->assetType->code ?? '');
+    $batchData = $asset->batch->category_data ?? [];
+    $unitData = $asset->unit_data ?? [];
     @endphp
 
     <div style="display: grid; grid-template-columns: 200px 1fr; gap: 2rem; margin-bottom: 2rem;">
@@ -62,53 +62,52 @@
 
     {{-- 🔥 TAMPILKAN SPESIFIKASI DINAMIS 🔥 --}}
     @if (count($batchData) > 0 || count($unitData) > 0)
-        <div
-            style="background: #f0f9ff; border: 1px solid #bae6fd; border-left: 4px solid #0ea5e9; border-radius: 8px; padding: 1.5rem; margin-bottom: 2rem;">
-            <h4 style="margin-top: 0; margin-bottom: 1rem; font-size: 0.95rem; color: #0369a1;">⚙️ Spesifikasi Khusus
-            </h4>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; font-size: 0.85rem;">
+    <div
+        style="background: #f0f9ff; border: 1px solid #bae6fd; border-left: 4px solid #0ea5e9; border-radius: 8px; padding: 1.5rem; margin-bottom: 2rem;">
+        <h4 style="margin-top: 0; margin-bottom: 1rem; font-size: 0.95rem; color: #0369a1;">⚙️ Spesifikasi Khusus
+        </h4>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; font-size: 0.85rem;">
 
-                {{-- Data Batch --}}
-                @foreach ($batchData as $key => $value)
-                    @if (isset($schema[$key]) && !empty($value))
-                        <div>
-                            <span style="color: #0369a1;">{{ $schema[$key]['label'] ?? $key }}:</span><br>
-                            <strong>{{ is_array($value) ? implode(', ', $value) : $value }}</strong>
-                        </div>
-                    @endif
-                @endforeach
-
-                {{-- Data Unit --}}
-                @foreach ($unitData as $key => $value)
-                    @if (isset($schema[$key]) && !empty($value))
-                        <div>
-                            <span style="color: #0369a1;">{{ $schema[$key]['label'] ?? $key }}:</span><br>
-                            <strong>{{ is_array($value) ? implode(', ', $value) : $value }}</strong>
-                        </div>
-                    @endif
-                @endforeach
-
+            {{-- Data Batch --}}
+            @foreach ($batchData as $key => $value)
+            @if (isset($schema[$key]) && !empty($value))
+            <div>
+                <span style="color: #0369a1;">{{ $schema[$key]['label'] ?? $key }}:</span><br>
+                <strong>{{ is_array($value) ? implode(', ', $value) : $value }}</strong>
             </div>
+            @endif
+            @endforeach
+
+            {{-- Data Unit --}}
+            @foreach ($unitData as $key => $value)
+            @if (isset($schema[$key]) && !empty($value))
+            <div>
+                <span style="color: #0369a1;">{{ $schema[$key]['label'] ?? $key }}:</span><br>
+                <strong>{{ is_array($value) ? implode(', ', $value) : $value }}</strong>
+            </div>
+            @endif
+            @endforeach
+
         </div>
+    </div>
     @endif
 
     <div style="text-align: center; margin: 2rem 0; padding: 1.5rem; background: var(--light-bg); border-radius: 12px;">
         <h5 style="margin-bottom: 1rem;">QR Code</h5>
         <div id="qr-detail-{{ $asset->id }}" style="display: inline-block;"></div>
         @if ($asset->qrCodes->count() > 0)
-            <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem; font-family: monospace;">
-                {{ $asset->qrCodes->first()->code_content }}
-            </p>
+        <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem; font-family: monospace;">
+            {{ $asset->qrCodes->first()->code_content }}
+        </p>
         @endif
     </div>
 
     <div class="btn-group" style="margin-top: 2rem; justify-content: center;">
         <button class="btn btn-secondary" onclick="closeAssetModal()">Tutup</button>
         @if ($asset->qrCodes->count() > 0)
-            <a href="{{ route('qrcodes.print', $asset->qrCodes->first()->id) }}" class="btn btn-primary"
-                target="_blank">
-                📄 Cetak QR
-            </a>
+        <a href="{{ route('qrcodes.print', $asset->qrCodes->first()->id) }}" class="btn btn-primary" target="_blank">
+            📄 Cetak QR
+        </a>
         @endif
         <a href="{{ route('assets-inv.edit', $asset->id) }}" class="btn btn-warning">
             ✏️ Edit
@@ -118,15 +117,15 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        @if ($asset->qrCodes->count() > 0)
-            if (typeof QRCode !== 'undefined') {
-                new QRCode(document.getElementById("qr-detail-{{ $asset->id }}"), {
-                    text: "{{ route('asset.detail', ['qrcode' => $asset->qrCodes->first()->code_content]) }}",
-                    width: 150,
-                    height: 150,
-                    correctLevel: QRCode.CorrectLevel.H
-                });
-            }
+        @if($asset - > qrCodes - > count() > 0)
+        if (typeof QRCode !== 'undefined') {
+            new QRCode(document.getElementById("qr-detail-{{ $asset->id }}"), {
+                text: "{{ route('asset.detail', ['qrcode' => $asset->qrCodes->first()->code_content]) }}",
+                width: 150,
+                height: 150,
+                correctLevel: QRCode.CorrectLevel.H
+            });
+        }
         @endif
     });
 </script>

@@ -30,12 +30,12 @@ class Asset extends Model
         'location_detail',
         'expired_at',
         'replaces_asset_id',
-        'unit_data', // 🔥 TAMBAHKAN INI
+        'unit_data',
     ];
 
     protected $casts = [
         'expired_at' => 'date',
-        'unit_data' => 'array', // 🔥 TAMBAHKAN INI
+        'unit_data' => 'array',
     ];
 
     protected static function boot()
@@ -44,32 +44,60 @@ class Asset extends Model
 
         static::creating(function ($asset) {
             if (empty($asset->asset_id)) {
-                // Fallback jika asset_type_id tidak ada, kita coba ambil dari batch
                 $assetTypeId = $asset->asset_type_id ?? $asset->batch?->asset_type_id;
+                $unitId = $asset->unit_id;
+                $assetName = $asset->batch?->name ?? 'ASSET';
 
                 if ($assetTypeId) {
-                    $asset->asset_id = self::generateAssetId($assetTypeId);
+                    $asset->asset_id = self::generateAssetId($assetTypeId, $unitId, $assetName);
                 }
             }
         });
     }
 
-    public static function generateAssetId($assetTypeId)
+    /**
+     * 🔥 Generate format ID Aset baru: Tahun/Bulan/KodeUnit/KodeJenis/NAMA_SINGKAT-0001
+     */
+    public static function generateAssetId($assetTypeId, $unitId = null, $assetName = 'ASSET')
     {
-        return DB::transaction(function () use ($assetTypeId) {
+        return DB::transaction(function () use ($assetTypeId, $unitId, $assetName) {
             $type = AssetType::findOrFail($assetTypeId);
+
+            // Ambil kode unit dari relasi atau default ke 'UMUM'
+            $unit = $unitId ? Unit::find($unitId) : null;
+            $unitCode = $unit ? $unit->code : 'UMUM'; // Kode unit TIDAK dipotong
+
             $year = date('Y');
             $month = date('m');
 
+            // Logika Pemotongan Nama Aset
+            $cleanName = strtoupper($assetName);
+            $parts = preg_split('/[^A-Z0-9]+/', $cleanName); // Pisahkan berdasarkan karakter non-alfanumerik
+
+            $shortenedParts = [];
+            foreach ($parts as $part) {
+                if ($part !== '') {
+                    $shortenedParts[] = substr($part, 0, 4); // Ambil maks 4 huruf
+                }
+            }
+
+            $nameString = implode('_', $shortenedParts);
+            if (empty($nameString)) {
+                $nameString = 'ASSET';
+            }
+
+            $prefix = "$year/$month/$unitCode/{$type->code}/$nameString-";
+
+            // Cari aset terakhir dengan prefix yang sama
             $lastAsset = self::withTrashed()
-                ->where('asset_id', 'LIKE', "$year/$month/{$type->code}-%")
+                ->where('asset_id', 'LIKE', "$prefix%")
                 ->lockForUpdate()
                 ->orderBy('asset_id', 'desc')
                 ->first();
 
             if ($lastAsset) {
-                $parts = explode('-', $lastAsset->asset_id);
-                $lastNumber = (int) end($parts);
+                $idParts = explode('-', $lastAsset->asset_id);
+                $lastNumber = (int) end($idParts);
                 $newNumber = $lastNumber + 1;
             } else {
                 $newNumber = 1;
@@ -77,7 +105,7 @@ class Asset extends Model
 
             $newNumberFormatted = str_pad($newNumber, 4, '0', STR_PAD_LEFT);
 
-            return "$year/$month/{$type->code}-$newNumberFormatted";
+            return $prefix . $newNumberFormatted;
         });
     }
 
@@ -98,8 +126,8 @@ class Asset extends Model
                 }
 
                 $filename = basename($this->image);
-                if (file_exists(public_path('assets/products/'.$filename))) {
-                    return asset('assets/products/'.$filename);
+                if (file_exists(public_path('assets/products/' . $filename))) {
+                    return asset('assets/products/' . $filename);
                 }
 
                 return asset('assets/logo-stti.png');
@@ -107,62 +135,61 @@ class Asset extends Model
         );
     }
 
+    public function getNameAttribute()
+    {
+        return $this->batch->name ?? '-';
+    }
+
+    public function getBrandAttribute()
+    {
+        return $this->batch->brand ?? '-';
+    }
+
     // Relasi
     public function assetType()
     {
         return $this->belongsTo(AssetType::class);
     }
-
     public function batch()
     {
         return $this->belongsTo(AssetBatch::class, 'asset_batch_id');
     }
-
     public function borrowings()
     {
         return $this->hasMany(Borrowing::class);
     }
-
     public function maintenances()
     {
         return $this->hasMany(Maintenance::class);
     }
-
     public function qrCode()
     {
         return $this->hasOne(QrCode::class);
     }
-
     public function qrCodes()
     {
         return $this->hasMany(QrCode::class, 'asset_id');
     }
-
     public function penanggungJawab()
     {
         return $this->belongsTo(User::class, 'penanggung_jawab_id');
     }
-
     public function assetRequest()
     {
         return $this->belongsTo(AssetRequest::class);
     }
-
     public function unit()
     {
         return $this->belongsTo(Unit::class);
     }
-
     public function location_ref()
     {
         return $this->belongsTo(Location::class, 'location_id');
     }
-
     public function replaces()
     {
         return $this->belongsTo(Asset::class, 'replaces_asset_id');
     }
-
     public function replacement()
     {
         return $this->hasOne(Asset::class, 'replaces_asset_id');
@@ -172,7 +199,6 @@ class Asset extends Model
     {
         return $query->where('status', '!=', 'Diganti');
     }
-
     public function scopeReplaced($query)
     {
         return $query->where('status', 'Diganti');

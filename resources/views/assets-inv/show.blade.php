@@ -66,9 +66,13 @@ $unitData = $asset->unit_data ?? [];
                     <a href="{{ route('assets-inv.edit', $asset->id) }}" class="btn btn-primary">✏️ Edit Unit</a>
                     @endcan
 
-                    {{-- 🔥 TOMBOL CETAK QR LANGSUNG KE ROUTE (TANPA JS LAMA) 🔥 --}}
+                    {{-- 🔥 TOMBOL CETAK & EXPORT PDF SINGLE 🔥 --}}
                     @if ($asset->qrCodes->count() > 0)
+                    {{-- Cetak via Browser --}}
                     <a href="{{ route('qrcodes.print', $asset->qrCodes->first()->id) }}" class="btn btn-secondary" target="_blank">🖨️ Cetak QR</a>
+
+                    {{-- Export PDF --}}
+                    <a href="{{ route('qrcodes.pdf', $asset->qrCodes->first()->id) }}" class="btn btn-danger">📄 Export pdf Qr</a>
                     @else
                     <button class="btn btn-secondary" disabled>QR Belum Tersedia</button>
                     @endif
@@ -191,6 +195,5 @@ $unitData = $asset->unit_data ?? [];
         }
     });
 
-    // 🔥 FUNGSI printQrCode() LAMA SUDAH DIHAPUS TOTAL 🔥
 </script>
 @endpush

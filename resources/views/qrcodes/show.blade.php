@@ -119,13 +119,19 @@
         <!-- Action Buttons -->
         <div class="btn-group" style="justify-content: center; margin-top: 2rem;">
             <a href="{{ route('qrcodes.index') }}" class="btn btn-secondary">Kembali ke Daftar</a>
+
             <form action="{{ route('qrcodes.toggle-status', $qrCode) }}" method="POST" style="display: inline;">
                 @csrf
                 <button type="submit" class="btn {{ $qrCode->status === 'Aktif' ? 'btn-warning' : 'btn-success' }}">
                     {{ $qrCode->status === 'Aktif' ? 'Nonaktifkan' : 'Aktifkan' }}
                 </button>
             </form>
-            <a href="{{ route('qrcodes.print', $qrCode) }}" class="btn btn-primary" target="_blank">Cetak QR Code</a>
+
+            {{-- Tombol Cetak via Browser --}}
+            <a href="{{ route('qrcodes.print', $qrCode->id) }}" class="btn btn-primary" target="_blank">🖨️ Cetak QR Code</a>
+
+            <a href="{{ route('qrcodes.pdf', $qrCode->id) }}" class="btn btn-danger">📄 Export PDF</a>
+
             <form action="{{ route('qrcodes.destroy', $qrCode) }}" method="POST" style="display: inline;"
                 onsubmit="return confirm('Apakah Anda yakin ingin menghapus QR Code ini?')">
                 @csrf
@@ -141,7 +147,7 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const qrContainer = document.getElementById('qrCodeContainer');
-        const qrUrl = "{{ route('asset.detail', ['qrcode' => $asset->qr_code]) }}";
+        const qrUrl = "{{ route('asset.detail', ['qrcode' => $qrCode->code_content]) }}";
 
         if (qrContainer && typeof QRCode !== 'undefined') {
             new QRCode(qrContainer, {
@@ -153,13 +159,5 @@
         }
     });
 
-    function printQrCode() {
-        @if($asset - > qrCodes - > count() > 0)
-        // 🔥 Buka halaman print.blade.php di tab baru
-        window.open('{{ route("qrcodes.print", $asset->qrCodes->first()->id) }}', '_blank');
-        @else
-        alert('QR Code belum tersedia untuk aset ini.');
-        @endif
-    }
 </script>
 @endpush

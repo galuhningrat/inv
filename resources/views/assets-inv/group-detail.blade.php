@@ -10,8 +10,13 @@
             {{ $batch->assets->count() }} Unit
         </h3>
         <div style="display: flex; gap: 0.5rem;">
+            {{-- Tombol Cetak via Browser --}}
             <a href="{{ route('qrcodes.print-batch', ['batch_id' => $batch->id]) }}" target="_blank" class="btn btn-success">
                 🖨️ Cetak Semua QR
+            </a>
+
+            <a href="{{ route('qrcodes.pdf-batch', ['batch_id' => $batch->id]) }}" class="btn btn-danger">
+                📄 Export PDF semua QR
             </a>
 
             @if (in_array(auth()->user()->level, ['Sarpras', 'Admin']))

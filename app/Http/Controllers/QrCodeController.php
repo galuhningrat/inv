@@ -2,8 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\AssetBatch; // 🔥 TAMBAHKAN BARIS INI 🔥
+use App\Models\AssetBatch;
 use App\Models\QrCode;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use SimpleSoftwareIO\QrCode\Facades\QrCode as QrCodeGenerator;
 
@@ -112,11 +113,61 @@ class QrCodeController extends Controller
         return redirect()->back()->with('success', 'QR Code berhasil dihapus.');
     }
 
-    /**
-     * Export semua QR Code ke PDF (Opsional, jika sudah ada)
-     */
-    public function exportAllPdf()
+    public function exportPdf(QrCode $qrCode)
     {
-        // ... logika export pdf Anda ...
+        $qrCode->load('asset.batch.assetType');
+
+        // 🔥 KEMBALIKAN KE FORMAT SVG 🔥
+        $svg = QrCodeGenerator::size(300)
+            ->format('svg')
+            ->errorCorrection('H')
+            ->generate(route('asset.detail', ['qrcode' => $qrCode->code_content]));
+
+        $qrCodesData = [
+            // 🔥 ENCODE SVG KE BASE64 AGAR DOMBDF BISA MERENDERNYA 🔥
+            ['qrCode' => $qrCode, 'qrCodeBase64' => 'data:image/svg+xml;base64,' . base64_encode($svg)]
+        ];
+
+        $pdf = Pdf::loadView('qrcodes.pdf', compact('qrCodesData'));
+        $pdf->setPaper('A4', 'portrait');
+
+        $fileName = 'QR-' . ($qrCode->asset->asset_id ?? 'Aset') . '.pdf';
+        $fileName = preg_replace('/[^A-Za-z0-9\-_\.]/', '_', $fileName);
+
+        return $pdf->download($fileName);
+    }
+
+    public function exportBatchPdf(Request $request)
+    {
+        $batchId = $request->query('batch_id');
+        $batch = AssetBatch::with(['assets.qrCodes', 'assets.batch.assetType'])->findOrFail($batchId);
+
+        $qrCodesData = [];
+
+        foreach ($batch->assets as $asset) {
+            foreach ($asset->qrCodes as $qrCode) {
+                $qrCode->setRelation('asset', $asset);
+
+                // 🔥 KEMBALIKAN KE FORMAT SVG 🔥
+                $svg = QrCodeGenerator::size(300)
+                    ->format('svg')
+                    ->errorCorrection('H')
+                    ->generate(route('asset.detail', ['qrcode' => $qrCode->code_content]));
+
+                $qrCodesData[] = [
+                    'qrCode' => $qrCode,
+                    // 🔥 ENCODE SVG KE BASE64 AGAR DOMBDF BISA MERENDERNYA 🔥
+                    'qrCodeBase64' => 'data:image/svg+xml;base64,' . base64_encode($svg)
+                ];
+            }
+        }
+
+        $pdf = Pdf::loadView('qrcodes.pdf', compact('qrCodesData', 'batch'));
+        $pdf->setPaper('A4', 'portrait');
+
+        $fileName = 'QR-Batch-' . ($batch->name ?? 'Grup') . '.pdf';
+        $fileName = preg_replace('/[^A-Za-z0-9\-_\.]/', '_', $fileName);
+
+        return $pdf->download($fileName);
     }
 }

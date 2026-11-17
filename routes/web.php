@@ -137,8 +137,10 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/qrcodes', [QrCodeController::class, 'index'])->name('qrcodes.index');
         Route::get('/qrcodes/export/pdf', [QrCodeController::class, 'exportAllPdf'])->name('qrcodes.export-pdf');
 
-        Route::get('/qrcodes/print-batch', [QrCodeController::class, 'printBatch'])->name('qrcodes.print-batch');
+        Route::get('/qrcodes/pdf-batch', [QrCodeController::class, 'exportBatchPdf'])->name('qrcodes.pdf-batch');
+        Route::get('/qrcodes/{qrCode}/pdf', [QrCodeController::class, 'exportPdf'])->name('qrcodes.pdf');
 
+        Route::get('/qrcodes/print-batch', [QrCodeController::class, 'printBatch'])->name('qrcodes.print-batch');
         Route::get('/qrcodes/{qrCode}', [QrCodeController::class, 'show'])->name('qrcodes.show');
         Route::delete('/qrcodes/{qrCode}', [QrCodeController::class, 'destroy'])->name('qrcodes.destroy');
         Route::post('/qrcodes/{qrCode}/toggle-status', [QrCodeController::class, 'toggleStatus'])->name('qrcodes.toggle-status');

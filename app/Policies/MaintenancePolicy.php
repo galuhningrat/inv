@@ -18,18 +18,54 @@ class MaintenancePolicy
             return true;
         }
         if ($user->level === 'Kalab') {
-            return $maintenance->asset->unit_id === $user->unit_id; // Kalab lihat tiket berdasarkan unit aset
+            return $maintenance->asset->unit_id === $user->unit_id;
         }
-        return $maintenance->recorded_by === $user->id; // Aslab/Karyawan/Mahasiswa: tiket sendiri
+        return $maintenance->recorded_by === $user->id;
     }
+
     public function create(User $user): bool
     {
         return in_array($user->level, ['Sarpras', 'Admin', 'Kalab', 'Aslab', 'Karyawan', 'Mahasiswa', 'Tim Pemeliharaan']);
     }
 
+    /**
+     * Hanya Kalab, Sarpras, Admin yang boleh memverifikasi tiket.
+     * Hanya tiket berstatus 'Menunggu Verifikasi' yang bisa diverifikasi.
+     */
+    public function verify(User $user, Maintenance $maintenance): bool
+    {
+        if ($maintenance->status !== 'Menunggu Verifikasi') {
+            return false;
+        }
+
+        if (in_array($user->level, ['Sarpras', 'Admin'])) {
+            return true;
+        }
+
+        if ($user->level === 'Kalab') {
+            // Kalab hanya bisa verifikasi aset dalam unit-nya
+            return $maintenance->asset->unit_id === $user->unit_id;
+        }
+
+        return false;
+    }
+
     public function update(User $user, Maintenance $maintenance): bool
     {
-        return in_array($user->level, ['Sarpras', 'Admin', 'Tim Pemeliharaan', 'Kalab']);
+        // Tidak bisa update tiket yang belum diverifikasi
+        if ($maintenance->status === 'Menunggu Verifikasi') {
+            return false;
+        }
+
+        if (in_array($user->level, ['Sarpras', 'Admin', 'Tim Pemeliharaan'])) {
+            return true;
+        }
+
+        if ($user->level === 'Kalab') {
+            return $maintenance->asset->unit_id === $user->unit_id;
+        }
+
+        return false;
     }
 
     public function delete(User $user, Maintenance $maintenance): bool

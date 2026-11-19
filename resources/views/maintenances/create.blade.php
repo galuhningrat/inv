@@ -10,6 +10,16 @@
         <a href="{{ route('maintenances.index') }}" class="btn btn-secondary">← Kembali</a>
     </div>
     <div style="padding: 2rem;">
+
+        {{-- Pemberitahuan alur verifikasi --}}
+        <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 1rem 1.5rem; margin-bottom: 1.5rem;">
+            <p style="margin: 0; font-size: 0.9rem; color: #1e40af;">
+                ℹ️ <strong>Alur Verifikasi:</strong> Setelah disimpan, tiket akan berstatus
+                <strong>"Menunggu Verifikasi"</strong>. Kalab / PJ Sarpras / Admin akan memverifikasi
+                laporan sebelum diteruskan ke Tim Pemeliharaan.
+            </p>
+        </div>
+
         <form action="{{ route('maintenances.store') }}" method="POST">
             @csrf
 
@@ -23,7 +33,7 @@
                         <optgroup label="{{ $typeName }}">
                             @foreach($assetList as $asset)
                             <option value="{{ $asset->id }}" {{ (old('asset_id') ?? $preselectedAssetId) == $asset->id ? 'selected' : '' }}>
-                                {{ $asset->name }} (ID: {{ $asset->asset_id }})
+                                {{ $asset->batch->name ?? '-' }} (ID: {{ $asset->asset_id }})
                             </option>
                             @endforeach
                         </optgroup>
@@ -49,7 +59,7 @@
 
             <div class="form-row">
                 <div class="form-group">
-                    <label for="maintenance_date">Tanggal Pemeliharaan <span style="color: red;">*</span></label>
+                    <label for="maintenance_date">Tanggal Laporan <span style="color: red;">*</span></label>
                     <input type="date" id="maintenance_date" name="maintenance_date"
                         class="form-control @error('maintenance_date') error @enderror"
                         value="{{ old('maintenance_date', date('Y-m-d')) }}" required>
@@ -60,7 +70,7 @@
                 <div class="form-group">
                     <label for="technician">Nama Pelapor <span style="color: red;">*</span></label>
                     <input type="text" id="technician" name="technician"
-                        class="form-control @error('technician') error @enderror" value="{{ old('technician') }}" required>
+                        class="form-control @error('technician') error @enderror" value="{{ old('technician', Auth::user()->name) }}" required>
                     @error('technician')
                     <div class="error-message" style="display: block;">{{ $message }}</div>
                     @enderror
@@ -68,9 +78,9 @@
             </div>
 
             <div class="form-group">
-                <label for="description">Deskripsi Pemeliharaan <span style="color: red;">*</span></label>
+                <label for="description">Deskripsi Kerusakan / Keluhan <span style="color: red;">*</span></label>
                 <textarea id="description" name="description" class="form-control @error('description') error @enderror"
-                    rows="3" required>{{ old('description') }}</textarea>
+                    rows="4" placeholder="Jelaskan gejala kerusakan, kapan mulai terjadi, dan kondisi terkini..." required>{{ old('description') }}</textarea>
                 @error('description')
                 <div class="error-message" style="display: block;">{{ $message }}</div>
                 @enderror
@@ -78,7 +88,7 @@
 
             <div class="btn-group">
                 <a href="{{ route('maintenances.index') }}" class="btn btn-secondary">Batal</a>
-                <button type="submit" class="btn btn-success">Simpan</button>
+                <button type="submit" class="btn btn-success">Kirim Laporan</button>
             </div>
         </form>
     </div>

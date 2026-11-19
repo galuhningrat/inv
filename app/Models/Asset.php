@@ -55,57 +55,38 @@ class Asset extends Model
         });
     }
 
-    /**
-     * 🔥 Generate format ID Aset baru: Tahun/Bulan/KodeUnit/KodeJenis/NAMA_SINGKAT-0001
-     */
-    public static function generateAssetId($assetTypeId, $unitId = null, $assetName = 'ASSET')
+    public static function generateAssetId($assetTypeId, $unitId = null)
     {
-        return DB::transaction(function () use ($assetTypeId, $unitId, $assetName) {
-            $type = AssetType::findOrFail($assetTypeId);
+        return DB::transaction(function () use ($assetTypeId, $unitId) {
+            $type = AssetType::with('category')->findOrFail($assetTypeId);
 
-            // Ambil kode unit dari relasi atau default ke 'UMUM'
+            // 1. Ambil Prefix Kategori Utama (3 Huruf)
+            $categoryCode = $type->category?->code ?? 'OTH';
+
+            // 2. Ambil Kode Unit (TI, TE, TM, UM)
             $unit = $unitId ? Unit::find($unitId) : null;
-            $unitCode = $unit ? $unit->code : 'UMUM'; // Kode unit TIDAK dipotong
+            $unitCode = $unit ? $unit->asset_id_code : 'UM';
 
             $year = date('Y');
-            $month = date('m');
 
-            // Logika Pemotongan Nama Aset
-            $cleanName = strtoupper($assetName);
-            $parts = preg_split('/[^A-Z0-9]+/', $cleanName); // Pisahkan berdasarkan karakter non-alfanumerik
+            // Format: PREFIX/TAHUN/KODEUNIT/
+            $prefix = "{$categoryCode}/{$year}/{$unitCode}/";
 
-            $shortenedParts = [];
-            foreach ($parts as $part) {
-                if ($part !== '') {
-                    $shortenedParts[] = substr($part, 0, 4); // Ambil maks 4 huruf
-                }
-            }
-
-            $nameString = implode('_', $shortenedParts);
-            if (empty($nameString)) {
-                $nameString = 'ASSET';
-            }
-
-            $prefix = "$year/$month/$unitCode/{$type->code}/$nameString-";
-
-            // Cari aset terakhir dengan prefix yang sama
+            // Cari urutan terakhir
             $lastAsset = self::withTrashed()
-                ->where('asset_id', 'LIKE', "$prefix%")
+                ->where('asset_id', 'LIKE', "{$prefix}%")
                 ->lockForUpdate()
                 ->orderBy('asset_id', 'desc')
                 ->first();
 
             if ($lastAsset) {
-                $idParts = explode('-', $lastAsset->asset_id);
-                $lastNumber = (int) end($idParts);
+                $lastNumber = (int) substr($lastAsset->asset_id, -4);
                 $newNumber = $lastNumber + 1;
             } else {
                 $newNumber = 1;
             }
 
-            $newNumberFormatted = str_pad($newNumber, 4, '0', STR_PAD_LEFT);
-
-            return $prefix . $newNumberFormatted;
+            return $prefix . str_pad($newNumber, 4, '0', STR_PAD_LEFT);
         });
     }
 

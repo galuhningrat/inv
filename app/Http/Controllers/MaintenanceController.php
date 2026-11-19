@@ -11,7 +11,7 @@ class MaintenanceController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Maintenance::with('asset', 'recorder');
+        $query = Maintenance::with('asset.batch.assetType', 'recorder', 'verifier');
 
         $user = auth()->user();
         if ($user->level === 'Kalab') {
@@ -26,15 +26,24 @@ class MaintenanceController extends Controller
 
         $maintenances = $query->latest()->paginate(10);
 
-        return view('maintenances.index', compact('maintenances'));
+        // Statistik ringkas untuk dashboard pemeliharaan
+        $stats = [
+            'menunggu_verifikasi' => Maintenance::where('status', 'Menunggu Verifikasi')->count(),
+            'dalam_proses' => Maintenance::whereIn('status', ['Diterima', 'Dalam Proses', 'Menunggu Komponen'])->count(),
+            'selesai' => Maintenance::where('status', 'Selesai')->count(),
+        ];
+
+        return view('maintenances.index', compact('maintenances', 'stats'));
     }
 
     public function create(Request $request)
     {
-        $assets = Asset::with('assetType')
-            ->orderBy('name')
+        // 🔥 PERBAIKAN: Karena asset sekarang tidak punya kolom 'name' & 'asset_type_id' langsung
+        // Eager-load relasi batch + assetType-nya, lalu kelompokkan berdasarkan nama jenis aset
+        $assets = Asset::with(['batch.assetType'])
+            ->whereHas('batch')
             ->get()
-            ->groupBy('assetType.name');
+            ->groupBy(fn($asset) => $asset->batch->assetType->name ?? 'Tanpa Kategori');
 
         $maintenanceTypes = ['Preventif', 'Kuratif', 'Emergensi'];
 
@@ -46,7 +55,7 @@ class MaintenanceController extends Controller
     public function store(Request $request)
     {
         $this->authorize('create', Maintenance::class);
-        
+
         $validated = $request->validate([
             'asset_id' => 'required|exists:assets,id',
             'type' => 'required|in:Preventif,Kuratif,Emergensi',
@@ -56,16 +65,42 @@ class MaintenanceController extends Controller
         ]);
 
         $validated['recorded_by'] = Auth::id();
-        $validated['status'] = 'Diterima';
-        $validated['cost'] = 0; // biaya diisi belakangan saat tiket diproses/selesai
+        $validated['status'] = 'Menunggu Verifikasi'; // Tiket baru selalu menunggu verifikasi
+        $validated['cost'] = 0;
 
         $maintenance = Maintenance::create($validated);
 
-        // Tandai aset sedang dalam penanganan
-        Asset::where('id', $validated['asset_id'])->update(['status' => 'Maintenance']);
+        // 🔥 Aset TIDAK langsung diubah ke 'Maintenance' — tunggu diverifikasi Kalab/PJ dulu
+        // Asset::where('id', $validated['asset_id'])->update(['status' => 'Maintenance']);
 
         return redirect()->route('maintenances.index')
-            ->with('success', 'Tiket pemeliharaan berhasil dibuat!');
+            ->with('success', 'Tiket pemeliharaan berhasil dibuat. Menunggu verifikasi Kalab/PJ.');
+    }
+
+    /**
+     * Verifikasi tiket oleh Kalab/PJ Sarpras/Admin.
+     * Hanya tiket dengan status 'Menunggu Verifikasi' yang bisa diverifikasi.
+     */
+    public function verify(Request $request, Maintenance $maintenance)
+    {
+        $this->authorize('verify', $maintenance);
+
+        $validated = $request->validate([
+            'verification_notes' => 'nullable|string|max:1000',
+        ]);
+
+        $maintenance->update([
+            'status' => 'Diterima',
+            'verified_by' => Auth::id(),
+            'verified_at' => now(),
+            'verification_notes' => $validated['verification_notes'] ?? null,
+        ]);
+
+        // Baru setelah diverifikasi, aset ditandai sedang dalam pemeliharaan
+        $maintenance->asset->update(['status' => 'Maintenance']);
+
+        return redirect()->route('maintenances.show', $maintenance)
+            ->with('success', 'Laporan diverifikasi dan diteruskan ke Tim Pemeliharaan.');
     }
 
     public function update(Request $request, Maintenance $maintenance)
@@ -93,13 +128,13 @@ class MaintenanceController extends Controller
     {
         $this->authorize('view', $maintenance);
 
-        $maintenance->load('asset', 'recorder');
+        $maintenance->load('asset.batch.assetType', 'recorder', 'verifier');
         return view('maintenances.show', compact('maintenance'));
     }
 
     public function destroy(Maintenance $maintenance)
     {
-        $this->authorize('delete', $maintenance); 
+        $this->authorize('delete', $maintenance);
 
         $maintenance->delete();
         return redirect()->route('maintenances.index')->with('success', 'Catatan pemeliharaan berhasil dihapus!');
@@ -107,7 +142,8 @@ class MaintenanceController extends Controller
 
     public function showAssetDetail($id)
     {
-        $asset = Asset::findOrFail($id);
+        // 🔥 PERBAIKAN: Eager-load batch relasi
+        $asset = Asset::with('batch.assetType', 'qrCodes')->findOrFail($id);
         return view('maintenances.asset-detail', compact('asset'));
     }
 }

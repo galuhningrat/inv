@@ -18,7 +18,19 @@ class AssetType extends Model
     public static function getOrdered()
     {
         $orderedCodes = [
-            'KOM', 'JAR', 'ELK', 'LAB', 'MEB', 'ARS', 'OTO', 'TNH', 'GDG', 'PRS', 'FUR', 'ATK', 'LAN',
+            'KOM',
+            'JAR',
+            'ELK',
+            'LAB',
+            'MEB',
+            'ARS',
+            'OTO',
+            'TNH',
+            'GDG',
+            'PRS',
+            'FUR',
+            'ATK',
+            'LAN',
         ];
 
         return self::all()->sortBy(function ($type) use ($orderedCodes) {
@@ -34,8 +46,14 @@ class AssetType extends Model
             'KOM' => [
                 'hide_general' => false,
                 'subkategori' => ['label' => 'Jenis Perangkat', 'type' => 'select', 'options' => [
-                    'laptop' => 'Laptop', 'desktop' => 'Desktop', 'server' => 'Server',
-                    'monitor' => 'Monitor', 'printer' => 'Printer', 'keyboard' => 'Keyboard', 'mouse' => 'Mouse', 'lainnya' => 'Periferal Lainnya',
+                    'laptop' => 'Laptop',
+                    'desktop' => 'Desktop',
+                    'server' => 'Server',
+                    'monitor' => 'Monitor',
+                    'printer' => 'Printer',
+                    'keyboard' => 'Keyboard',
+                    'mouse' => 'Mouse',
+                    'lainnya' => 'Periferal Lainnya',
                 ], 'required' => true, 'in_batch' => true],
 
                 'processor' => ['label' => 'Prosesor / Chipset', 'type' => 'text', 'required' => false, 'in_unit' => true, 'show_if' => ['subkategori' => ['laptop', 'desktop', 'server']]],
@@ -63,8 +81,13 @@ class AssetType extends Model
             'JAR' => [
                 'hide_general' => false,
                 'subkategori' => ['label' => 'Jenis Perangkat Jaringan', 'type' => 'select', 'options' => [
-                    'router' => 'Router', 'switch' => 'Switch', 'ap' => 'Access Point', 'modem' => 'Modem / ONT', 'firewall' => 'Firewall',
-                    'kabel' => 'Kabel / Fiber Optic', 'lainnya' => 'Lainnya',
+                    'router' => 'Router',
+                    'switch' => 'Switch',
+                    'ap' => 'Access Point',
+                    'modem' => 'Modem / ONT',
+                    'firewall' => 'Firewall',
+                    'kabel' => 'Kabel / Fiber Optic',
+                    'lainnya' => 'Lainnya',
                 ], 'required' => true, 'in_batch' => true],
 
                 'jumlah_port' => ['label' => 'Jumlah Port', 'type' => 'number', 'required' => false, 'in_unit' => true],
@@ -94,7 +117,12 @@ class AssetType extends Model
             'ELK' => [
                 'hide_general' => false,
                 'subkategori' => ['label' => 'Jenis Elektronik', 'type' => 'select', 'options' => [
-                    'proyektor' => 'Proyektor', 'tv' => 'TV / Layar', 'kamera' => 'Kamera', 'audio' => 'Audio', 'ac' => 'AC', 'lainnya' => 'Lainnya',
+                    'proyektor' => 'Proyektor',
+                    'tv' => 'TV / Layar',
+                    'kamera' => 'Kamera',
+                    'audio' => 'Audio',
+                    'ac' => 'AC',
+                    'lainnya' => 'Lainnya',
                 ], 'required' => true, 'in_batch' => true],
 
                 'daya_listrik' => ['label' => 'Daya Listrik (Watt)', 'type' => 'number', 'required' => false, 'in_unit' => true],
@@ -106,7 +134,10 @@ class AssetType extends Model
             'LAB' => [
                 'hide_general' => false,
                 'subkategori' => ['label' => 'Jenis Instrumen', 'type' => 'select', 'options' => [
-                    'ukur' => 'Alat Ukur', 'eksperimen' => 'Peralatan Eksperimen', 'mikroskop' => 'Mikroskop / Optik', 'lainnya' => 'Lainnya',
+                    'ukur' => 'Alat Ukur',
+                    'eksperimen' => 'Peralatan Eksperimen',
+                    'mikroskop' => 'Mikroskop / Optik',
+                    'lainnya' => 'Lainnya',
                 ], 'required' => true, 'in_batch' => true],
 
                 'fungsi_alat' => ['label' => 'Fungsi Instrumen', 'type' => 'text', 'required' => false, 'in_unit' => true],
@@ -169,7 +200,8 @@ class AssetType extends Model
             'ARS' => [
                 'hide_general' => true,
                 'subkategori' => ['label' => 'Jenis Koleksi', 'type' => 'select', 'options' => [
-                    'pustaka' => 'Bahan Pustaka (Buku/Jurnal)', 'arsip' => 'Arsip Dokumen',
+                    'pustaka' => 'Bahan Pustaka (Buku/Jurnal)',
+                    'arsip' => 'Arsip Dokumen',
                 ], 'required' => true, 'in_batch' => true],
                 'penulis' => ['label' => 'Penulis / Kontributor', 'type' => 'text', 'required' => false, 'in_batch' => true, 'show_if' => ['subkategori' => ['pustaka']]],
                 'isbn' => ['label' => 'ISBN / ISSN', 'type' => 'text', 'required' => false, 'in_batch' => true, 'show_if' => ['subkategori' => ['pustaka']]],
@@ -188,7 +220,11 @@ class AssetType extends Model
             'OTO' => [
                 'hide_general' => true,
                 'subkategori' => ['label' => 'Jenis Kendaraan', 'type' => 'select', 'options' => [
-                    'mobil' => 'Mobil', 'motor' => 'Motor', 'truk' => 'Truk', 'bus' => 'Bus', 'lainnya' => 'Lainnya',
+                    'mobil' => 'Mobil',
+                    'motor' => 'Motor',
+                    'truk' => 'Truk',
+                    'bus' => 'Bus',
+                    'lainnya' => 'Lainnya',
                 ], 'required' => true, 'in_batch' => true],
                 'merek' => ['label' => 'Merek Kendaraan', 'type' => 'text', 'required' => true, 'in_batch' => true],
                 'model' => ['label' => 'Tipe / Model', 'type' => 'text', 'required' => true, 'in_batch' => true],
@@ -232,7 +268,10 @@ class AssetType extends Model
                 'hide_condition' => true,
                 'hide_image' => true,
                 'subkategori' => ['label' => 'Status Kepemilikan', 'type' => 'select', 'options' => [
-                    'HM' => 'Hak Milik', 'HGB' => 'Hak Guna Bangunan', 'HGU' => 'Hak Guna Usaha', 'lainnya' => 'Lainnya',
+                    'HM' => 'Hak Milik',
+                    'HGB' => 'Hak Guna Bangunan',
+                    'HGU' => 'Hak Guna Usaha',
+                    'lainnya' => 'Lainnya',
                 ], 'required' => true, 'in_batch' => true],
                 'luas_m2' => ['label' => 'Luas Tanah (m²)', 'type' => 'number', 'required' => true, 'in_batch' => true],
                 'no_sertifikat' => ['label' => 'Nomor Sertifikat', 'type' => 'text', 'required' => true, 'in_batch' => true],
@@ -257,7 +296,10 @@ class AssetType extends Model
                 'hide_condition' => true,
                 'hide_image' => true,
                 'subkategori' => ['label' => 'Jenis Bangunan', 'type' => 'select', 'options' => [
-                    'perkantoran' => 'Perkantoran', 'laboratorium' => 'Laboratorium', 'kelas' => 'Ruang Kelas', 'lainnya' => 'Lainnya',
+                    'perkantoran' => 'Perkantoran',
+                    'laboratorium' => 'Laboratorium',
+                    'kelas' => 'Ruang Kelas',
+                    'lainnya' => 'Lainnya',
                 ], 'required' => true, 'in_batch' => true],
                 'luas_bangunan' => ['label' => 'Luas Bangunan (m²)', 'type' => 'number', 'required' => true, 'in_batch' => true],
                 'jumlah_lantai' => ['label' => 'Jumlah Lantai', 'type' => 'number', 'required' => true, 'in_batch' => true],
@@ -277,7 +319,10 @@ class AssetType extends Model
             'PRS' => [
                 'hide_general' => true,
                 'subkategori' => ['label' => 'Jenis Prasarana', 'type' => 'select', 'options' => [
-                    'listrik' => 'Instalasi Listrik', 'air' => 'Instalasi Air', 'jalan' => 'Jalan / Drainase', 'jaringan' => 'Jaringan Utilitas',
+                    'listrik' => 'Instalasi Listrik',
+                    'air' => 'Instalasi Air',
+                    'jalan' => 'Jalan / Drainase',
+                    'jaringan' => 'Jaringan Utilitas',
                 ], 'required' => true, 'in_batch' => true],
                 'panjang_meter' => ['label' => 'Panjang (meter)', 'type' => 'number', 'required' => false, 'in_batch' => true],
                 'kapasitas_volume' => ['label' => 'Kapasitas / Volume', 'type' => 'text', 'required' => false, 'in_batch' => true],
@@ -307,5 +352,10 @@ class AssetType extends Model
     public function assetRequests()
     {
         return $this->hasMany(AssetRequest::class);
+    }
+
+    public function category()
+    {
+        return $this->belongsTo(AssetCategory::class, 'asset_category_id');
     }
 }

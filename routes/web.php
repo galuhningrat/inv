@@ -87,6 +87,7 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware(['level:maintenance'])->group(function () {
         Route::resource('maintenances', MaintenanceController::class)->except(['edit']); // update diaktifkan lagi
         Route::get('/maintenances/asset/{id}', [MaintenanceController::class, 'showAssetDetail'])->name('maintenances.asset.detail');
+        Route::post('/maintenances/{maintenance}/verify', [MaintenanceController::class, 'verify'])->name('maintenances.verify');
     });
 
     // User Management

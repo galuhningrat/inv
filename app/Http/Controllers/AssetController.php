@@ -37,10 +37,10 @@ class AssetController extends Controller
         $query = AssetBatch::with(['assetType', 'assets.unit'])
             ->withCount([
                 'assets',
-                'assets as tersedia_count' => fn ($q) => $q->where('status', 'Tersedia'),
-                'assets as dipinjam_count' => fn ($q) => $q->where('status', 'Dipinjam'),
-                'assets as maintenance_count' => fn ($q) => $q->where('status', 'Maintenance'),
-                'assets as diganti_count' => fn ($q) => $q->where('status', 'Diganti'),
+                'assets as tersedia_count' => fn($q) => $q->where('status', 'Tersedia'),
+                'assets as dipinjam_count' => fn($q) => $q->where('status', 'Dipinjam'),
+                'assets as maintenance_count' => fn($q) => $q->where('status', 'Maintenance'),
+                'assets as diganti_count' => fn($q) => $q->where('status', 'Diganti'),
             ]);
 
         if ($request->filled('search')) {
@@ -52,13 +52,13 @@ class AssetController extends Controller
             });
         }
         if ($request->filled('type')) {
-            $query->whereHas('assetType', fn ($q) => $q->where('code', $request->type));
+            $query->whereHas('assetType', fn($q) => $q->where('code', $request->type));
         }
         if ($request->filled('unit_id')) {
-            $query->whereHas('assets', fn ($q) => $q->where('unit_id', $request->unit_id));
+            $query->whereHas('assets', fn($q) => $q->where('unit_id', $request->unit_id));
         }
         if ($request->filled('status')) {
-            $query->whereHas('assets', fn ($q) => $q->where('status', $request->status));
+            $query->whereHas('assets', fn($q) => $q->where('status', $request->status));
         }
 
         $batches = $query->orderBy('created_at', 'desc')->get();
@@ -118,7 +118,7 @@ class AssetController extends Controller
         }
 
         $groupedNonFisik = $query->orderBy('created_at', 'desc')->get()
-            ->groupBy(fn ($i) => $i->name.'|'.$i->category.'|'.$i->vendor)
+            ->groupBy(fn($i) => $i->name . '|' . $i->category . '|' . $i->vendor)
             ->map(function ($group) {
                 $first = $group->first();
 
@@ -163,14 +163,14 @@ class AssetController extends Controller
         }
 
         if ($request->filled('type')) {
-            $physicalQuery->whereHas('assetType', fn ($q) => $q->where('code', $request->type));
+            $physicalQuery->whereHas('assetType', fn($q) => $q->where('code', $request->type));
         }
 
         if ($unitId) {
-            $physicalQuery->whereHas('assets', fn ($q) => $q->where('unit_id', $unitId));
+            $physicalQuery->whereHas('assets', fn($q) => $q->where('unit_id', $unitId));
         }
         if ($status && in_array($status, ['Tersedia', 'Dipinjam', 'Maintenance', 'Diganti'])) {
-            $physicalQuery->whereHas('assets', fn ($q) => $q->where('status', $status));
+            $physicalQuery->whereHas('assets', fn($q) => $q->where('status', $status));
         }
 
         $physicalGroups = $physicalQuery->get()->map(function ($batch) {
@@ -184,7 +184,7 @@ class AssetController extends Controller
                 'category_label' => $batch->assetType->name ?? '-',
                 'unit_label' => $unitName,
                 'quantity' => $batch->quantity,
-                'status_label' => $tersedia.' Tersedia',
+                'status_label' => $tersedia . ' Tersedia',
                 'detail_route' => route('assets-inv.group-detail', ['batch_id' => $batch->id]),
             ];
         });
@@ -217,7 +217,7 @@ class AssetController extends Controller
         }
 
         $intangibleGroups = $intangibleQuery->get()
-            ->groupBy(fn ($i) => $i->name.'|'.$i->category.'|'.$i->vendor)
+            ->groupBy(fn($i) => $i->name . '|' . $i->category . '|' . $i->vendor)
             ->map(function ($group) {
                 $first = $group->first();
                 $kadaluarsa = $group->where('status', 'Kadaluarsa')->count();
@@ -277,7 +277,19 @@ class AssetController extends Controller
         }
 
         $orderedCodes = [
-            'KOM', 'JAR', 'ELK', 'LAB', 'MEB', 'ARS', 'OTO', 'TNH', 'GDG', 'PRS', 'FUR', 'ATK', 'LAN',
+            'KOM',
+            'JAR',
+            'ELK',
+            'LAB',
+            'MEB',
+            'ARS',
+            'OTO',
+            'TNH',
+            'GDG',
+            'PRS',
+            'FUR',
+            'ATK',
+            'LAN',
         ];
         $assetTypes = AssetType::all()->sortBy(function ($type) use ($orderedCodes) {
             $pos = array_search(strtoupper($type->code), $orderedCodes);
@@ -325,7 +337,7 @@ class AssetController extends Controller
                 if ($field['type'] === 'number') {
                     $rule .= '|numeric';
                 } elseif ($field['type'] === 'select' && isset($field['options'])) {
-                    $rule .= '|in:'.implode(',', array_keys($field['options']));
+                    $rule .= '|in:' . implode(',', array_keys($field['options']));
                 } elseif ($field['type'] === 'file') {
                     $rule .= '|file|mimes:pdf,jpg,jpeg,png|max:5120';
                 }
@@ -401,14 +413,19 @@ class AssetController extends Controller
 
     public function create()
     {
-        $assetTypes = AssetType::getOrdered();
+        // Ambil Kategori Utama beserta Subkategorinya (AssetType)
+        $categories = \App\Models\AssetCategory::with(['types' => function ($q) {
+            $q->orderBy('name');
+        }])->orderBy('name')->get();
+
+        // Hapus $assetTypes lama karena sudah digantikan $categories
         $units = Unit::with('locations')->whereNotNull('category')->orderBy('category')->orderBy('name')->get();
         $usersByLevel = \App\Models\User::orderBy('name')->get()->groupBy('level');
         $fundingSources = ['Dana Yayasan', 'Hibah/Bantuan Pemerintah (LLDIKTI)', 'Dana Mandiri/UKT Mahasiswa', 'Kerja Sama Industri'];
 
         $schemas = [];
-        foreach (AssetType::all() as $type) {
-            $schemas[$type->id] = AssetType::getSchema($type->code);
+        foreach (\App\Models\AssetType::all() as $type) {
+            $schemas[$type->id] = \App\Models\AssetType::getSchema($type->code);
         }
 
         $unitsForJs = $units->map(function ($u) {
@@ -422,7 +439,8 @@ class AssetController extends Controller
             ];
         })->values();
 
-        return view('assets-inv.create', compact('assetTypes', 'units', 'usersByLevel', 'unitsForJs', 'fundingSources', 'schemas'));
+        // Kirim $categories ke view
+        return view('assets-inv.create', compact('categories', 'units', 'usersByLevel', 'unitsForJs', 'fundingSources', 'schemas'));
     }
 
     public function store(Request $request)
@@ -474,7 +492,7 @@ class AssetController extends Controller
         ];
 
         if (! $hideGeneral) {
-            $rules['serial_numbers'] = 'required|array|size:'.$request->input('quantity', 1);
+            $rules['serial_numbers'] = 'required|array|size:' . $request->input('quantity', 1);
             $rules['serial_numbers.*'] = ['required', 'string', 'distinct', Rule::unique('assets', 'serial_number')->whereNull('deleted_at')];
         }
 
@@ -490,10 +508,10 @@ class AssetController extends Controller
                 if ($field['type'] === 'number') {
                     $rule .= '|numeric';
                 } elseif ($field['type'] === 'select' && isset($field['options'])) {
-                    $rule .= '|in:'.implode(',', array_keys($field['options']));
+                    $rule .= '|in:' . implode(',', array_keys($field['options']));
                 } elseif ($field['type'] === 'file') {
                     if (! empty($field['multiple'])) {
-                        $rules["category_data.{$key}"] = $rule.'|array';
+                        $rules["category_data.{$key}"] = $rule . '|array';
                         $rules["category_data.{$key}.*"] = 'file|mimes:pdf,jpg,jpeg,png|max:5120';
 
                         continue;
@@ -504,9 +522,9 @@ class AssetController extends Controller
 
                 if (isset($field['rules'])) {
                     if (is_array($field['rules'])) {
-                        $rule .= '|'.implode('|', $field['rules']);
+                        $rule .= '|' . implode('|', $field['rules']);
                     } else {
-                        $rule .= '|'.$field['rules'];
+                        $rule .= '|' . $field['rules'];
                     }
                 }
 
@@ -592,7 +610,7 @@ class AssetController extends Controller
                     }
                 }
 
-                $newAssetId = Asset::generateAssetId($assetType->id);
+                $newAssetId = Asset::generateAssetId($assetType->id, $validated['unit_id'] ?? null);
 
                 $asset = Asset::create([
                     'asset_id' => $newAssetId,
@@ -611,7 +629,7 @@ class AssetController extends Controller
                 ]);
 
                 QrCode::create([
-                    'qr_code_id' => 'QCD-'.str_pad($asset->id, 3, '0', STR_PAD_LEFT),
+                    'qr_code_id' => 'QCD-' . str_pad($asset->id, 3, '0', STR_PAD_LEFT),
                     'asset_id' => $asset->id,
                     'code_content' => $asset->qr_code,
                     'status' => 'Aktif',
@@ -628,7 +646,7 @@ class AssetController extends Controller
         } catch (\Exception $e) {
             DB::rollback();
 
-            return redirect()->back()->withInput()->with('error', 'Gagal menambahkan aset: '.$e->getMessage());
+            return redirect()->back()->withInput()->with('error', 'Gagal menambahkan aset: ' . $e->getMessage());
         }
     }
 
@@ -655,7 +673,19 @@ class AssetController extends Controller
     public function edit(Asset $asset)
     {
         $orderedCodes = [
-            'KOM', 'JAR', 'ELK', 'LAB', 'MEB', 'ARS', 'OTO', 'TNH', 'GDG', 'PRS', 'FUR', 'ATK', 'LAN',
+            'KOM',
+            'JAR',
+            'ELK',
+            'LAB',
+            'MEB',
+            'ARS',
+            'OTO',
+            'TNH',
+            'GDG',
+            'PRS',
+            'FUR',
+            'ATK',
+            'LAN',
         ];
         $assetTypes = AssetType::all()->sortBy(function ($type) use ($orderedCodes) {
             $pos = array_search(strtoupper($type->code), $orderedCodes);
@@ -714,16 +744,16 @@ class AssetController extends Controller
                 if ($field['type'] === 'number') {
                     $rule .= '|numeric';
                 } elseif ($field['type'] === 'select' && isset($field['options'])) {
-                    $rule .= '|in:'.implode(',', array_keys($field['options']));
+                    $rule .= '|in:' . implode(',', array_keys($field['options']));
                 } elseif ($field['type'] === 'file') {
                     $rule .= '|file|mimes:pdf,jpg,jpeg,png|max:5120';
                 }
 
                 if (isset($field['rules'])) {
                     if (is_array($field['rules'])) {
-                        $rule .= '|'.implode('|', $field['rules']);
+                        $rule .= '|' . implode('|', $field['rules']);
                     } else {
-                        $rule .= '|'.$field['rules'];
+                        $rule .= '|' . $field['rules'];
                     }
                 }
 
@@ -836,10 +866,9 @@ class AssetController extends Controller
 
             return redirect()->route('assets-inv.group-detail', ['batch_id' => $batchId])
                 ->with('success', '1 unit aset berhasil dihapus!');
-
         } catch (\Exception $e) {
             return redirect()->route('assets-inv.index')
-                ->with('error', 'Gagal menghapus aset: '.$e->getMessage());
+                ->with('error', 'Gagal menghapus aset: ' . $e->getMessage());
         }
     }
 
@@ -913,9 +942,9 @@ class AssetController extends Controller
         } catch (\Exception $e) {
             DB::rollback();
 
-            ActivityLog::record('ERROR', 'Gagal menghapus aset secara massal: '.$e->getMessage());
+            ActivityLog::record('ERROR', 'Gagal menghapus aset secara massal: ' . $e->getMessage());
 
-            return response()->json(['success' => false, 'message' => 'Gagal menghapus aset: '.$e->getMessage()], 500);
+            return response()->json(['success' => false, 'message' => 'Gagal menghapus aset: ' . $e->getMessage()], 500);
         }
     }
 

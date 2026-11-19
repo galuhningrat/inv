@@ -3,14 +3,14 @@
 
     <div class="detail-row" style="display: flex; gap: 1.5rem; margin-bottom: 1.5rem;">
         <div class="detail-image" style="flex: 0 0 200px;">
-            <img src="{{ $asset->image_url }}" alt="{{ $asset->name }}" style="width: 100%; border-radius: 8px; object-fit: cover;">
+            <img src="{{ $asset->image_url }}" alt="{{ $asset->batch->name ?? 'Aset' }}" style="width: 100%; border-radius: 8px; object-fit: cover;">
         </div>
         <div class="detail-info" style="flex: 1;">
-            <h4 style="margin-bottom: 1rem;">{{ $asset->name }}</h4>
+            <h4 style="margin-bottom: 1rem;">{{ $asset->batch->name ?? '-' }}</h4>
             <p><strong>ID:</strong> {{ $asset->asset_id }}</p>
-            <p><strong>Jenis:</strong> {{ $asset->assetType->name ?? '-' }}</p>
-            <p><strong>Merek:</strong> {{ $asset->brand }}</p>
-            <p><strong>Nomor Seri:</strong> {{ $asset->serial_number }}</p>
+            <p><strong>Jenis:</strong> {{ $asset->batch->assetType->name ?? '-' }}</p>
+            <p><strong>Merek:</strong> {{ $asset->batch->brand ?? '-' }}</p>
+            <p><strong>Nomor Seri:</strong> {{ $asset->serial_number ?? '-' }}</p>
         </div>
     </div>
 
@@ -26,9 +26,11 @@
             {{ $asset->condition }}
         </span>
     </p>
-    <p><strong>Lokasi:</strong> {{ $asset->location }}</p>
-    <p><strong>Harga:</strong> Rp {{ number_format($asset->price, 0, ',', '.') }}</p>
-    <p><strong>Tanggal Pembelian:</strong> {{ \Carbon\Carbon::parse($asset->purchase_date)->format('d F Y') }}</p>
+    <p><strong>Lokasi:</strong> {{ $asset->location ?? '-' }}</p>
+    <p><strong>Harga:</strong> Rp {{ number_format($asset->batch->price ?? 0, 0, ',', '.') }}</p>
+    <p><strong>Tanggal Pembelian:</strong>
+        {{ $asset->batch->purchase_date ? $asset->batch->purchase_date->format('d F Y') : '-' }}
+    </p>
 
     @if($asset->qrCodes && $asset->qrCodes->count() > 0)
     <div style="text-align: center; margin: 1.5rem 0;">

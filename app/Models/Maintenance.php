@@ -20,11 +20,15 @@ class Maintenance extends Model
         'technician',
         'status',
         'recorded_by',
+        'verified_by',
+        'verified_at',
+        'verification_notes',
     ];
 
     protected $casts = [
         'maintenance_date' => 'date',
         'cost' => 'decimal:2',
+        'verified_at' => 'datetime',
     ];
 
     protected static function boot()
@@ -40,10 +44,10 @@ class Maintenance extends Model
 
     public static function generateMaintenanceId()
     {
-        $lastMaintenance = self::orderBy('maintenance_id', 'desc')->first();
+        $last = self::withTrashed()->orderBy('maintenance_id', 'desc')->first();
 
-        if ($lastMaintenance) {
-            $lastNumber = (int) substr($lastMaintenance->maintenance_id, 4);
+        if ($last) {
+            $lastNumber = (int) substr($last->maintenance_id, 4);
             $newNumber = str_pad($lastNumber + 1, 3, '0', STR_PAD_LEFT);
         } else {
             $newNumber = '001';
@@ -60,5 +64,28 @@ class Maintenance extends Model
     public function recorder()
     {
         return $this->belongsTo(User::class, 'recorded_by');
+    }
+
+    public function verifier()
+    {
+        return $this->belongsTo(User::class, 'verified_by');
+    }
+
+    // Helper untuk badge status
+    public function getStatusBadgeClassAttribute(): string
+    {
+        return match ($this->status) {
+            'Menunggu Verifikasi' => 'pending',
+            'Diterima' => 'borrowed',
+            'Dalam Proses' => 'borrowed',
+            'Menunggu Komponen' => 'maintenance',
+            'Selesai' => 'available',
+            default => 'pending',
+        };
+    }
+
+    public function isAwaitingVerification(): bool
+    {
+        return $this->status === 'Menunggu Verifikasi';
     }
 }

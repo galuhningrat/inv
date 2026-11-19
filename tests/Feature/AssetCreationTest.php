@@ -4,17 +4,17 @@ namespace Tests\Feature;
 
 use App\Models\AssetType;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Tests\TestCase;
 
 class AssetCreationTest extends TestCase
 {
-    use RefreshDatabase;
+    use DatabaseTransactions;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->seed();
+        $this->seed(StakeholderSeeder::class);  // ← hanya seeder user
     }
 
     public function test_sarpras_can_create_tanah_without_location()

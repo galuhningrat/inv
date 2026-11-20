@@ -20,7 +20,7 @@ class ReportController extends Controller
     public function index()
     {
         $allowedTypes = collect(['assets', 'borrowing', 'maintenance', 'financial'])
-            ->filter(fn ($type) => Gate::allows('view-report', $type))
+            ->filter(fn($type) => Gate::allows('view-report', $type))
             ->values();
 
         return view('reports.index', compact('allowedTypes'));
@@ -51,13 +51,11 @@ class ReportController extends Controller
                 $title = 'LAPORAN PEMELIHARAAN ASET';
                 break;
             case 'financial':
-                $data = [
-                    'total_assets' => Asset::count(),
-                    'total_value' => Asset::sum('price'),
+                $financialData = $this->calculateFinancialStats();
+                $data = array_merge($financialData, [
                     'maintenance_cost' => Maintenance::sum('cost'),
-                    'average_value' => Asset::avg('price'),
                     'maintenance_records' => Maintenance::count(),
-                ];
+                ]);
                 $title = 'LAPORAN KEUANGAN ASET';
                 break;
             default:
@@ -134,13 +132,11 @@ class ReportController extends Controller
                 $title = 'LAPORAN PEMELIHARAAN ASET';
                 break;
             case 'financial':
-                $data = [
-                    'total_assets' => Asset::count(),
-                    'total_value' => Asset::sum('price'),
+                $financialData = $this->calculateFinancialStats();
+                $data = array_merge($financialData, [
                     'maintenance_cost' => Maintenance::sum('cost'),
-                    'average_value' => Asset::avg('price'),
                     'maintenance_records' => Maintenance::count(),
-                ];
+                ]);
                 $title = 'LAPORAN KEUANGAN ASET';
                 break;
             default:
@@ -209,5 +205,28 @@ class ReportController extends Controller
             default:
                 return back()->with('error', 'Jenis laporan tidak valid');
         }
+    }
+
+    /**
+     * Hitung statistik keuangan aset dengan mempertimbangkan batch.
+     * - total_value: sum(harga_batch × 1) untuk setiap unit aset
+     * - average_value: rata-rata nilai per unit aset
+     */
+    private function calculateFinancialStats(): array
+    {
+        // Total nilai = SUM(harga batch) untuk setiap aset yang ada
+        $totalValue = (int) \Illuminate\Support\Facades\DB::table('assets')
+            ->join('asset_batches', 'assets.asset_batch_id', '=', 'asset_batches.id')
+            ->whereNull('assets.deleted_at')
+            ->sum('asset_batches.price');
+
+        $totalAssets = \App\Models\Asset::count();
+        $averageValue = $totalAssets > 0 ? ($totalValue / $totalAssets) : 0;
+
+        return [
+            'total_assets' => $totalAssets,
+            'total_value' => $totalValue,
+            'average_value' => $averageValue,
+        ];
     }
 }

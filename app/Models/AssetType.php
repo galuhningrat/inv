@@ -17,27 +17,12 @@ class AssetType extends Model
 
     public static function getOrdered()
     {
-        $orderedCodes = [
-            'KOM',
-            'JAR',
-            'ELK',
-            'LAB',
-            'MEB',
-            'ARS',
-            'OTO',
-            'TNH',
-            'GDG',
-            'PRS',
-            'FUR',
-            'ATK',
-            'LAN',
-        ];
-
-        return self::all()->sortBy(function ($type) use ($orderedCodes) {
-            $pos = array_search(strtoupper($type->code), $orderedCodes);
-
-            return $pos === false ? 999 : $pos;
-        });
+        // Ambil data berdasarkan relasi kategori, urutkan berdasarkan kode kategori
+        return self::with('category')
+            ->get()
+            ->sortBy(function ($type) {
+                return ($type->category->code ?? 'ZZZ') . '-' . $type->name;
+            });
     }
 
     public static function getSchema($code)

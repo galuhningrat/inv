@@ -4,6 +4,7 @@ namespace App\Exports;
 
 use App\Models\Asset;
 use App\Models\Maintenance;
+use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithTitle;
@@ -12,14 +13,23 @@ class FinancialExport implements FromArray, WithHeadings, WithTitle
 {
     public function array(): array
     {
+        // 🔥 FIX: hitung dari batch, bukan dari kolom price yang sudah dihapus
+        $totalValue = (int) DB::table('assets')
+            ->join('asset_batches', 'assets.asset_batch_id', '=', 'asset_batches.id')
+            ->whereNull('assets.deleted_at')
+            ->sum('asset_batches.price');
+
+        $totalAssets = Asset::count();
+        $averageValue = $totalAssets > 0 ? ($totalValue / $totalAssets) : 0;
+
         return [
             [
                 'Total Aset',
-                Asset::count(),
+                $totalAssets,
             ],
             [
                 'Total Nilai Aset',
-                'Rp ' . number_format(Asset::sum('price'), 0, ',', '.'),
+                'Rp ' . number_format($totalValue, 0, ',', '.'),
             ],
             [
                 'Total Biaya Pemeliharaan',
@@ -27,7 +37,7 @@ class FinancialExport implements FromArray, WithHeadings, WithTitle
             ],
             [
                 'Rata-rata Nilai Aset',
-                'Rp ' . number_format(Asset::avg('price'), 0, ',', '.'),
+                'Rp ' . number_format($averageValue, 0, ',', '.'),
             ],
             [
                 'Jumlah Record Pemeliharaan',

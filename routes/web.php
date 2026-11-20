@@ -66,7 +66,9 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/intangible-assets/{intangibleAsset}', [IntangibleAssetController::class, 'destroy'])->name('intangible-assets.destroy');
 
         // Rute download file privat
-        Route::get('/intangible-assets/{intangibleAsset}/download-certificate', [IntangibleAssetController::class, 'downloadCertificate'])->name('intangible-assets.download-certificate');
+        // Rute download file privat (protected by middleware 'level:assets-inv' di grup atas)
+        Route::get('/intangible-assets/{intangibleAsset}/download-certificate', [IntangibleAssetController::class, 'downloadCertificate'])
+            ->name('intangible-assets.download-certificate');
 
         // API for modal
         Route::get('/api/assets/{asset}/detail', [AssetController::class, 'showModal'])->name('api.assets.detail');
@@ -99,6 +101,13 @@ Route::middleware(['auth'])->group(function () {
 
     // Asset Requests Management
     Route::middleware(['level:requests'])->group(function () {
+        Route::get('/requests/{assetRequest}/procurement', [\App\Http\Controllers\ProcurementOfferController::class, 'index'])->name('procurement.index');
+        Route::get('/requests/{assetRequest}/procurement/create', [\App\Http\Controllers\ProcurementOfferController::class, 'create'])->name('procurement.create');
+        Route::post('/requests/{assetRequest}/procurement', [\App\Http\Controllers\ProcurementOfferController::class, 'store'])->name('procurement.store');
+        Route::post('/procurement/{offer}/select', [\App\Http\Controllers\ProcurementOfferController::class, 'selectVendor'])->name('procurement.select');
+
+        Route::get('/procurement/{offer}/quotation', [\App\Http\Controllers\ProcurementOfferController::class, 'downloadQuotation'])->name('procurement.download-quotation');
+
         Route::get('/requests/create-service/{category?}', [AssetRequestController::class, 'createService'])
             ->name('requests.create-service')
             ->whereIn('category', ['pemeliharaan', 'instalasi', 'pelatihan', 'sewa', 'konsultasi']);

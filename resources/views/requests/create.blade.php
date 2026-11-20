@@ -226,7 +226,7 @@
         <template id="relatedAssetOptionsTemplate">
             <option value="">-- Pilih Aset --</option>
             @foreach ($assets as $a)
-            <option value="{{ $a->id }}">{{ $a->asset_id }} — {{ $a->name }}</option>
+            <option value="{{ $a->id }}">{{ $a->asset_id }} — {{ $a->batch->name ?? '-' }} ({{ $a->serial_number }})</option>
             @endforeach
         </template>
 

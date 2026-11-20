@@ -15,6 +15,21 @@ class IntangibleAsset extends Model
      */
     protected static function booted(): void
     {
+        parent::booted(); 
+        
+        // 🔥 FIX #1: Generate asset_code jika kosong (sebelumnya di-comment)
+        static::creating(function ($asset) {
+            if (empty($asset->asset_code)) {
+                $year = date('Y');
+                $last = self::withTrashed()
+                    ->whereYear('created_at', $year)
+                    ->orderBy('id', 'desc')
+                    ->first();
+                $nextNum = $last ? (int) substr($last->asset_code, -4) + 1 : 1;
+                $asset->asset_code = sprintf('NF/%s/%04d', $year, $nextNum);
+            }
+        });
+
         // 1. Log saat aset dibuat
         static::created(function ($asset) {
             IntangibleAssetLog::create([
@@ -106,8 +121,8 @@ class IntangibleAsset extends Model
 
                 // Format harga
                 if ($key === 'price') {
-                    $oldValue = $oldValue !== null ? 'Rp '.number_format((float) $oldValue, 0, ',', '.') : '-';
-                    $newValue = $newValue !== null ? 'Rp '.number_format((float) $newValue, 0, ',', '.') : '-';
+                    $oldValue = $oldValue !== null ? 'Rp ' . number_format((float) $oldValue, 0, ',', '.') : '-';
+                    $newValue = $newValue !== null ? 'Rp ' . number_format((float) $newValue, 0, ',', '.') : '-';
                 }
 
                 $tracked[$key] = [
@@ -128,7 +143,7 @@ class IntangibleAsset extends Model
                 'user_id' => auth()->id(),
                 'action' => 'updated',
                 'changes' => $tracked,
-                'description' => 'Mengubah: '.implode(', ', $changedLabels),
+                'description' => 'Mengubah: ' . implode(', ', $changedLabels),
             ]);
         });
 
@@ -164,11 +179,30 @@ class IntangibleAsset extends Model
     ];
 
     protected $fillable = [
-        'name', 'description', 'category', 'category_data', 'vendor',
-        'price', 'acquisition_method', 'activation_date', 'funding_source', 'contract_number',
-        'license_type', 'billing_model', 'expiry_date', 'reminder_days',
-        'quota', 'unit_id', 'pic_id', 'access_url', 'certificate_file',
-        'product_key', 'assigned_user_email', 'status', 'created_by', 'asset_request_id',
+        'name',
+        'description',
+        'category',
+        'category_data',
+        'vendor',
+        'price',
+        'acquisition_method',
+        'activation_date',
+        'funding_source',
+        'contract_number',
+        'license_type',
+        'billing_model',
+        'expiry_date',
+        'reminder_days',
+        'quota',
+        'unit_id',
+        'pic_id',
+        'access_url',
+        'certificate_file',
+        'product_key',
+        'assigned_user_email',
+        'status',
+        'created_by',
+        'asset_request_id',
     ];
 
     protected $casts = [

@@ -148,6 +148,11 @@ class AssetRequest extends Model
         return $this->hasMany(AssetRequestItem::class);
     }
 
+    public function procurementOffers()
+    {
+        return $this->hasMany(ProcurementOffer::class);
+    }
+
     /**
      * Item jasa yang diajukan pada dokumen ini (Fase 3).
      */
@@ -172,7 +177,7 @@ class AssetRequest extends Model
 
     public function getServiceTotalAttribute()
     {
-        return $this->serviceItems->sum(fn ($item) => $item->subtotal);
+        return $this->serviceItems->sum(fn($item) => $item->subtotal);
     }
 
     public function getAllItemsAttribute()
@@ -221,19 +226,19 @@ class AssetRequest extends Model
     {
         $assetApproved = $this->items
             ->where('approval_status', 'approved')
-            ->sum(fn ($item) => $item->subtotal);
+            ->sum(fn($item) => $item->subtotal);
 
         $serviceApproved = $this->serviceItems
             ->where('approval_status', 'approved')
-            ->sum(fn ($item) => $item->subtotal);
+            ->sum(fn($item) => $item->subtotal);
 
         return $assetApproved + $serviceApproved;
     }
 
     public function getTotalEstimatedPriceAttribute()
     {
-        return $this->items->sum(fn ($item) => $item->subtotal)
-            + $this->serviceItems->sum(fn ($item) => $item->subtotal);
+        return $this->items->sum(fn($item) => $item->subtotal)
+            + $this->serviceItems->sum(fn($item) => $item->subtotal);
     }
 
     public function getTotalQuantityAttribute()
@@ -257,7 +262,7 @@ class AssetRequest extends Model
     {
         if (
             $this->status === 'Pending' &&
-            $this->items->contains(fn ($item) => ! is_null($item->rolled_from_item_id))
+            $this->items->contains(fn($item) => ! is_null($item->rolled_from_item_id))
         ) {
             return 'Menunggu Verifikasi PJ Pengadaan untuk Pengadaan Bulan Berikutnya';
         }

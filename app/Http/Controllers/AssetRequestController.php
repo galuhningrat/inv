@@ -63,7 +63,8 @@ class AssetRequestController extends Controller
         $priorities = ['Normal', 'Mendesak', 'Sangat Mendesak'];
 
         $assets = $category === 'pemeliharaan'
-            ? Asset::orderBy('name')->get()
+            ? Asset::with('batch')->whereHas('batch')->get()
+            ->sortBy(fn($a) => $a->batch->name ?? '')->values()
             : collect();
 
         return view('requests.create-service', compact(
@@ -198,7 +199,11 @@ class AssetRequestController extends Controller
         $assetTypes = AssetType::all();
         $priorities = ['Normal', 'Mendesak', 'Sangat Mendesak'];
         $alasanOptions = ['Pengadaan Baru', 'Penggantian', 'Pengisian Kembali'];
-        $assets = Asset::orderBy('name')->get();
+        $assets = Asset::with('batch')
+            ->whereHas('batch')
+            ->get()
+            ->sortBy(fn($a) => $a->batch->name ?? '')
+            ->values();
 
         $canChooseUnit = in_array($user->level, ['Sarpras', 'Admin']);
         $units = $canChooseUnit
@@ -496,8 +501,8 @@ class AssetRequestController extends Controller
         if (Auth::user()->level !== 'Sarpras' && Auth::user()->level !== 'Admin') {
             abort(403, 'Hanya Bagian Sarpras yang dapat melakukan registrasi aset.');
         }
-        if ($assetRequest->status !== 'Dikonfirmasi') {
-            return redirect()->route('requests.index')->with('error', 'Barang belum dikonfirmasi diterima secara fisik.');
+        if (! in_array($assetRequest->status, ['Dikonfirmasi', 'Diterima Sebagian'])) {
+            return redirect()->route('requests.index')->with('error', 'Barang belum dikonfirmasi atau sudah selesai diterima.');
         }
 
         $assetRequest->load([
@@ -526,10 +531,13 @@ class AssetRequestController extends Controller
                 $rules["receipt_notes.{$item->id}"] = 'nullable|string|max:1000';
                 $rules["receipt_proof_files.{$item->id}"] = 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120';
             } elseif ($item->item_type === 'Fisik') {
+                $rules["received_quantities.{$item->id}"] = 'nullable|integer|min:0|max:' . $item->quantity;
                 $rules["brand.{$item->id}"] = 'required|string|max:255';
-                $rules["model.{$item->id}"] = 'nullable|string|max:255'; // TAMBAHAN: Model
+                $rules["model.{$item->id}"] = 'nullable|string|max:255';
                 $rules["prices.{$item->id}"] = 'required|numeric|min:0';
-                for ($i = 0; $i < $item->quantity; $i++) {
+                // 🔥 Validasi hanya sejumlah yang diterima (bukan semua quantity)
+                $receivedQty = (int) ($request->input("received_quantities.{$item->id}") ?? $item->quantity);
+                for ($i = 0; $i < $receivedQty; $i++) {
                     $rules["images.{$item->id}.{$i}"] = 'required|image|mimes:jpg,jpeg,png,webp|max:2048';
                     $rules["serial_numbers.{$item->id}.{$i}"] = 'required|string|distinct|unique:assets,serial_number';
                     $rules["conditions.{$item->id}.{$i}"] = 'required|in:Baik,Rusak Ringan,Rusak Berat';
@@ -543,14 +551,15 @@ class AssetRequestController extends Controller
                 $rules["funding_sources.{$item->id}"] = 'nullable|string|max:255';
                 $rules["contract_numbers.{$item->id}"] = 'nullable|string|max:255';
                 $rules["license_types.{$item->id}"] = 'required|in:Berlangganan,Selamanya';
-                $rules["expiry_dates.{$item->id}"] = 'required_if:license_types.' . $item->id . ',Berlangganan|nullable|date';
+                // 🔥 FIX #2: expiry_date wajib >= purchase_date
+                $rules["expiry_dates.{$item->id}"] = 'required_if:license_types.' . $item->id . ',Berlangganan|nullable|date|after_or_equal:purchase_date';
                 $rules["reminder_days.{$item->id}"] = 'nullable|in:30,14,7';
                 $rules["access_urls.{$item->id}"] = 'nullable|url|max:255';
                 $rules["certificate_files.{$item->id}"] = 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120';
-                for ($i = 0; $i < $item->quantity; $i++) {
-                    $rules["product_keys.{$item->id}.{$i}"] = 'nullable|string|max:255';
-                    $rules["assigned_emails.{$item->id}.{$i}"] = 'nullable|email|max:255';
-                }
+                // 🔥 FIX #4: product_keys harus distinct (tidak boleh ada duplikat dalam 1 item)
+                $rules["product_keys.{$item->id}"] = 'nullable|array';
+                $rules["product_keys.{$item->id}.*"] = 'nullable|string|max:255|distinct';
+                $rules["assigned_emails.{$item->id}.*"] = 'nullable|email|max:255';
             }
         }
 
@@ -565,14 +574,28 @@ class AssetRequestController extends Controller
 
             foreach ($assetRequest->items as $item) {
                 if ($item->isLightReceipt()) {
+                    // 🔥 FIX #3: simpan ke disk 'local' (private)
                     $proofPath = $request->hasFile("receipt_proof_files.{$item->id}")
-                        ? $request->file("receipt_proof_files.{$item->id}")->store('receipt-proofs', 'public')
+                        ? $request->file("receipt_proof_files.{$item->id}")->store('receipt-proofs', 'local')
                         : null;
 
+                    // 🔥 FIX #3: akumulasi received_quantity (bukan replace)
+                    $newQty = (int) ($validated['received_quantities'][$item->id] ?? $item->quantity);
+                    $existingQty = (int) ($item->received_quantity ?? 0);
+                    $cumulativeQty = $existingQty + $newQty;
+
                     $item->update([
-                        'received_quantity' => $validated['received_quantities'][$item->id] ?? $item->quantity,
-                        'receipt_notes' => $validated['receipt_notes'][$item->id] ?? null,
-                        'receipt_proof_file' => $proofPath,
+                        'received_quantity' => $cumulativeQty,
+                        'receipt_notes' => $validated['receipt_notes'][$item->id] ?? $item->receipt_notes,
+                        'receipt_proof_file' => $proofPath ?? $item->receipt_proof_file,
+                    ]);
+
+                    \App\Models\LightReceiptLog::create([
+                        'asset_request_item_id' => $item->id,
+                        'received_quantity'     => $newQty,
+                        'proof_file'            => $proofPath,
+                        'notes'                 => $validated['receipt_notes'][$item->id] ?? null,
+                        'received_by'           => \Illuminate\Support\Facades\Auth::id(),
                     ]);
                 } elseif ($item->item_type === 'Fisik') {
 
@@ -586,7 +609,10 @@ class AssetRequestController extends Controller
                         'purchase_date' => $validated['purchase_date'],
                     ]);
 
-                    for ($i = 0; $i < $item->quantity; $i++) {
+                    // 🔥 Hanya buat aset sejumlah yang diterima
+                    $receivedQty = (int) ($validated['received_quantities'][$item->id] ?? $item->quantity);
+
+                    for ($i = 0; $i < $receivedQty; $i++) {
                         $unitImagePath = $request->file("images.{$item->id}.{$i}")->store('assets', 'public');
 
                         // 2. SIMPAN UNIT
@@ -611,7 +637,7 @@ class AssetRequestController extends Controller
                     }
                 } else {
                     $certificatePath = $request->hasFile("certificate_files.{$item->id}")
-                        ? $request->file("certificate_files.{$item->id}")->store('intangible-certificates', 'public')
+                        ? $request->file("certificate_files.{$item->id}")->store('intangible-certificates', 'local')  // ✅
                         : null;
 
                     for ($i = 0; $i < $item->quantity; $i++) {
@@ -665,7 +691,24 @@ class AssetRequestController extends Controller
                 }
             }
 
-            $assetRequest->update(['status' => 'Diterima']);
+            // Refresh item dari DB agar received_quantity akurat
+            $allItemsFull = true;
+            foreach ($assetRequest->items()->get() as $item) {
+                if ($item->isLightReceipt()) {
+                    if ((int) ($item->received_quantity ?? 0) < (int) $item->quantity) {
+                        $allItemsFull = false;
+                        break;
+                    }
+                } elseif ($item->item_type === 'Fisik') {
+                    $received = (int) ($validated['received_quantities'][$item->id] ?? $item->quantity);
+                    if ($received < (int) $item->quantity) {
+                        $allItemsFull = false;
+                        break;
+                    }
+                }
+            }
+
+            $assetRequest->update(['status' => $allItemsFull ? 'Diterima' : 'Diterima Sebagian']);
             DB::commit();
 
             return redirect()->route('requests.index')

@@ -88,4 +88,38 @@ class Maintenance extends Model
     {
         return $this->status === 'Menunggu Verifikasi';
     }
+
+    protected static function booted()
+    {
+        // 1. Log saat tiket baru dibuat
+        static::created(function ($maintenance) {
+            MaintenanceLog::create([
+                'maintenance_id' => $maintenance->id,
+                'user_id' => auth()->id() ?? 1,
+                'action' => 'created',
+                'new_status' => $maintenance->status,
+                'notes' => 'Laporan kerusakan dibuat.',
+            ]);
+        });
+
+        // 2. Log saat status berubah (verifikasi / proses / selesai)
+        static::updated(function ($maintenance) {
+            if ($maintenance->isDirty('status')) {
+                MaintenanceLog::create([
+                    'maintenance_id' => $maintenance->id,
+                    'user_id' => auth()->id() ?? 1,
+                    'action' => 'status_changed',
+                    'old_status' => $maintenance->getOriginal('status'),
+                    'new_status' => $maintenance->status,
+                    'notes' => $maintenance->verification_notes ?? 'Status diperbarui.',
+                ]);
+            }
+        });
+    }
+
+    // Tambahkan relasi di bagian bawah model
+    public function logs()
+    {
+        return $this->hasMany(MaintenanceLog::class)->latest();
+    }
 }

@@ -141,5 +141,38 @@
         @endcan
         @endif
     </div>
+
+    {{-- ===== BAGIAN AUDIT TRAIL (CELAH 4) ===== --}}
+    <hr style="margin: 2rem 0;">
+    <h4 style="margin-bottom: 1rem;">📜 Riwayat Aktivitas (Audit Trail)</h4>
+    <div style="background: #f8fafc; border-radius: 8px; padding: 1.5rem;">
+        <div style="position: relative; padding-left: 2rem; border-left: 2px solid #cbd5e1;">
+            @forelse($maintenance->logs as $log)
+            <div style="margin-bottom: 1.5rem; position: relative;">
+                {{-- Titik penanda --}}
+                <div style="position: absolute; left: -2.4rem; top: 0.25rem; width: 12px; height: 12px; border-radius: 50%; background: #3b82f6;"></div>
+
+                <p style="margin: 0; font-weight: 600; color: #1e293b;">
+                    {{ $log->user->name ?? 'Sistem' }} <span style="font-weight: normal; color: #64748b;">({{ $log->user->level ?? '-' }})</span>
+                </p>
+                <p style="margin: 0; font-size: 0.85rem; color: #64748b;">
+                    {{ $log->created_at->format('d F Y H:i') }}
+                </p>
+                <p style="margin: 0.5rem 0 0; font-size: 0.9rem;">
+                    @if($log->action === 'created')
+                    Membuat laporan pemeliharaan.
+                    @else
+                    Mengubah status dari <strong>{{ $log->old_status }}</strong> menjadi <strong>{{ $log->new_status }}</strong>.
+                    @endif
+                    @if($log->notes)
+                    <br><em style="color: #475569;">"{{ $log->notes }}"</em>
+                    @endif
+                </p>
+            </div>
+            @empty
+            <p style="color: var(--text-secondary);">Belum ada riwayat aktivitas.</p>
+            @endforelse
+        </div>
+    </div>
 </div>
 @endsection

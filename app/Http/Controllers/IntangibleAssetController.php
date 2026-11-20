@@ -82,8 +82,8 @@ class IntangibleAssetController extends Controller
 
         $availableRequests = \App\Models\AssetRequest::query()
             ->whereIn('status', ['Dikonfirmasi', 'Diterima', 'Selesai'])
-            ->whereHas('items', fn ($q) => $q->where('item_type', 'non-fisik'))
-            ->with(['items' => fn ($q) => $q->where('item_type', 'non-fisik')])
+            ->whereHas('items', fn($q) => $q->where('item_type', 'non-fisik'))
+            ->with(['items' => fn($q) => $q->where('item_type', 'non-fisik')])
             ->withCount(['intangibleAssets as linked_count'])
             ->orderBy('created_at', 'desc')
             ->limit(50)
@@ -124,8 +124,10 @@ class IntangibleAssetController extends Controller
             'license_type' => ['required', Rule::in(array_keys($schema['license_types'] ?? []))],
             'billing_model' => ['nullable', Rule::in(array_keys($schema['billing_models'] ?? []))],
             'expiry_date' => [
-                'nullable', 'date', 'after:activation_date',
-                Rule::requiredIf(fn () => in_array($request->input('license_type'), ['Subscription', 'Registered Right'])),
+                'nullable',
+                'date',
+                'after:activation_date',
+                Rule::requiredIf(fn() => in_array($request->input('license_type'), ['Subscription', 'Registered Right'])),
             ],
             'reminder_days' => 'nullable|in:30,14,7',
             'quota' => 'nullable|string|max:100',
@@ -135,7 +137,7 @@ class IntangibleAssetController extends Controller
             ],
             'pic_id' => [
                 'nullable',
-                Rule::exists('users', 'id')->where(fn ($query) => $query->whereNull('deleted_at')),
+                Rule::exists('users', 'id')->where(fn($query) => $query->whereNull('deleted_at')),
             ],
             'access_url' => 'nullable|url|max:255',
             'status' => 'required|in:Aktif,Belum Aktif,Ditangguhkan,Dihentikan,Kadaluarsa',
@@ -151,11 +153,18 @@ class IntangibleAssetController extends Controller
         ];
 
         $attributes = [
-            'name' => 'Nama Aset', 'category' => 'Kategori', 'vendor' => 'Vendor',
-            'price' => 'Harga Perolehan', 'activation_date' => 'Tanggal Perolehan',
-            'funding_source' => 'Sumber Pendanaan', 'license_type' => 'Jenis Lisensi',
-            'expiry_date' => 'Tanggal Kedaluwarsa', 'unit_id' => 'Unit Pengelola',
-            'pic_id' => 'PIC', 'status' => 'Status', 'certificate_file' => 'File Sertifikat',
+            'name' => 'Nama Aset',
+            'category' => 'Kategori',
+            'vendor' => 'Vendor',
+            'price' => 'Harga Perolehan',
+            'activation_date' => 'Tanggal Perolehan',
+            'funding_source' => 'Sumber Pendanaan',
+            'license_type' => 'Jenis Lisensi',
+            'expiry_date' => 'Tanggal Kedaluwarsa',
+            'unit_id' => 'Unit Pengelola',
+            'pic_id' => 'PIC',
+            'status' => 'Status',
+            'certificate_file' => 'File Sertifikat',
             'asset_request_id' => 'Permintaan Pengadaan',
         ];
 
@@ -175,7 +184,7 @@ class IntangibleAssetController extends Controller
                     $rule .= '|url';
                 }
                 if ($field['type'] === 'select') {
-                    $rule .= '|in:'.implode(',', array_keys($field['options']));
+                    $rule .= '|in:' . implode(',', array_keys($field['options']));
                 }
 
                 $rules["category_data.{$key}"] = $rule;
@@ -246,7 +255,7 @@ class IntangibleAssetController extends Controller
 
                 // 🔥 FIX UTAMA: Jangan pakai create(), tapi set manual
                 $asset = new IntangibleAsset($validated);
-                $asset->asset_code = $prefix.str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+                $asset->asset_code = $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
                 $asset->save();
 
                 DB::commit();
@@ -257,7 +266,6 @@ class IntangibleAssetController extends Controller
                 }
 
                 return redirect()->route('intangible-assets.index')->with('success', $successMsg);
-
             } catch (\Illuminate\Database\QueryException $e) {
                 DB::rollBack();
                 if ($uploadedFilePath && Storage::disk('local')->exists($uploadedFilePath)) {
@@ -270,7 +278,7 @@ class IntangibleAssetController extends Controller
                     }
                     usleep(500000);
                 } else {
-                    return back()->withInput()->with('error', 'Gagal menambahkan aset: '.$e->getMessage());
+                    return back()->withInput()->with('error', 'Gagal menambahkan aset: ' . $e->getMessage());
                 }
             } catch (\Exception $e) {
                 DB::rollBack();
@@ -278,7 +286,7 @@ class IntangibleAssetController extends Controller
                     Storage::disk('local')->delete($uploadedFilePath);
                 }
 
-                return back()->withInput()->with('error', 'Gagal menambahkan aset: '.$e->getMessage());
+                return back()->withInput()->with('error', 'Gagal menambahkan aset: ' . $e->getMessage());
             }
         }
     }
@@ -294,8 +302,8 @@ class IntangibleAssetController extends Controller
 
         $availableRequests = \App\Models\AssetRequest::query()
             ->whereIn('status', ['Dikonfirmasi', 'Diterima', 'Selesai'])
-            ->whereHas('items', fn ($q) => $q->where('item_type', 'non-fisik'))
-            ->with(['items' => fn ($q) => $q->where('item_type', 'non-fisik')])
+            ->whereHas('items', fn($q) => $q->where('item_type', 'non-fisik'))
+            ->with(['items' => fn($q) => $q->where('item_type', 'non-fisik')])
             ->withCount(['intangibleAssets as linked_count'])
             ->orderBy('created_at', 'desc')
             ->limit(50)
@@ -339,8 +347,10 @@ class IntangibleAssetController extends Controller
             'license_type' => ['required', Rule::in(array_keys($schema['license_types'] ?? []))],
             'billing_model' => ['nullable', Rule::in(array_keys($schema['billing_models'] ?? []))],
             'expiry_date' => [
-                'nullable', 'date', 'after:activation_date',
-                Rule::requiredIf(fn () => in_array($request->input('license_type'), ['Subscription', 'Registered Right'])),
+                'nullable',
+                'date',
+                'after:activation_date',
+                Rule::requiredIf(fn() => in_array($request->input('license_type'), ['Subscription', 'Registered Right'])),
             ],
             'reminder_days' => 'nullable|in:30,14,7',
             'quota' => 'nullable|string|max:100',
@@ -350,7 +360,7 @@ class IntangibleAssetController extends Controller
             ],
             'pic_id' => [
                 'nullable',
-                Rule::exists('users', 'id')->where(fn ($query) => $query->whereNull('deleted_at')),
+                Rule::exists('users', 'id')->where(fn($query) => $query->whereNull('deleted_at')),
             ],
             'access_url' => 'nullable|url|max:255',
             'status' => 'required|in:Aktif,Belum Aktif,Ditangguhkan,Dihentikan,Kadaluarsa',
@@ -366,11 +376,18 @@ class IntangibleAssetController extends Controller
         ];
 
         $attributes = [
-            'name' => 'Nama Aset', 'category' => 'Kategori', 'vendor' => 'Vendor',
-            'price' => 'Harga Perolehan', 'activation_date' => 'Tanggal Perolehan',
-            'funding_source' => 'Sumber Pendanaan', 'license_type' => 'Jenis Lisensi',
-            'expiry_date' => 'Tanggal Kedaluwarsa', 'unit_id' => 'Unit Pengelola',
-            'pic_id' => 'PIC', 'status' => 'Status', 'certificate_file' => 'File Sertifikat',
+            'name' => 'Nama Aset',
+            'category' => 'Kategori',
+            'vendor' => 'Vendor',
+            'price' => 'Harga Perolehan',
+            'activation_date' => 'Tanggal Perolehan',
+            'funding_source' => 'Sumber Pendanaan',
+            'license_type' => 'Jenis Lisensi',
+            'expiry_date' => 'Tanggal Kedaluwarsa',
+            'unit_id' => 'Unit Pengelola',
+            'pic_id' => 'PIC',
+            'status' => 'Status',
+            'certificate_file' => 'File Sertifikat',
             'asset_request_id' => 'Permintaan Pengadaan',
         ];
 
@@ -390,7 +407,7 @@ class IntangibleAssetController extends Controller
                     $rule .= '|url';
                 }
                 if ($field['type'] === 'select') {
-                    $rule .= '|in:'.implode(',', array_keys($field['options']));
+                    $rule .= '|in:' . implode(',', array_keys($field['options']));
                 }
 
                 $rules["category_data.{$key}"] = $rule;
@@ -463,7 +480,7 @@ class IntangibleAssetController extends Controller
                 Storage::disk('local')->delete($newFilePath);
             }
 
-            return back()->withInput()->with('error', 'Gagal update aset: '.$e->getMessage());
+            return back()->withInput()->with('error', 'Gagal update aset: ' . $e->getMessage());
         }
 
         return redirect()->route('intangible-assets.show', $intangibleAsset)
@@ -514,4 +531,4 @@ class IntangibleAssetController extends Controller
 
         abort(404, 'File tidak ditemukan di server.');
     }
-}
+} 

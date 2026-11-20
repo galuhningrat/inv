@@ -77,6 +77,15 @@ class AssetRequestItem extends Model
         'bast_file',
         'executor',
         'actual_cost',
+        'item_type',
+        'sifat_barang',
+        'asset_type_id',
+        'category',
+        'related_asset_id',
+        'received_quantity',
+        'receipt_notes',
+        'receipt_proof_file',
+        'image',
     ];
 
     protected $casts = [

@@ -60,19 +60,20 @@ class Asset extends Model
         return DB::transaction(function () use ($assetTypeId, $unitId) {
             $type = AssetType::with('category')->findOrFail($assetTypeId);
 
-            // 1. Ambil Prefix Kategori Utama (3 Huruf)
+            // 1. Prefix Kategori Utama (null-safe, fallback 'OTH' kalau tidak ada)
             $categoryCode = $type->category?->code ?? 'OTH';
 
-            // 2. Ambil Kode Unit (TI, TE, TM, UM)
+            // 2. Kode Unit dari field asset_id_code (bukan kolom 'code' lama)
+            //    Fallback ke 'UM' jika unit tidak ada atau asset_id_code null/kosong
             $unit = $unitId ? Unit::find($unitId) : null;
-            $unitCode = $unit ? $unit->asset_id_code : 'UM';
+            $unitCode = $unit?->asset_id_code ?: 'UM';
 
             $year = date('Y');
 
             // Format: PREFIX/TAHUN/KODEUNIT/
             $prefix = "{$categoryCode}/{$year}/{$unitCode}/";
 
-            // Cari urutan terakhir
+            // Cari nomor urut terakhir dengan prefix sama (lock untuk concurrency safety)
             $lastAsset = self::withTrashed()
                 ->where('asset_id', 'LIKE', "{$prefix}%")
                 ->lockForUpdate()
